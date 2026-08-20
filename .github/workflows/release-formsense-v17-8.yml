@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - ".github/workflows/release-formsense-v17-8.yml"
+  workflow_dispatch:
 
 permissions:
   contents: write
