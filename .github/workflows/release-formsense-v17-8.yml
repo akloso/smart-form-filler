@@ -3,8 +3,6 @@ name: Release Smart FormSense v17.8.0
 on:
   push:
     branches: [main]
-    paths:
-      - ".github/workflows/release-formsense-v17-8.yml"
   workflow_dispatch:
 
 permissions:
@@ -44,8 +42,9 @@ jobs:
           set -euo pipefail
           rm -f .github/release/formsense_v17_8.part*
           rmdir .github/release 2>/dev/null || true
+          rm -f .github/workflows/release-formsense-v17-8.yml
           git config user.name "Smart FormSense Release"
           git config user.email "actions@users.noreply.github.com"
           git add -A
-          git commit -m "Release Smart FormSense v17.8.0"
+          git commit -m "Release Smart FormSense v17.8.0 [skip ci]"
           git push origin HEAD:main
