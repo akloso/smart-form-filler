@@ -37,16 +37,121 @@ jobs:
           echo "Decoded patch size: $(wc -c < /tmp/formsense_v17_8.patch) bytes"
           head -n 5 /tmp/formsense_v17_8.patch
 
-          # The generated patch has inaccurate hunk line counts around one large
-          # userscript section. --recount tells git to infer the real hunk sizes
-          # from the patch body instead of rejecting it as malformed.
-          git init -q
-          git apply --recount --check /tmp/formsense_v17_8.patch
-          git apply --recount /tmp/formsense_v17_8.patch
+          # The prepared patch contains inaccurate hunk metadata. Apply each hunk
+          # by matching its actual old-text block against the untouched source,
+          # rather than trusting the generated line counts/offsets.
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+
+          patch_path = Path('/tmp/formsense_v17_8.patch')
+          patch_lines = patch_path.read_text(encoding='utf-8').splitlines(keepends=True)
+
+          file_sections = []
+          i = 0
+          while i < len(patch_lines):
+              line = patch_lines[i]
+              if not line.startswith('diff --git a/'):
+                  i += 1
+                  continue
+
+              m = re.match(r'diff --git a/(.+) b/(.+)\n?$', line)
+              if not m:
+                  raise RuntimeError(f'Cannot parse diff header: {line!r}')
+              old_path, new_path = m.group(1), m.group(2)
+              i += 1
+              hunks = []
+
+              while i < len(patch_lines) and not patch_lines[i].startswith('diff --git a/'):
+                  if not patch_lines[i].startswith('@@ '):
+                      i += 1
+                      continue
+
+                  header = patch_lines[i]
+                  hm = re.match(r'@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@', header)
+                  if not hm:
+                      raise RuntimeError(f'Cannot parse hunk header: {header!r}')
+                  old_start = int(hm.group(1))
+                  new_start = int(hm.group(3))
+                  i += 1
+                  body = []
+
+                  while i < len(patch_lines):
+                      candidate = patch_lines[i]
+                      if candidate.startswith('@@ ') or candidate.startswith('diff --git a/'):
+                          break
+                      if candidate.startswith((' ', '+', '-', '\\')):
+                          body.append(candidate)
+                          i += 1
+                          continue
+                      # Diff metadata between hunks belongs to the section, not the hunk.
+                      break
+
+                  hunks.append((old_start, new_start, body, header.rstrip()))
+
+              file_sections.append((old_path, new_path, hunks))
+
+          def find_sequence(haystack, needle, expected):
+              if not needle:
+                  return max(0, min(expected, len(haystack)))
+              first = needle[0]
+              candidates = []
+              limit = len(haystack) - len(needle) + 1
+              for pos in range(max(0, limit)):
+                  if haystack[pos] != first:
+                      continue
+                  if haystack[pos:pos + len(needle)] == needle:
+                      candidates.append(pos)
+              if not candidates:
+                  return None
+              return min(candidates, key=lambda pos: abs(pos - expected))
+
+          for old_path, new_path, hunks in file_sections:
+              target = Path(new_path)
+              if not target.exists():
+                  raise RuntimeError(f'Target file does not exist: {new_path}')
+
+              original = target.read_text(encoding='utf-8').splitlines(keepends=True)
+              replacements = []
+
+              for old_start, new_start, body, header in hunks:
+                  old_block = [ln[1:] for ln in body if ln and ln[0] in (' ', '-')]
+                  new_block = [ln[1:] for ln in body if ln and ln[0] in (' ', '+')]
+                  expected = max(0, old_start - 1)
+                  pos = find_sequence(original, old_block, expected)
+
+                  if pos is None:
+                      context = [ln[1:] for ln in body if ln.startswith(' ')]
+                      preview = ''.join(context[:8])
+                      raise RuntimeError(
+                          f'Unable to locate old block for {new_path} hunk {header}. '
+                          f'Context preview:\n{preview}'
+                      )
+
+                  replacements.append((pos, pos + len(old_block), new_block, header))
+
+              replacements.sort(key=lambda item: item[0])
+              previous_end = -1
+              for start, end, _, header in replacements:
+                  if start < previous_end:
+                      raise RuntimeError(
+                          f'Overlapping hunks in {new_path}; cannot safely apply {header}'
+                      )
+                  previous_end = end
+
+              updated = original[:]
+              for start, end, new_block, header in reversed(replacements):
+                  updated[start:end] = new_block
+
+              target.write_text(''.join(updated), encoding='utf-8')
+              print(f'Applied {len(hunks)} hunks to {new_path}')
+          PY
 
           node --check Smart_Form_Filler.user.js
           grep -Fq "// @name         Smart FormSense" Smart_Form_Filler.user.js
           grep -Fq "// @version      17.8.0" Smart_Form_Filler.user.js
+          grep -Fq "Intelligent Form Filling & QA Testing" Smart_Form_Filler.user.js
+          grep -Fq "Run QA Audit" Smart_Form_Filler.user.js
 
           if grep -En '\.(submit|requestSubmit)[[:space:]]*\(' Smart_Form_Filler.user.js; then
             echo "Unexpected final-submit API found."
