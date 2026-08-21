@@ -16,6 +16,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
+          set -x
 
           mkdir -p work/.github/release
           cd work
@@ -33,9 +34,11 @@ jobs:
           cat .github/release/formsense_v17_8.part* > /tmp/formsense_v17_8.patch.b64
           base64 --decode /tmp/formsense_v17_8.patch.b64 > /tmp/formsense_v17_8.patch
 
-          git init -q
-          git apply --check /tmp/formsense_v17_8.patch
-          git apply /tmp/formsense_v17_8.patch
+          echo "Decoded patch size: $(wc -c < /tmp/formsense_v17_8.patch) bytes"
+          head -n 5 /tmp/formsense_v17_8.patch
+
+          patch --batch --forward --dry-run -p1 < /tmp/formsense_v17_8.patch
+          patch --batch --forward -p1 < /tmp/formsense_v17_8.patch
 
           node --check Smart_Form_Filler.user.js
           grep -Fq "// @name         Smart FormSense" Smart_Form_Filler.user.js
