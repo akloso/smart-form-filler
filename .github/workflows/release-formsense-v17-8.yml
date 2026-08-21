@@ -37,8 +37,12 @@ jobs:
           echo "Decoded patch size: $(wc -c < /tmp/formsense_v17_8.patch) bytes"
           head -n 5 /tmp/formsense_v17_8.patch
 
-          patch --batch --forward --dry-run -p1 < /tmp/formsense_v17_8.patch
-          patch --batch --forward -p1 < /tmp/formsense_v17_8.patch
+          # The generated patch has inaccurate hunk line counts around one large
+          # userscript section. --recount tells git to infer the real hunk sizes
+          # from the patch body instead of rejecting it as malformed.
+          git init -q
+          git apply --recount --check /tmp/formsense_v17_8.patch
+          git apply --recount /tmp/formsense_v17_8.patch
 
           node --check Smart_Form_Filler.user.js
           grep -Fq "// @name         Smart FormSense" Smart_Form_Filler.user.js
