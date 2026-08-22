@@ -60,15 +60,21 @@ jobs:
           test "$(grep -c 'commitSelectedRadioGroups' Smart_Form_Filler.user.js)" -eq 1
 
           sha="$(gh api "repos/${GITHUB_REPOSITORY}/contents/Smart_Form_Filler.user.js?ref=main" --jq '.sha')"
-          encoded="$(base64 -w0 Smart_Form_Filler.user.js)"
+
+          # Keep the large base64 payload out of command-line arguments.
+          # The v17.8 userscript is ~356 KB, so passing its encoded contents via
+          # `jq --arg` exceeds Linux ARG_MAX. Read it from a temporary file instead.
+          base64 -w0 Smart_Form_Filler.user.js > /tmp/content.b64
 
           jq -n \
             --arg message "Release Smart FormSense v17.8.0" \
-            --arg content "$encoded" \
             --arg sha "$sha" \
             --arg branch "main" \
+            --rawfile content /tmp/content.b64 \
             '{message:$message,content:$content,sha:$sha,branch:$branch}' \
             > /tmp/payload.json
+
+          jq -e '.message == "Release Smart FormSense v17.8.0" and .branch == "main" and (.content | length) > 400000' /tmp/payload.json >/dev/null
 
           gh api \
             --method PUT \
