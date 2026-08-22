@@ -1,7 +1,10 @@
-name: Release Smart FormSense v17.8.0
+name: One-time Smart FormSense v17.8 direct release
 
 on:
-  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/release-formsense-v17-8.yml"
 
 permissions:
   contents: write
@@ -10,148 +13,42 @@ jobs:
   release:
     runs-on: ubuntu-latest
     steps:
-      - name: Build, validate and publish release
+      - name: Build validated v17.8 from production source and publish
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          set -x
 
-          mkdir -p work/.github/release
+          mkdir work
           cd work
-
           base="https://raw.githubusercontent.com/${GITHUB_REPOSITORY}/main"
 
           curl -fsSL "$base/Smart_Form_Filler.user.js" -o Smart_Form_Filler.user.js
-          curl -fsSL "$base/README.md" -o README.md
-          curl -fsSL "$base/CHANGELOG.md" -o CHANGELOG.md
+          curl -fsSL "$base/.github/release-direct/builder.gz.b64.00" -o builder.00
+          curl -fsSL "$base/.github/release-direct/builder.gz.b64.01" -o builder.01
+          curl -fsSL "$base/.github/release-direct/builder.gz.b64.02" -o builder.02
 
-          for i in 00 01 02 03 04 05 06 07; do
-            curl -fsSL "$base/.github/release/formsense_v17_8.part${i}" -o ".github/release/formsense_v17_8.part${i}"
-          done
+          cat builder.00 builder.01 builder.02 > builder.gz.b64
+          echo "0b73b9a3a5ae7d2cbb7f82a2666a1b45447f1ad5720157c75ad938f02769ee22  builder.gz.b64" | sha256sum -c -
 
-          cat .github/release/formsense_v17_8.part* > /tmp/formsense_v17_8.patch.b64
-          base64 --decode /tmp/formsense_v17_8.patch.b64 > /tmp/formsense_v17_8.patch
+          base64 --decode builder.gz.b64 > builder.py.gz
+          gzip --decompress --stdout builder.py.gz > build_formsense_17_8.py
+          echo "d06d30cbd67d7b50e23bf87bb04cf7512733c313b625c5c5fe871854acb9d30f  build_formsense_17_8.py" | sha256sum -c -
 
-          echo "Decoded patch size: $(wc -c < /tmp/formsense_v17_8.patch) bytes"
-          head -n 5 /tmp/formsense_v17_8.patch
-
-          # The prepared patch contains inaccurate hunk metadata. Apply each hunk
-          # by matching its actual old-text block against the untouched source,
-          # rather than trusting the generated line counts/offsets.
-          python3 - <<'PY'
-          from pathlib import Path
-          import re
-
-          patch_path = Path('/tmp/formsense_v17_8.patch')
-          patch_lines = patch_path.read_text(encoding='utf-8').splitlines(keepends=True)
-
-          file_sections = []
-          i = 0
-          while i < len(patch_lines):
-              line = patch_lines[i]
-              if not line.startswith('diff --git a/'):
-                  i += 1
-                  continue
-
-              m = re.match(r'diff --git a/(.+) b/(.+)\n?$', line)
-              if not m:
-                  raise RuntimeError(f'Cannot parse diff header: {line!r}')
-              old_path, new_path = m.group(1), m.group(2)
-              i += 1
-              hunks = []
-
-              while i < len(patch_lines) and not patch_lines[i].startswith('diff --git a/'):
-                  if not patch_lines[i].startswith('@@ '):
-                      i += 1
-                      continue
-
-                  header = patch_lines[i]
-                  hm = re.match(r'@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@', header)
-                  if not hm:
-                      raise RuntimeError(f'Cannot parse hunk header: {header!r}')
-                  old_start = int(hm.group(1))
-                  new_start = int(hm.group(3))
-                  i += 1
-                  body = []
-
-                  while i < len(patch_lines):
-                      candidate = patch_lines[i]
-                      if candidate.startswith('@@ ') or candidate.startswith('diff --git a/'):
-                          break
-                      if candidate.startswith((' ', '+', '-', '\\')):
-                          body.append(candidate)
-                          i += 1
-                          continue
-                      # Diff metadata between hunks belongs to the section, not the hunk.
-                      break
-
-                  hunks.append((old_start, new_start, body, header.rstrip()))
-
-              file_sections.append((old_path, new_path, hunks))
-
-          def find_sequence(haystack, needle, expected):
-              if not needle:
-                  return max(0, min(expected, len(haystack)))
-              first = needle[0]
-              candidates = []
-              limit = len(haystack) - len(needle) + 1
-              for pos in range(max(0, limit)):
-                  if haystack[pos] != first:
-                      continue
-                  if haystack[pos:pos + len(needle)] == needle:
-                      candidates.append(pos)
-              if not candidates:
-                  return None
-              return min(candidates, key=lambda pos: abs(pos - expected))
-
-          for old_path, new_path, hunks in file_sections:
-              target = Path(new_path)
-              if not target.exists():
-                  raise RuntimeError(f'Target file does not exist: {new_path}')
-
-              original = target.read_text(encoding='utf-8').splitlines(keepends=True)
-              replacements = []
-
-              for old_start, new_start, body, header in hunks:
-                  old_block = [ln[1:] for ln in body if ln and ln[0] in (' ', '-')]
-                  new_block = [ln[1:] for ln in body if ln and ln[0] in (' ', '+')]
-                  expected = max(0, old_start - 1)
-                  pos = find_sequence(original, old_block, expected)
-
-                  if pos is None:
-                      context = [ln[1:] for ln in body if ln.startswith(' ')]
-                      preview = ''.join(context[:8])
-                      raise RuntimeError(
-                          f'Unable to locate old block for {new_path} hunk {header}. '
-                          f'Context preview:\n{preview}'
-                      )
-
-                  replacements.append((pos, pos + len(old_block), new_block, header))
-
-              replacements.sort(key=lambda item: item[0])
-              previous_end = -1
-              for start, end, _, header in replacements:
-                  if start < previous_end:
-                      raise RuntimeError(
-                          f'Overlapping hunks in {new_path}; cannot safely apply {header}'
-                      )
-                  previous_end = end
-
-              updated = original[:]
-              for start, end, new_block, header in reversed(replacements):
-                  updated[start:end] = new_block
-
-              target.write_text(''.join(updated), encoding='utf-8')
-              print(f'Applied {len(hunks)} hunks to {new_path}')
-          PY
+          python3 build_formsense_17_8.py
 
           node --check Smart_Form_Filler.user.js
           grep -Fq "// @name         Smart FormSense" Smart_Form_Filler.user.js
           grep -Fq "// @version      17.8.0" Smart_Form_Filler.user.js
           grep -Fq "Intelligent Form Filling & QA Testing" Smart_Form_Filler.user.js
           grep -Fq "Run QA Audit" Smart_Form_Filler.user.js
+          grep -Fq "// @match        *://*/*" Smart_Form_Filler.user.js
+
+          if grep -Fq "// @noframes" Smart_Form_Filler.user.js; then
+            echo "Unexpected @noframes found."
+            exit 1
+          fi
 
           if grep -En '\.(submit|requestSubmit)[[:space:]]*\(' Smart_Form_Filler.user.js; then
             echo "Unexpected final-submit API found."
@@ -162,29 +59,21 @@ jobs:
           grep -Fq "akash.singh@meritto.com" Smart_Form_Filler.user.js
           test "$(grep -c 'commitSelectedRadioGroups' Smart_Form_Filler.user.js)" -eq 1
 
-          publish_file() {
-            path="$1"
-            message="$2"
-            sha="$(gh api "repos/${GITHUB_REPOSITORY}/contents/${path}?ref=main" --jq '.sha')"
-            encoded="$(base64 -w0 "$path")"
+          sha="$(gh api "repos/${GITHUB_REPOSITORY}/contents/Smart_Form_Filler.user.js?ref=main" --jq '.sha')"
+          encoded="$(base64 -w0 Smart_Form_Filler.user.js)"
 
-            jq -n \
-              --arg message "$message" \
-              --arg content "$encoded" \
-              --arg sha "$sha" \
-              --arg branch "main" \
-              '{message:$message,content:$content,sha:$sha,branch:$branch}' \
-              > /tmp/payload.json
+          jq -n \
+            --arg message "Release Smart FormSense v17.8.0" \
+            --arg content "$encoded" \
+            --arg sha "$sha" \
+            --arg branch "main" \
+            '{message:$message,content:$content,sha:$sha,branch:$branch}' \
+            > /tmp/payload.json
 
-            gh api \
-              --method PUT \
-              "repos/${GITHUB_REPOSITORY}/contents/${path}" \
-              --input /tmp/payload.json \
-              >/dev/null
-          }
+          gh api \
+            --method PUT \
+            "repos/${GITHUB_REPOSITORY}/contents/Smart_Form_Filler.user.js" \
+            --input /tmp/payload.json \
+            >/dev/null
 
-          publish_file Smart_Form_Filler.user.js "Release Smart FormSense v17.8.0"
-          publish_file README.md "Update README for Smart FormSense v17.8.0"
-          publish_file CHANGELOG.md "Update changelog for Smart FormSense v17.8.0"
-
-          echo "Smart FormSense v17.8.0 published successfully."
+          echo "Smart FormSense v17.8.0 published to main."
