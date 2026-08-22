@@ -2,11 +2,11 @@
 
 *Intelligent Form Filling & QA Testing*
 
-Smart FormSense is a Tampermonkey userscript for authorized form filling and QA testing with synthetic test data. It combines fast completion-first form automation with a safe, non-destructive QA audit for form readiness checks.
+Smart FormSense is a Tampermonkey userscript for authorized form filling and black-box functional QA with synthetic test data. It combines fast completion-first form automation with applicant-side QA that safely exercises the finished form without touching backend configuration or automatically submitting the final form.
 
 ## Current version
 
-**17.9.0**
+**17.10.0**
 
 ## Two modes
 
@@ -22,19 +22,21 @@ Smart FormSense is a Tampermonkey userscript for authorized form filling and QA 
 
 ### 🧪 QA Testing
 
-- Run a **non-destructive QA Audit** without submitting the form or deliberately injecting invalid values
-- Produce a weighted **Form Readiness** score that accounts for passed checks and finding severity instead of allowing repeated low-severity findings to collapse the score
-- Summarize **Critical**, **Warning**, **Observation**, and **Checks Passed** results
-- Detect native, ARIA, and common framework/custom required-field signals while treating visual-only required markers as manual confirmation points rather than automatic configuration failures
-- Audit radio groups once instead of reporting each option separately
-- Use stronger row/column context for academic and table-based field labels
-- Check required-field consistency, field clarity, contradictory constraints, dropdown/dependency readiness, current validation state, duplicate IDs, and manual QA requirements
-- Group repeated findings in the panel and keep findings navigable to the affected field when supported
+- Run **black-box functional QA** from the applicant/user point of view instead of auditing backend implementation choices
+- Temporarily exercise fields with relevant blank, valid, invalid, and boundary values, then restore the original state after each test
+- Test mandatory-field behaviour, valid/invalid input handling, dropdown selection, radio/checkbox interaction, and common numeric/text boundaries
+- Use field semantics to generate relevant cases for email, mobile, pincode, percentage/CGPA, names, passing years, and dates where safe
+- Probe common dependency chains such as **Country → State → District → City** and report whether child fields react to parent changes
+- Recognize read-only datepicker controls as widget-driven fields instead of automatically treating them as broken
+- Keep file uploads, datepicker UI details, and journey-only validation as explicit review/manual test cases where browser restrictions or no-submit safety prevent a reliable automated conclusion
+- Produce a **Functional QA Score** based on executed test cases
+- Summarize **Failed**, **Warning**, **Review**, and **Passed** test cases
+- Keep findings navigable to the affected field when supported
 - Support embedded/cross-origin forms through the existing child-frame agent bridge
-- Export a human-readable **HTML QA Report** with score, risk summary, grouped findings, affected fields, guidance, and printable details
-- Export a separate **QA Debug JSON** with detailed field signals, constraints, validity information, runtime diagnostics, and the standard Smart FormSense debug data for troubleshooting
+- Export a human-readable **HTML Functional QA Report**
+- Export a separate **QA Debug JSON** with detailed field/test/runtime diagnostics for troubleshooting
 
-The QA readiness score is an advisory testing aid, not a production certification.
+Smart FormSense never automatically performs the final submission. Functional QA temporarily changes field state only for safe test execution and restores values afterward.
 
 ## Installation
 
@@ -56,12 +58,12 @@ Every public production code change must increment the userscript `@version` met
 2. Install Smart FormSense from Greasy Fork.
 3. Open a form you are authorized to test.
 4. Activate **Smart FormSense** from the Tampermonkey menu.
-5. Use **⚡ Form Filling** for completion assistance or **🧪 QA Testing** for the readiness audit.
-6. Review any errors, QA findings, review fields, or manual-required fields before proceeding manually.
+5. Use **⚡ Form Filling** for completion assistance or **🧪 QA Testing** for black-box functional testing.
+6. Review reproduced failures, warnings, review/manual cases, and the exported report before go-live approval.
 
 ## Safety
 
-Smart FormSense is intended for authorized QA, testing, staging, demo, and development workflows. It generates synthetic test data, preserves existing values by default, and does not intentionally submit the final form.
+Smart FormSense is intended for authorized QA, testing, staging, demo, and development workflows. It generates synthetic test data, preserves/restores user state during QA where supported, and does not intentionally submit the final form.
 
 ## Creator
 
