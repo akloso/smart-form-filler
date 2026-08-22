@@ -2,6 +2,26 @@
 
 All notable public changes to Smart FormSense are documented here.
 
+## 17.10.0
+
+Black-box functional QA release.
+
+- Reframed QA from a static readiness/configuration scan into **applicant-side functional testing of the finished form**
+- Added reversible field snapshots so QA can temporarily test values and restore the original state after each case
+- Added functional mandatory-field checks that exercise blank values and observe user-facing validation without automatically submitting the form
+- Added semantic positive/negative test cases for email, mobile, pincode, names, percentage/CGPA, passing year, and date fields where safe
+- Added boundary tests for configured maxlength/min/max constraints
+- Added dropdown selection tests and radio/checkbox interaction tests
+- Added safe dependency probes for common **Country → State → District → City** chains, restoring the original parent/child values after testing
+- Changed read-only datepicker handling so widget-controlled date fields are no longer treated as automatic critical failures
+- Added explicit Review/manual cases for datepicker UI, file uploads, and journey-only validation that cannot be proven safely without user progression/submission
+- Added a **Functional QA Score** based on actual executed test cases
+- Updated QA terminology to **Failed / Warning / Review / Passed** and changed the main action to **Run Functional QA**
+- Updated the HTML QA report to describe reproduced functional failures and safe black-box testing rather than backend/readiness configuration findings
+- Preserved the separate QA Debug export for detailed troubleshooting
+- Embedded/cross-origin forms now use the same functional QA engine through the child-frame bridge
+- Final form submission remains manual and is never invoked automatically
+
 ## 17.9.0
 
 QA accuracy and reporting refinement release.
