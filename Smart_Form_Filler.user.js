@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Smart FormSense
 // @namespace    smart-form-filler
-// @version      17.9.0
+// @version      17.10.0
 // @description  Intelligent form filling and QA testing for authorized web-form validation, readiness checks, embedded forms, safe repair, and synthetic test data.
 // @author       Akash Singh
 // @match        *://*/*
@@ -185,7 +185,7 @@
     );
 
     console.error(
-      `Smart FormSense V17.9 [${stage}]`,
+      `Smart FormSense V17.10 [${stage}]`,
       error
     );
 
@@ -12320,7 +12320,7 @@
     const report = {
       reportVersion: 1,
       generatedBy:
-        'Smart FormSense V17.9',
+        'Smart FormSense V17.10',
       generatedAt:
         new Date().toISOString(),
       mode:
@@ -12440,7 +12440,7 @@
           .slice(0, 60);
 
       const filename =
-        `Smart_FormSense_V17_9_Debug_${host}_${stamp}.json`;
+        `Smart_FormSense_V17_10_Debug_${host}_${stamp}.json`;
 
       downloadTextFile(
         filename,
@@ -12458,7 +12458,7 @@
       return report;
     } catch (error) {
       console.error(
-        'Smart FormSense V17.9 debug export:',
+        'Smart FormSense V17.10 debug export:',
         error
       );
 
@@ -13793,11 +13793,11 @@
         const label =
           severity ===
           'critical'
-            ? 'Critical blockers'
+            ? 'Functional failures'
             : severity ===
                 'warning'
               ? 'Warnings to review'
-              : 'Observations to confirm';
+              : 'Review / manual tests';
 
         return `
           <section class="section">
@@ -13942,9 +13942,9 @@
 <body>
 <div class="wrap">
   <header class="hero">
-    <div class="brand">✦ Smart FormSense • QA Readiness Report</div>
+    <div class="brand">✦ Smart FormSense • Functional QA Report</div>
     <h1>${qaEscapeHtml(safeTitle)}</h1>
-    <div class="meta">${qaEscapeHtml(safeHost)}<br>Generated ${qaEscapeHtml(generated)} • Smart FormSense ${qaEscapeHtml(qa.productVersion || '17.9.0')}</div>
+    <div class="meta">${qaEscapeHtml(safeHost)}<br>Generated ${qaEscapeHtml(generated)} • Smart FormSense ${qaEscapeHtml(qa.productVersion || '17.10.0')}</div>
 
     <div class="scoreRow">
       <div class="score">
@@ -13956,15 +13956,15 @@
         <h2>${qaEscapeHtml(summary.headline || '')}</h2>
         <p><b>Risk level:</b> ${qaEscapeHtml(summary.riskLevel || 'Review')}</p>
         <p>${qaEscapeHtml(summary.recommendation || '')}</p>
-        <p>${Number(qa.fieldsAudited || 0)} fields inspected • ${Number(qa.checksRun || 0)} readiness checks performed</p>
+        <p>${Number(qa.fieldsAudited || 0)} fields analysed • ${Number(qa.checksRun || 0)} functional test cases executed</p>
       </div>
     </div>
   </header>
 
   <div class="cards">
-    <div class="card critical"><strong>${Number(counts.critical || 0)}</strong><span>Critical blockers</span></div>
+    <div class="card critical"><strong>${Number(counts.critical || 0)}</strong><span>Functional failures</span></div>
     <div class="card warning"><strong>${Number(counts.warning || 0)}</strong><span>Warnings</span></div>
-    <div class="card observation"><strong>${Number(counts.observation || 0)}</strong><span>Observations</span></div>
+    <div class="card observation"><strong>${Number(counts.observation || 0)}</strong><span>Review</span></div>
     <div class="card passed"><strong>${Number(counts.passed || 0)}</strong><span>Checks passed</span></div>
   </div>
 
@@ -13975,18 +13975,18 @@
   ${!grouped.length ? `
     <section class="section">
       <article class="finding">
-        <h3>No readiness findings were surfaced</h3>
-        <p>The non-destructive audit did not identify any issue that needs to be listed in this report. Continue with normal functional and submission testing.</p>
+        <h3>No functional failures were reproduced</h3>
+        <p>The safe black-box test run did not reproduce a user-facing failure. Complete the remaining manual journey checks before go-live.</p>
       </article>
     </section>
   ` : ''}
 
   <section class="scope">
     <h2>How to read this report</h2>
-    <b>Critical:</b> likely blocker that should be fixed before go-live.<br>
+    <b>Failed:</b> a user-facing test case that Smart FormSense reproduced as failing.<br>
     <b>Warning:</b> behaviour or configuration that needs review.<br>
-    <b>Observation:</b> a manual confirmation point; it may be valid for a dynamic/custom form.<br><br>
-    This is a non-destructive readiness audit. Smart FormSense does not submit the final form and does not deliberately inject invalid boundary values during this audit. Final go-live approval remains with the QA tester.
+    <b>Review:</b> a journey/widget behaviour that needs human confirmation because it cannot be proven safely at field level.<br><br>
+    This is black-box functional QA of the finished form. Smart FormSense temporarily tests valid, invalid and boundary values, restores the original field state after each case, and never submits the final form automatically. Final go-live approval remains with the QA tester.
   </section>
 
   <div class="footer">Created with love ❤️ Akash Singh • Smart FormSense</div>
@@ -14002,7 +14002,7 @@
 
     if (!qa) {
       state.panel?.setStatus(
-        'Run a QA Audit before exporting a report.'
+        'Run Functional QA before exporting a report.'
       );
 
       return null;
@@ -14041,7 +14041,7 @@
     );
 
     state.panel?.setStatus(
-      `Readable QA report exported • Score ${qa.score}/100 • ${qa.findings.length} finding(s)`
+      `Functional QA report exported • Score ${qa.score}/100 • ${qa.findings.length} finding(s)`
     );
 
     return qa;
@@ -14259,7 +14259,7 @@
       return report;
     } catch (error) {
       console.error(
-        'Smart FormSense V17.9 QA debug export:',
+        'Smart FormSense V17.10 QA debug export:',
         error
       );
 
@@ -14976,6 +14976,891 @@
     };
 
 
+
+  // ==========================================================
+  // Smart FormSense Functional QA engine (black-box, reversible)
+  // ==========================================================
+  const qaDispatchInteraction = (el, includeBlur = true) => {
+    if (!el) return;
+
+    try {
+      el.dispatchEvent(new Event('input', { bubbles: true }));
+    } catch {}
+
+    try {
+      el.dispatchEvent(new Event('change', { bubbles: true }));
+    } catch {}
+
+    if (includeBlur) {
+      try {
+        el.dispatchEvent(new FocusEvent('blur', { bubbles: true }));
+      } catch {
+        try {
+          el.dispatchEvent(new Event('blur', { bubbles: true }));
+        } catch {}
+      }
+    }
+  };
+
+  const qaSnapshotFieldValue = el => {
+    if (!el) return null;
+
+    const type = normalize(el.type);
+
+    if (type === 'radio') {
+      return {
+        kind: 'radio-group',
+        values: radioGroupMembers(el).map(item => ({
+          key: fieldKey(item),
+          checked: !!item.checked
+        }))
+      };
+    }
+
+    if (type === 'checkbox') {
+      return {
+        kind: 'checkbox',
+        checked: !!el.checked,
+        value: String(el.value ?? '')
+      };
+    }
+
+    if (el.tagName === 'SELECT') {
+      return {
+        kind: 'select',
+        value: String(el.value ?? ''),
+        selectedIndex: Number(el.selectedIndex)
+      };
+    }
+
+    return {
+      kind: 'value',
+      value: String(el.value ?? '')
+    };
+  };
+
+  const qaSetNativeLikeValue = (el, value) => {
+    if (!el) return false;
+
+    const type = normalize(el.type);
+
+    try {
+      if (type === 'checkbox') {
+        el.checked = !!value;
+        qaDispatchInteraction(el);
+        return true;
+      }
+
+      if (type === 'radio') {
+        const members = radioGroupMembers(el);
+        const target = members.find(item => String(item.value) === String(value)) || members[0];
+        if (!target) return false;
+        target.checked = true;
+        qaDispatchInteraction(target);
+        return true;
+      }
+
+      if (el.tagName === 'SELECT') {
+        el.value = String(value ?? '');
+        qaDispatchInteraction(el);
+        return true;
+      }
+
+      const proto =
+        el instanceof HTMLTextAreaElement
+          ? HTMLTextAreaElement.prototype
+          : HTMLInputElement.prototype;
+
+      const descriptor = Object.getOwnPropertyDescriptor(proto, 'value');
+
+      if (descriptor?.set) {
+        descriptor.set.call(el, String(value ?? ''));
+      } else {
+        el.value = String(value ?? '');
+      }
+
+      qaDispatchInteraction(el);
+      return true;
+    } catch {
+      try {
+        el.value = String(value ?? '');
+        qaDispatchInteraction(el);
+        return true;
+      } catch {
+        return false;
+      }
+    }
+  };
+
+  const qaRestoreFieldValue = async (el, snapshot) => {
+    if (!el || !snapshot) return;
+
+    try {
+      if (snapshot.kind === 'radio-group') {
+        const members = radioGroupMembers(el);
+        for (const item of members) {
+          const saved = snapshot.values.find(row => row.key === fieldKey(item));
+          if (saved) item.checked = !!saved.checked;
+        }
+        if (members[0]) qaDispatchInteraction(members[0], false);
+      } else if (snapshot.kind === 'checkbox') {
+        el.checked = !!snapshot.checked;
+        qaDispatchInteraction(el, false);
+      } else if (snapshot.kind === 'select') {
+        el.value = snapshot.value;
+        if (String(el.value) !== String(snapshot.value) && Number.isFinite(snapshot.selectedIndex)) {
+          el.selectedIndex = snapshot.selectedIndex;
+        }
+        qaDispatchInteraction(el, false);
+      } else {
+        qaSetNativeLikeValue(el, snapshot.value);
+      }
+    } catch {}
+
+    await sleep(45);
+  };
+
+  const qaVisibleFeedback = el => {
+    if (!el) {
+      return {
+        invalid: false,
+        signature: '',
+        text: ''
+      };
+    }
+
+    const parts = [];
+
+    const validity = qaNativeValiditySummary(el);
+    if (validity) parts.push(validity);
+
+    if (el.getAttribute?.('aria-invalid') === 'true') {
+      parts.push('aria-invalid');
+    }
+
+    try {
+      const direct = validationText(el);
+      if (direct) parts.push(String(direct));
+    } catch {}
+
+    try {
+      const container = fieldContainerFor(el) || el.parentElement;
+      const selectors = [
+        '.error',
+        '.errors',
+        '.invalid-feedback',
+        '.field-error',
+        '.help-block',
+        '.text-danger',
+        '.validation-error',
+        '[role="alert"]',
+        '[aria-live="assertive"]'
+      ].join(',');
+
+      for (const node of container?.querySelectorAll?.(selectors) || []) {
+        if (!isVisible(node)) continue;
+        const text = String(node.innerText || node.textContent || '')
+          .replace(/\s+/g, ' ')
+          .trim()
+          .slice(0, 240);
+        if (text && /required|mandatory|invalid|enter|select|choose|valid|must|minimum|maximum|digit|character|format|error/i.test(text)) {
+          parts.push(text);
+        }
+      }
+    } catch {}
+
+    const unique = [...new Set(parts.filter(Boolean))];
+    const text = unique.join(' | ').slice(0, 600);
+
+    return {
+      invalid: !!text,
+      signature: normalize(text),
+      text
+    };
+  };
+
+  const qaValueLooksRetained = (el, attempted) => {
+    if (!el) return false;
+    const type = normalize(el.type);
+
+    if (type === 'checkbox') {
+      return !!el.checked === !!attempted;
+    }
+
+    if (type === 'radio') {
+      return radioGroupMembers(el).some(item => item.checked && String(item.value) === String(attempted));
+    }
+
+    return String(el.value ?? '') === String(attempted ?? '');
+  };
+
+  const qaSemanticFor = el => {
+    const snapshot = debugFieldSnapshot(el);
+    if (snapshot?.semantic && snapshot.confidence !== 'low') {
+      return normalize(snapshot.semantic);
+    }
+
+    const context = normalize([
+      qaHumanLabel(el),
+      el?.name,
+      el?.id,
+      el?.getAttribute?.('placeholder'),
+      tableHeaderContext(el),
+      tableRowLabelContext(el)
+    ].filter(Boolean).join(' '));
+
+    if (/email|e mail/.test(context)) return 'email';
+    if (/mobile|phone|contact number|telephone/.test(context)) return 'mobile';
+    if (/pin code|pincode|postal|zip/.test(context)) return 'pincode';
+    if (/percentage|percent/.test(context)) return 'percentage';
+    if (/cgpa/.test(context)) return 'cgpa';
+    if (/date of birth|birth date|\bdob\b/.test(context)) return 'dob';
+    if (/year of passing|passing year|pass year|completion year/.test(context)) return 'passing_year';
+    if (/first name|last name|father.*name|mother.*name|guardian.*name|applicant name|parent name/.test(context)) return 'name';
+    if (/country/.test(context)) return 'country';
+    if (/state|province/.test(context)) return 'state';
+    if (/district/.test(context)) return 'district';
+    if (/city|town/.test(context)) return 'city';
+    return snapshot?.semantic ? normalize(snapshot.semantic) : '';
+  };
+
+  const qaFunctionalCasesFor = el => {
+    const type = normalize(el.type);
+    const semantic = qaSemanticFor(el);
+    const currentYear = new Date().getFullYear();
+    const cases = [];
+
+    const add = (id, label, value, expectation, severity = 'warning') => {
+      cases.push({ id, label, value, expectation, severity });
+    };
+
+    if (semantic === 'email') {
+      add('email-invalid', 'Reject malformed email', 'qa.invalid@', 'reject');
+      add('email-valid', 'Accept valid email', 'qa.test.user@gmail.com', 'accept');
+    } else if (semantic === 'mobile') {
+      add('mobile-alpha', 'Reject alphabetic mobile number', '98ABCD1234', 'reject');
+      add('mobile-short', 'Reject short mobile number', '98765', 'reject');
+      add('mobile-valid', 'Accept valid 10-digit mobile number', '9876543210', 'accept');
+    } else if (semantic === 'pincode') {
+      add('pincode-alpha', 'Reject alphabetic pincode', '11AB01', 'reject');
+      add('pincode-short', 'Reject short pincode', '11001', 'reject');
+      add('pincode-valid', 'Accept valid 6-digit pincode', '110001', 'accept');
+    } else if (semantic === 'percentage') {
+      add('percentage-over', 'Reject percentage above 100', '101', 'reject');
+      add('percentage-valid', 'Accept valid percentage', '75', 'accept');
+    } else if (semantic === 'cgpa') {
+      add('cgpa-over', 'Reject CGPA above expected range', '11', 'reject');
+      add('cgpa-valid', 'Accept valid CGPA', '8.5', 'accept');
+    } else if (semantic === 'passing_year') {
+      add('year-future', 'Reject future passing year', String(currentYear + 5), 'reject');
+      add('year-valid', 'Accept realistic passing year', String(currentYear - 3), 'accept');
+    } else if (semantic === 'dob') {
+      if (!el.readOnly) {
+        if (type === 'date') {
+          add('dob-future', 'Reject future date of birth', `${currentYear + 1}-01-15`, 'reject');
+          add('dob-valid', 'Accept realistic date of birth', '2000-01-15', 'accept');
+        } else {
+          add('dob-invalid', 'Reject impossible date of birth', '31/02/2020', 'reject');
+          add('dob-valid', 'Accept realistic date of birth', '15/01/2000', 'accept');
+        }
+      }
+    } else if (semantic === 'name') {
+      add('name-numeric', 'Reject numeric-only name', '123456', 'reject');
+      add('name-valid', 'Accept normal name', 'Test User', 'accept');
+    }
+
+    const maxLength = Number(el.getAttribute?.('maxlength'));
+    if (
+      Number.isFinite(maxLength) &&
+      maxLength > 0 &&
+      maxLength <= 120 &&
+      !['file', 'radio', 'checkbox'].includes(type)
+    ) {
+      add(
+        'maxlength-boundary',
+        `Enforce maximum length of ${maxLength}`,
+        'A'.repeat(maxLength + 1),
+        'reject',
+        'warning'
+      );
+    }
+
+    if (
+      type === 'number' &&
+      el.getAttribute?.('max') !== null &&
+      el.getAttribute?.('max') !== ''
+    ) {
+      const max = Number(el.getAttribute('max'));
+      if (Number.isFinite(max)) {
+        add('number-over-max', `Reject value above maximum ${max}`, String(max + 1), 'reject');
+      }
+    }
+
+    if (
+      type === 'number' &&
+      el.getAttribute?.('min') !== null &&
+      el.getAttribute?.('min') !== ''
+    ) {
+      const min = Number(el.getAttribute('min'));
+      if (Number.isFinite(min)) {
+        add('number-under-min', `Reject value below minimum ${min}`, String(min - 1), 'reject');
+      }
+    }
+
+    return cases.slice(0, 4);
+  };
+
+  const qaRunOneFieldCase = async (el, testCase) => {
+    const before = qaVisibleFeedback(el);
+    const snapshot = qaSnapshotFieldValue(el);
+
+    qaSetNativeLikeValue(el, testCase.value);
+    await sleep(110);
+
+    const after = qaVisibleFeedback(el);
+    const retained = qaValueLooksRetained(el, testCase.value);
+    const newFeedback =
+      after.invalid &&
+      (
+        !before.invalid ||
+        after.signature !== before.signature
+      );
+
+    let status = 'passed';
+    let actual = '';
+
+    if (testCase.expectation === 'reject') {
+      if (!retained) {
+        status = 'passed';
+        actual = 'Invalid test value was rejected or normalized by the field.';
+      } else if (newFeedback || after.invalid) {
+        status = 'passed';
+        actual = `Invalid value produced validation feedback${after.text ? `: ${after.text}` : '.'}`;
+      } else {
+        status = 'failed';
+        actual = 'Invalid test value remained accepted with no immediate user-facing validation feedback.';
+      }
+    } else {
+      if (retained && !after.invalid) {
+        status = 'passed';
+        actual = 'Valid test value was accepted and no validation error remained.';
+      } else {
+        status = 'failed';
+        actual = retained
+          ? `Valid value remained in the field but validation feedback was still present${after.text ? `: ${after.text}` : '.'}`
+          : 'Valid test value was not retained by the field.';
+      }
+    }
+
+    await qaRestoreFieldValue(el, snapshot);
+
+    return {
+      status,
+      actual,
+      feedback: after.text || '',
+      attemptedValue: String(testCase.value)
+    };
+  };
+
+  const qaRunRequiredBlankCase = async el => {
+    const snapshot = qaSnapshotFieldValue(el);
+    const before = qaVisibleFeedback(el);
+    const type = normalize(el.type);
+
+    if (type === 'radio') {
+      for (const member of radioGroupMembers(el)) {
+        member.checked = false;
+      }
+      if (radioGroupMembers(el)[0]) qaDispatchInteraction(radioGroupMembers(el)[0]);
+    } else if (type === 'checkbox') {
+      el.checked = false;
+      qaDispatchInteraction(el);
+    } else if (el.tagName === 'SELECT') {
+      const placeholder = [...el.options].find(option =>
+        !option.disabled &&
+        (!String(option.value || '').trim() || /^(?:select|choose|please select|--)/i.test(String(option.textContent || '').trim()))
+      );
+      if (placeholder) {
+        el.value = placeholder.value;
+      } else {
+        el.selectedIndex = -1;
+      }
+      qaDispatchInteraction(el);
+    } else if (!el.readOnly) {
+      qaSetNativeLikeValue(el, '');
+    } else {
+      await qaRestoreFieldValue(el, snapshot);
+      return {
+        status: 'review',
+        actual: /datepicker/i.test(String(el.className || ''))
+          ? 'Field is controlled by a date picker and cannot be meaningfully blank-tested through direct typing.'
+          : 'Field is read-only, so blank validation needs journey-level confirmation.',
+        feedback: ''
+      };
+    }
+
+    await sleep(110);
+    const after = qaVisibleFeedback(el);
+    const nativeMissing = !!el.validity?.valueMissing;
+    const feedbackAppeared = after.invalid && (!before.invalid || after.signature !== before.signature);
+
+    const status = nativeMissing || feedbackAppeared ? 'passed' : 'review';
+    const actual = status === 'passed'
+      ? `Empty required value produced validation feedback${after.text ? `: ${after.text}` : '.'}`
+      : 'No field-level validation appeared after leaving the required field empty. It may validate only when the user continues or submits.';
+
+    await qaRestoreFieldValue(el, snapshot);
+
+    return {
+      status,
+      actual,
+      feedback: after.text || ''
+    };
+  };
+
+  const qaRunSelectInteractionCase = async el => {
+    const options = validOptions(el);
+    if (!options.length) {
+      return {
+        status: 'failed',
+        actual: 'No selectable option was available.'
+      };
+    }
+
+    const snapshot = qaSnapshotFieldValue(el);
+    const current = String(el.value ?? '');
+    const target = options.find(option => String(option.value) !== current) || options[0];
+
+    el.value = target.value;
+    qaDispatchInteraction(el);
+    await sleep(90);
+
+    const retained = String(el.value ?? '') === String(target.value);
+    const feedback = qaVisibleFeedback(el);
+
+    await qaRestoreFieldValue(el, snapshot);
+
+    return {
+      status: retained && !feedback.invalid ? 'passed' : 'failed',
+      actual: retained
+        ? (feedback.invalid ? `Selection changed but validation feedback remained: ${feedback.text}` : 'A valid dropdown option could be selected and retained.')
+        : 'A valid dropdown option could not be selected or retained.'
+    };
+  };
+
+  const qaRunToggleCase = async el => {
+    const snapshot = qaSnapshotFieldValue(el);
+    const type = normalize(el.type);
+
+    let changed = false;
+
+    if (type === 'checkbox') {
+      const target = !el.checked;
+      qaSetNativeLikeValue(el, target);
+      await sleep(70);
+      changed = !!el.checked === target;
+    } else if (type === 'radio') {
+      const members = radioGroupMembers(el);
+      const current = members.find(item => item.checked);
+      const target = members.find(item => item !== current && !item.disabled) || members.find(item => !item.disabled);
+      if (target) {
+        target.checked = true;
+        qaDispatchInteraction(target);
+        await sleep(70);
+        changed = !!target.checked;
+      }
+    }
+
+    await qaRestoreFieldValue(el, snapshot);
+
+    return {
+      status: changed ? 'passed' : 'failed',
+      actual: changed
+        ? 'Control changed state successfully and the original state was restored.'
+        : 'Control did not change state as expected.'
+    };
+  };
+
+  const qaDependencyCandidates = fields => {
+    const bySemantic = new Map();
+
+    for (const el of fields) {
+      if (el.tagName !== 'SELECT') continue;
+      const semantic = qaSemanticFor(el);
+      if (semantic && !bySemantic.has(semantic)) bySemantic.set(semantic, el);
+    }
+
+    return [
+      ['country', 'state'],
+      ['state', 'district'],
+      ['district', 'city']
+    ]
+      .map(([parent, child]) => ({
+        parent: bySemantic.get(parent),
+        child: bySemantic.get(child),
+        parentSemantic: parent,
+        childSemantic: child
+      }))
+      .filter(pair => pair.parent && pair.child);
+  };
+
+  const qaRunDependencyCase = async pair => {
+    const parent = pair.parent;
+    const child = pair.child;
+    const parentOptions = validOptions(parent);
+
+    if (parentOptions.length < 2) {
+      return {
+        status: 'review',
+        actual: 'Not enough parent options were available to safely exercise the dependency.'
+      };
+    }
+
+    const parentSnapshot = qaSnapshotFieldValue(parent);
+    const childSnapshot = qaSnapshotFieldValue(child);
+    const before = {
+      value: String(child.value ?? ''),
+      optionCount: validOptions(child).length,
+      disabled: !!child.disabled
+    };
+
+    const current = String(parent.value ?? '');
+    const target = parentOptions.find(option => String(option.value) !== current) || parentOptions[0];
+
+    parent.value = target.value;
+    qaDispatchInteraction(parent);
+
+    let reacted = false;
+    const started = Date.now();
+
+    while (Date.now() - started < 1500) {
+      await sleep(120);
+      const now = {
+        value: String(child.value ?? ''),
+        optionCount: validOptions(child).length,
+        disabled: !!child.disabled
+      };
+
+      if (
+        now.value !== before.value ||
+        now.optionCount !== before.optionCount ||
+        now.disabled !== before.disabled
+      ) {
+        reacted = true;
+        break;
+      }
+    }
+
+    await qaRestoreFieldValue(parent, parentSnapshot);
+    await sleep(500);
+    await qaRestoreFieldValue(child, childSnapshot);
+
+    return {
+      status: reacted ? 'passed' : 'review',
+      actual: reacted
+        ? `${qaHumanLabel(child)} reacted when ${qaHumanLabel(parent)} changed, and the original values were restored.`
+        : `${qaHumanLabel(child)} did not visibly change during the safe dependency probe. Confirm the dependency manually if it is expected to change.`
+    };
+  };
+
+  const buildQaFunctionalReport = async () => {
+    const generatedAt = new Date().toISOString();
+    const findings = [];
+    const testCases = [];
+    const seenRadioGroups = new Set();
+    let fields = [];
+
+    try {
+      fields = visibleFillableFields().filter(el =>
+        el &&
+        !isLikelyInternalField(el) &&
+        !['hidden', 'submit', 'button', 'reset'].includes(normalize(el.type))
+      );
+    } catch {}
+
+    const addCase = ({
+      el = null,
+      category = 'Functional Behaviour',
+      name = 'Functional test',
+      status = 'review',
+      expected = '',
+      actual = '',
+      attemptedValue = '',
+      guidance = ''
+    }) => {
+      const field = el ? qaHumanLabel(el) : '';
+      const fieldKeyValue = el ? fieldKey(el) : null;
+      const row = {
+        id: `tc_${testCases.length + 1}`,
+        category,
+        name,
+        status,
+        field,
+        fieldKey: fieldKeyValue,
+        expected,
+        actual,
+        attemptedValue
+      };
+
+      testCases.push(row);
+
+      if (status === 'passed') return;
+
+      const severity =
+        status === 'failed'
+          ? 'critical'
+          : status === 'warning'
+            ? 'warning'
+            : 'observation';
+
+      findings.push({
+        id: `qa_${findings.length + 1}`,
+        severity,
+        category,
+        title: name,
+        message: actual,
+        fieldKey: fieldKeyValue,
+        field,
+        expected,
+        actual,
+        guidance: guidance || (
+          status === 'failed'
+            ? 'Review the user-facing validation or control behaviour and rerun this test.'
+            : 'Confirm this behaviour manually during the end-to-end form journey.'
+        ),
+        testCaseId: row.id,
+        attemptedValue
+      });
+    };
+
+    if (!fields.length) {
+      addCase({
+        category: 'Form Detection',
+        name: 'Detect active form',
+        status: 'failed',
+        expected: 'At least one active user-facing form field',
+        actual: 'No active user-facing form fields were detected.',
+        guidance: 'Confirm the form is fully loaded and the correct page/frame is active.'
+      });
+    }
+
+    state.panel?.setStatus?.(`Functional QA • analysing ${fields.length} field(s)...`);
+
+    for (let index = 0; index < fields.length; index++) {
+      if (state.stopRequested) break;
+
+      const el = fields[index];
+      const type = normalize(el.type);
+      const label = qaHumanLabel(el);
+
+      if (type === 'radio') {
+        const key = `${el.ownerDocument?.URL || ''}|${el.name || fieldKey(el)}`;
+        if (seenRadioGroups.has(key)) continue;
+        seenRadioGroups.add(key);
+      }
+
+      state.panel?.setStatus?.(`Functional QA • ${index + 1}/${fields.length} • ${label}`);
+
+      const required = !!(
+        qaRequiredSignals(el).visible ||
+        qaRequiredSignals(el).configured ||
+        isRequired(el)
+      );
+
+      if (type === 'file') {
+        addCase({
+          el,
+          category: 'File Upload',
+          name: `${label} — manual upload test`,
+          status: 'review',
+          expected: required
+            ? 'Valid file uploads successfully; invalid type/size is rejected; required upload blocks progression when missing'
+            : 'Valid file uploads successfully; invalid type/size is rejected',
+          actual: 'Browser security requires a real file selection for this test.',
+          guidance: 'Test one valid file, wrong file type, oversized file, removal/re-upload, and required behaviour manually.'
+        });
+        continue;
+      }
+
+      if (required) {
+        const result = await qaRunRequiredBlankCase(el);
+        addCase({
+          el,
+          category: 'Mandatory Validation',
+          name: `${label} — required-field behaviour`,
+          status: result.status,
+          expected: 'Leaving a mandatory field empty should create clear user-facing validation before the user can complete the journey.',
+          actual: result.actual,
+          guidance: result.status === 'review'
+            ? 'Confirm this field blocks progression at the appropriate journey step; absence of blur validation alone is not treated as a defect.'
+            : ''
+        });
+      }
+
+      if (el.readOnly) {
+        const adapter = debugFieldSnapshot(el)?.adapter || '';
+        if (/datepicker/i.test(String(adapter)) || /datepicker/i.test(String(el.className || ''))) {
+          addCase({
+            el,
+            category: 'Date Picker',
+            name: `${label} — date-picker interaction`,
+            status: 'review',
+            expected: 'The user can open the date picker, select an allowed date, and see the selected value populated correctly.',
+            actual: 'The textbox is intentionally read-only and appears to be controlled by a date-picker widget.',
+            guidance: 'Manually verify calendar opening, date selection, disabled dates, keyboard/close behaviour, and value persistence.'
+          });
+        }
+        continue;
+      }
+
+      if (el.tagName === 'SELECT') {
+        const result = await qaRunSelectInteractionCase(el);
+        addCase({
+          el,
+          category: 'Dropdown Behaviour',
+          name: `${label} — option selection`,
+          status: result.status,
+          expected: 'A real selectable option can be chosen, retained, and does not leave a validation error.',
+          actual: result.actual
+        });
+      } else if (['checkbox', 'radio'].includes(type)) {
+        const result = await qaRunToggleCase(el);
+        addCase({
+          el,
+          category: 'Choice Controls',
+          name: `${label} — selection behaviour`,
+          status: result.status,
+          expected: 'The user can change the selection and the control responds correctly.',
+          actual: result.actual
+        });
+      }
+
+      const functionalCases = qaFunctionalCasesFor(el);
+
+      for (const testCase of functionalCases) {
+        if (state.stopRequested) break;
+        const result = await qaRunOneFieldCase(el, testCase);
+        addCase({
+          el,
+          category: 'Input Validation',
+          name: `${label} — ${testCase.label}`,
+          status: result.status,
+          expected: testCase.expectation === 'reject'
+            ? 'Invalid value should be rejected, normalized, or produce clear validation feedback.'
+            : 'Valid value should be accepted without a validation error.',
+          actual: result.actual,
+          attemptedValue: result.attemptedValue,
+          guidance: result.status === 'failed'
+            ? `Reproduce with the tested value ${JSON.stringify(result.attemptedValue)} and correct the user-facing validation behaviour.`
+            : ''
+        });
+      }
+
+      await yieldToUI();
+    }
+
+    for (const pair of qaDependencyCandidates(fields)) {
+      if (state.stopRequested) break;
+      state.panel?.setStatus?.(`Functional QA • testing ${pair.parentSemantic} → ${pair.childSemantic} dependency...`);
+      const result = await qaRunDependencyCase(pair);
+      addCase({
+        el: pair.child,
+        category: 'Dependencies',
+        name: `${qaHumanLabel(pair.parent)} → ${qaHumanLabel(pair.child)} dependency`,
+        status: result.status,
+        expected: `${qaHumanLabel(pair.child)} should react appropriately when ${qaHumanLabel(pair.parent)} changes.`,
+        actual: result.actual,
+        guidance: result.status === 'review'
+          ? 'Change the parent selection manually and verify child options/value reset or reload as expected.'
+          : ''
+      });
+    }
+
+    const counts = {
+      critical: testCases.filter(item => item.status === 'failed').length,
+      warning: testCases.filter(item => item.status === 'warning').length,
+      observation: testCases.filter(item => ['review', 'manual'].includes(item.status)).length,
+      passed: testCases.filter(item => item.status === 'passed').length
+    };
+
+    const checksRun = testCases.length;
+    const weightedTotal =
+      counts.passed +
+      counts.critical +
+      counts.warning * 0.65 +
+      counts.observation * 0.18;
+
+    let score = checksRun
+      ? Math.round(clamp((counts.passed / Math.max(1, weightedTotal)) * 100, 0, 100))
+      : 0;
+
+    if (counts.critical > 0) {
+      score = Math.min(score, counts.critical >= 3 ? 59 : 79);
+    }
+
+    const rating =
+      score >= 92
+        ? 'Strong'
+        : score >= 82
+          ? 'Good'
+          : score >= 70
+            ? 'Needs Review'
+            : 'Needs Attention';
+
+    const summary = {
+      riskLevel: counts.critical > 0 ? 'High' : counts.warning > 0 ? 'Moderate' : counts.observation > 0 ? 'Low' : 'Low',
+      headline: counts.critical > 0
+        ? `${counts.critical} functional failure${counts.critical === 1 ? '' : 's'} were reproduced and should be reviewed before go-live.`
+        : counts.warning > 0
+          ? `${counts.warning} warning${counts.warning === 1 ? '' : 's'} need review; no functional blocker was reproduced.`
+          : `No functional blocker was reproduced in ${checksRun} safe test case${checksRun === 1 ? '' : 's'}.`,
+      recommendation: counts.critical > 0
+        ? 'Fix the reproduced user-facing failures first, rerun Functional QA, then complete the remaining manual journey checks.'
+        : counts.observation > 0
+          ? 'Complete the review/manual test cases, especially date pickers, file uploads, and journey-only validation.'
+          : 'Complete a final human journey check before go-live.',
+      fieldsAudited: fields.length,
+      checksRun,
+      score
+    };
+
+    const categoryCounts = {};
+    for (const item of findings) {
+      categoryCounts[item.category] = (categoryCounts[item.category] || 0) + 1;
+    }
+
+    return {
+      reportVersion: 3,
+      product: 'Smart FormSense',
+      productVersion: '17.10.0',
+      generatedAt,
+      auditType: 'Black-box Functional Form QA',
+      page: {
+        url: location.href,
+        hostname: location.hostname,
+        pathname: location.pathname,
+        title: document.title || ''
+      },
+      formSignature: state.currentFormSignature || null,
+      fieldsAudited: fields.length,
+      checksRun,
+      score,
+      rating,
+      summary,
+      counts,
+      categoryCounts,
+      findings,
+      testCases,
+      notes: [
+        'Smart FormSense tests the finished form from the applicant/user point of view; it does not audit backend implementation choices.',
+        'Field values are temporarily changed for safe black-box tests and restored after each test case.',
+        'The final form is never submitted automatically.',
+        'Journey-only behaviours that cannot be proven safely without progression/submission are marked for review instead of being guessed as failures.',
+        'File uploads and some widget-specific behaviours remain manual QA steps because browsers restrict synthetic user actions.'
+      ]
+    };
+  };
+
   const runSmartQaAudit = async () => {
     if (!IS_TOP || state.running) return;
 
@@ -15004,7 +15889,7 @@
       }
 
       if (context.kind === 'none') {
-        const report = buildQaAuditReport();
+        const report = await buildQaFunctionalReport();
         state.qaReport = report;
         state.panel?.setQaReport?.(report);
         state.panel?.setStatus(
@@ -15015,11 +15900,11 @@
 
       state.lastRemoteAgentId = null;
 
-      const report = buildQaAuditReport();
+      const report = await buildQaFunctionalReport();
       state.qaReport = report;
       state.panel?.setQaReport?.(report);
       state.panel?.setStatus(
-        `QA Audit completed • Readiness ${report.score}/100 • ${report.counts.critical} critical • ${report.counts.warning} warning(s)`
+        `Functional QA completed • Score ${report.score}/100 • ${report.counts.critical} critical • ${report.counts.warning} warning(s)`
       );
 
       return report;
@@ -15789,7 +16674,7 @@
             agent.action ===
             'qa-audit'
           ) {
-            qaReport = buildQaAuditReport();
+            qaReport = await buildQaFunctionalReport();
             state.qaReport = qaReport;
           }
 
@@ -15804,7 +16689,7 @@
               qaReport,
               status:
                 agent.action === 'qa-audit' && qaReport
-                  ? `Embedded QA Audit completed • Readiness ${qaReport.score}/100 • ${qaReport.counts.critical} critical • ${qaReport.counts.warning} warning(s)`
+                  ? `Embedded Functional QA completed • Score ${qaReport.score}/100 • ${qaReport.counts.critical} critical • ${qaReport.counts.warning} warning(s)`
                   : `Embedded ${agent.action} completed • Filled ${state.stats.filled.size} • Errors ${state.stats.errors.size} • Manual ${state.stats.manual.size}`
             }
           );
@@ -16404,22 +17289,22 @@
 
           <div class="workspace" id="qaWorkspace">
             <div class="qaScoreCard">
-              <div class="qaScoreLabel">FORM READINESS</div>
+              <div class="qaScoreLabel">FUNCTIONAL QA SCORE</div>
               <div class="qaScore" id="qaScore">--</div>
-              <div class="qaRating" id="qaRating">Run an audit to check this form</div>
+              <div class="qaRating" id="qaRating">Run functional QA to test this form</div>
             </div>
 
-            <button class="primary" id="qaRunBtn">Run QA Audit</button>
+            <button class="primary" id="qaRunBtn">Run Functional QA</button>
 
             <div class="qaStats">
-              <div class="qaStat qaCritical"><b id="qaCritical">0</b><span>Critical</span></div>
+              <div class="qaStat qaCritical"><b id="qaCritical">0</b><span>Failed</span></div>
               <div class="qaStat qaWarning"><b id="qaWarning">0</b><span>Warnings</span></div>
-              <div class="qaStat qaObservation"><b id="qaObservation">0</b><span>Observations</span></div>
+              <div class="qaStat qaObservation"><b id="qaObservation">0</b><span>Review</span></div>
               <div class="qaStat qaPassed"><b id="qaPassed">0</b><span>Checks Passed</span></div>
             </div>
 
             <div class="qaIssues" id="qaIssues">
-              <div class="qaEmpty">Run QA Audit to inspect required fields, validations, dropdown dependencies and form readiness.</div>
+              <div class="qaEmpty">Run Functional QA to inspect required fields, validations, dropdown dependencies and form readiness.</div>
             </div>
 
             <div class="utilityGrid">
@@ -16802,7 +17687,7 @@
           refs.fillBtn.classList.remove('danger');
           refs.fillBtn.onclick = showModeDialog;
           if (refs.qaRunBtn) {
-            refs.qaRunBtn.textContent = 'Run QA Audit';
+            refs.qaRunBtn.textContent = 'Run Functional QA';
             refs.qaRunBtn.onclick = runSmartQaAudit;
           }
           if (refs.qaRefreshBtn) {
