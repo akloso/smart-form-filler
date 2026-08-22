@@ -1,8 +1,8 @@
 // ==UserScript==
-// @name         Smart Form Filler
+// @name         Smart FormSense
 // @namespace    smart-form-filler
-// @version      17.7.0
-// @description  Generic smart form autofiller for testing: direct and embedded forms, validation-aware repair, responsive controls, academic/date intelligence, debug export, and safe manual handling.
+// @version      17.8.0
+// @description  Intelligent form filling and QA testing for authorized web-form validation, readiness checks, embedded forms, safe repair, and synthetic test data.
 // @author       Akash Singh
 // @match        *://*/*
 // @run-at       document-idle
@@ -97,7 +97,10 @@
     activeRemoteAgentId: null,
     lastRemoteAgentId: null,
     activeRemoteRequestId: null,
-    activeRemoteAction: null
+    activeRemoteAction: null,
+    workspace: 'fill',
+    qaReport: null,
+    qaNavIndex: 0
   };
 
   const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
@@ -182,7 +185,7 @@
     );
 
     console.error(
-      `Smart Form Filler V17.1 [${stage}]`,
+      `Smart FormSense V17.8 [${stage}]`,
       error
     );
 
@@ -12317,7 +12320,7 @@
     const report = {
       reportVersion: 1,
       generatedBy:
-        'Smart Form Filler V17.7',
+        'Smart FormSense V17.8',
       generatedAt:
         new Date().toISOString(),
       mode:
@@ -12437,7 +12440,7 @@
           .slice(0, 60);
 
       const filename =
-        `STFF_V17_7_Debug_${host}_${stamp}.json`;
+        `Smart_FormSense_V17_8_Debug_${host}_${stamp}.json`;
 
       downloadTextFile(
         filename,
@@ -12455,7 +12458,7 @@
       return report;
     } catch (error) {
       console.error(
-        'Smart Form Filler V17.7 debug export:',
+        'Smart FormSense V17.8 debug export:',
         error
       );
 
@@ -12465,6 +12468,591 @@
 
       return null;
     }
+  };
+
+
+  // ==========================================================
+  // Smart FormSense QA audit
+  // ==========================================================
+  const qaTechnicalRequired = el => {
+    if (!el) return false;
+
+    if (el.type === 'radio') {
+      return radioGroupMembers(el).some(
+        item =>
+          item.required ||
+          item.getAttribute?.('aria-required') === 'true'
+      );
+    }
+
+    return !!(
+      el.required ||
+      el.getAttribute?.('aria-required') === 'true'
+    );
+  };
+
+  const qaVisibleRequiredMarker = el => {
+    if (!el) return false;
+
+    const human = [
+      explicitLabelContext(el),
+      questionContext(el),
+      tableHeaderContext(el)
+    ]
+      .filter(Boolean)
+      .join(' ');
+
+    if (/\*|\brequired\b|\bmandatory\b/i.test(human)) {
+      return true;
+    }
+
+    const container = fieldContainerFor(el);
+
+    return !!(
+      container &&
+      (
+        container.classList.contains('required') ||
+        container.querySelector?.(
+          ':scope > .required,:scope > .mandatory,:scope > [data-required="true"]'
+        )
+      )
+    );
+  };
+
+  const qaHumanLabel = el => {
+    const value = [
+      explicitLabelContext(el),
+      questionContext(el),
+      tableHeaderContext(el),
+      el.getAttribute?.('aria-label'),
+      el.getAttribute?.('placeholder')
+    ]
+      .filter(Boolean)
+      .map(item => String(item).replace(/\s+/g, ' ').trim())
+      .find(Boolean);
+
+    if (value) return value.slice(0, 120);
+
+    const technical = [
+      el.getAttribute?.('name'),
+      el.getAttribute?.('id'),
+      el.getAttribute?.('type')
+    ]
+      .filter(Boolean)
+      .join(' ')
+      .replace(/[_-]+/g, ' ')
+      .trim();
+
+    return technical.slice(0, 120) || 'Unnamed field';
+  };
+
+  const qaNativeValiditySummary = el => {
+    try {
+      const validity = el?.validity;
+      if (!validity || validity.valid) return '';
+
+      const labels = [
+        ['valueMissing', 'required value missing'],
+        ['typeMismatch', 'type mismatch'],
+        ['patternMismatch', 'pattern mismatch'],
+        ['tooLong', 'value too long'],
+        ['tooShort', 'value too short'],
+        ['rangeUnderflow', 'below minimum'],
+        ['rangeOverflow', 'above maximum'],
+        ['stepMismatch', 'step mismatch'],
+        ['badInput', 'bad input'],
+        ['customError', 'custom validation error']
+      ];
+
+      return labels
+        .filter(([key]) => !!validity[key])
+        .map(([, label]) => label)
+        .join(', ');
+    } catch {
+      return '';
+    }
+  };
+
+  const buildQaAuditReport = () => {
+    const generatedAt = new Date().toISOString();
+    const findings = [];
+    const seen = new Set();
+    let passed = 0;
+    let fields = [];
+
+    try {
+      fields = visibleFillableFields();
+    } catch {}
+
+    const addFinding = ({
+      severity = 'observation',
+      category = 'General',
+      title = 'QA observation',
+      message = '',
+      el = null,
+      expected = '',
+      actual = ''
+    }) => {
+      const fieldKeyValue = el ? fieldKey(el) : null;
+      const label = el ? qaHumanLabel(el) : '';
+      const signature = [
+        severity,
+        category,
+        title,
+        fieldKeyValue || '',
+        message
+      ].join('|');
+
+      if (seen.has(signature)) return;
+      seen.add(signature);
+
+      findings.push({
+        id: `qa_${findings.length + 1}`,
+        severity,
+        category,
+        title,
+        message,
+        fieldKey: fieldKeyValue,
+        field: label,
+        expected,
+        actual
+      });
+    };
+
+    const meaningful =
+      fields.length >= 2 ||
+      (
+        fields.length >= 1 &&
+        fields.some(el => isRequired(el))
+      );
+
+    if (!meaningful) {
+      addFinding({
+        severity: 'critical',
+        category: 'Form Detection',
+        title: 'No meaningful active form detected',
+        message: 'Smart FormSense could not find a meaningful visible form in this execution context.',
+        expected: 'A meaningful operational form with fillable controls',
+        actual: `${fields.length} operational field(s) detected`
+      });
+    }
+
+    const activeIds = new Map();
+
+    for (const el of fields) {
+      if (!el || isLikelyInternalField(el)) continue;
+
+      const technicalRequired = qaTechnicalRequired(el);
+      const visibleRequired = qaVisibleRequiredMarker(el);
+      const hasValue = fieldHasValue(el);
+      const label = qaHumanLabel(el);
+      const type = normalize(el.type);
+      const context = fieldContext(el);
+
+      // Label/readability check.
+      const humanLabel = normalize(
+        [
+          explicitLabelContext(el),
+          questionContext(el),
+          tableHeaderContext(el),
+          el.getAttribute?.('aria-label'),
+          el.getAttribute?.('placeholder')
+        ].filter(Boolean).join(' ')
+      );
+
+      if (!humanLabel && !['hidden', 'submit', 'button', 'reset'].includes(type)) {
+        addFinding({
+          severity: 'observation',
+          category: 'Field Clarity',
+          title: 'Field has no clear user-facing label',
+          message: `${label} may be difficult to identify consistently during QA or accessibility review.`,
+          el,
+          expected: 'Visible label, question, ARIA label, table heading, or placeholder',
+          actual: 'No clear user-facing label detected'
+        });
+      } else {
+        passed++;
+      }
+
+      // Required-field consistency check. Visual markers alone are not treated
+      // as proof that browser/custom validation is correctly configured.
+      if (visibleRequired && !technicalRequired) {
+        addFinding({
+          severity: 'warning',
+          category: 'Required Fields',
+          title: 'Required marker without required constraint',
+          message: `${label} looks mandatory to the user, but no native/ARIA required constraint was detected. Verify the configured validation before go-live.`,
+          el,
+          expected: 'Visible mandatory indicator backed by a required constraint',
+          actual: 'Mandatory indicator detected; required constraint not detected'
+        });
+      } else if (technicalRequired && !visibleRequired) {
+        addFinding({
+          severity: 'warning',
+          category: 'Required Fields',
+          title: 'Required field is not visibly marked',
+          message: `${label} is technically required but Smart FormSense could not find a visible required/mandatory indicator.`,
+          el,
+          expected: 'Required field clearly indicated to the user',
+          actual: 'Required constraint detected without a clear visual marker'
+        });
+      } else {
+        passed++;
+      }
+
+      if (
+        technicalRequired &&
+        (el.disabled || el.readOnly) &&
+        !hasValue
+      ) {
+        addFinding({
+          severity: 'critical',
+          category: 'Field Behaviour',
+          title: 'Required field cannot currently be completed',
+          message: `${label} is required but is ${el.disabled ? 'disabled' : 'read-only'} and currently empty.`,
+          el,
+          expected: 'Required field should be completable or pre-populated',
+          actual: `${el.disabled ? 'Disabled' : 'Read-only'} and empty`
+        });
+      } else {
+        passed++;
+      }
+
+      // Constraint contradictions.
+      const minLengthRaw = el.getAttribute?.('minlength');
+      const maxLengthRaw = el.getAttribute?.('maxlength');
+      const minLength = minLengthRaw !== null && minLengthRaw !== '' ? Number(minLengthRaw) : null;
+      const maxLength = maxLengthRaw !== null && maxLengthRaw !== '' ? Number(maxLengthRaw) : null;
+
+      if (
+        Number.isFinite(minLength) &&
+        Number.isFinite(maxLength) &&
+        minLength > maxLength
+      ) {
+        addFinding({
+          severity: 'critical',
+          category: 'Validation Rules',
+          title: 'Contradictory length validation',
+          message: `${label} has minlength ${minLength} but maxlength ${maxLength}.`,
+          el,
+          expected: 'Minimum length should not exceed maximum length',
+          actual: `minlength=${minLength}, maxlength=${maxLength}`
+        });
+      } else {
+        passed++;
+      }
+
+      const minRaw = el.getAttribute?.('min');
+      const maxRaw = el.getAttribute?.('max');
+
+      if (
+        ['number', 'range'].includes(type) &&
+        minRaw !== null && minRaw !== '' &&
+        maxRaw !== null && maxRaw !== '' &&
+        Number.isFinite(Number(minRaw)) &&
+        Number.isFinite(Number(maxRaw)) &&
+        Number(minRaw) > Number(maxRaw)
+      ) {
+        addFinding({
+          severity: 'critical',
+          category: 'Validation Rules',
+          title: 'Contradictory numeric range',
+          message: `${label} has minimum ${minRaw} greater than maximum ${maxRaw}.`,
+          el,
+          expected: 'Minimum value should not exceed maximum value',
+          actual: `min=${minRaw}, max=${maxRaw}`
+        });
+      } else if (
+        ['date', 'month', 'time', 'datetime-local'].includes(type) &&
+        minRaw &&
+        maxRaw &&
+        String(minRaw) > String(maxRaw)
+      ) {
+        addFinding({
+          severity: 'critical',
+          category: 'Validation Rules',
+          title: 'Contradictory date/time range',
+          message: `${label} has minimum ${minRaw} after maximum ${maxRaw}.`,
+          el,
+          expected: 'Minimum date/time should not be after maximum date/time',
+          actual: `min=${minRaw}, max=${maxRaw}`
+        });
+      } else {
+        passed++;
+      }
+
+      // Dropdown and dependency readiness.
+      if (el.tagName === 'SELECT') {
+        const options = validOptions(el);
+
+        if (technicalRequired && !el.disabled && !options.length) {
+          addFinding({
+            severity: 'critical',
+            category: 'Dropdown & Dependencies',
+            title: 'Required dropdown has no selectable options',
+            message: `${label} is required but currently has no valid selectable option.`,
+            el,
+            expected: 'At least one valid selectable option',
+            actual: '0 valid options'
+          });
+        } else if (
+          el.disabled &&
+          !hasValue &&
+          /state|province|district|city|town|course|program|programme|speciali[sz]ation|branch|campus/.test(context)
+        ) {
+          addFinding({
+            severity: technicalRequired ? 'warning' : 'observation',
+            category: 'Dropdown & Dependencies',
+            title: 'Dependent dropdown is not ready',
+            message: `${label} is disabled and empty. Verify that its parent selection enables and loads this field correctly.`,
+            el,
+            expected: 'Dependent field should become available after its parent condition is satisfied',
+            actual: 'Disabled and empty at audit time'
+          });
+        } else {
+          passed++;
+        }
+      }
+
+      // Manual actions are intentionally surfaced rather than faked.
+      if (type === 'file' && technicalRequired && !el.files?.length) {
+        addFinding({
+          severity: 'observation',
+          category: 'Manual QA',
+          title: 'Required file upload needs manual QA',
+          message: `${label} requires a real browser file selection and remains a manual test step.`,
+          el,
+          expected: 'QA tester manually verifies allowed files, size/type validation, upload and removal behaviour',
+          actual: 'Manual browser action required'
+        });
+      }
+
+      // Existing invalid values can be surfaced without changing the field or
+      // triggering a form submission.
+      const validity = qaNativeValiditySummary(el);
+      const ariaInvalid = el.getAttribute?.('aria-invalid') === 'true';
+
+      if (hasValue && (validity || ariaInvalid)) {
+        addFinding({
+          severity: 'warning',
+          category: 'Current Validation State',
+          title: 'Current field value is invalid',
+          message: `${label} is currently reporting an invalid state${validity ? ` (${validity})` : ''}.`,
+          el,
+          expected: 'Current populated value should satisfy configured validation',
+          actual: validity || 'aria-invalid=true'
+        });
+      } else {
+        passed++;
+      }
+
+    }
+
+    try {
+      for (const doc of collectDocuments()) {
+        for (const el of queryFieldsDeep(doc)) {
+          if (
+            !isLogicalField(el) ||
+            !isFieldOperationallyVisible(el) ||
+            !el.id
+          ) {
+            continue;
+          }
+
+          const id = String(el.id);
+          const items = activeIds.get(id) || [];
+          items.push(el);
+          activeIds.set(id, items);
+        }
+      }
+    } catch {}
+
+    for (const [id, items] of activeIds.entries()) {
+      if (items.length <= 1) continue;
+
+      for (const el of items) {
+        addFinding({
+          severity: 'warning',
+          category: 'Form Structure',
+          title: 'Duplicate active field ID',
+          message: `${qaHumanLabel(el)} shares the DOM id "${id}" with another active field. This can cause label, validation, or scripting ambiguity.`,
+          el,
+          expected: 'Unique DOM id for active controls',
+          actual: `${items.length} active controls use id="${id}"`
+        });
+      }
+    }
+
+    // Hidden/inactive required controls are observations only because dynamic
+    // forms legitimately keep required templates hidden until a dependency is met.
+    try {
+      for (const doc of collectDocuments()) {
+        for (const el of allFields(doc)) {
+          if (
+            isFieldOperationallyVisible(el) ||
+            el.disabled ||
+            isLikelyInternalField(el) ||
+            !qaTechnicalRequired(el)
+          ) {
+            continue;
+          }
+
+          addFinding({
+            severity: 'observation',
+            category: 'Dynamic Fields',
+            title: 'Inactive required field detected',
+            message: `${qaHumanLabel(el)} is required in markup but is not currently active/visible. Verify that inactive states do not block progression unexpectedly.`,
+            el,
+            expected: 'Inactive conditional fields should not block the current journey',
+            actual: 'Required constraint exists while field is inactive'
+          });
+        }
+      }
+    } catch {}
+
+    const rank = {
+      critical: 0,
+      warning: 1,
+      observation: 2
+    };
+
+    findings.sort((a, b) =>
+      (rank[a.severity] ?? 9) - (rank[b.severity] ?? 9)
+    );
+
+    const counts = {
+      critical: findings.filter(item => item.severity === 'critical').length,
+      warning: findings.filter(item => item.severity === 'warning').length,
+      observation: findings.filter(item => item.severity === 'observation').length,
+      passed
+    };
+
+    const score = meaningful
+      ? clamp(
+      100 -
+        counts.critical * 18 -
+        counts.warning * 6 -
+        counts.observation,
+      0,
+      100
+    )
+      : 0;
+
+    const rating =
+      score >= 90
+        ? 'Strong'
+        : score >= 75
+          ? 'Good'
+          : score >= 60
+            ? 'Needs Review'
+            : 'Needs Attention';
+
+    return {
+      reportVersion: 1,
+      product: 'Smart FormSense',
+      productVersion: '17.8.0',
+      generatedAt,
+      auditType: 'Non-destructive Form Readiness Audit',
+      page: {
+        url: location.href,
+        hostname: location.hostname,
+        pathname: location.pathname,
+        title: document.title || ''
+      },
+      formSignature: formTechnicalSignature(),
+      fieldsAudited: fields.length,
+      score,
+      rating,
+      counts,
+      findings,
+      notes: [
+        'This audit does not submit the form.',
+        'This release performs non-destructive readiness checks; it does not deliberately inject invalid boundary values.',
+        'Observations are review prompts and may be valid for conditional/dynamic form designs.',
+        'Final go-live approval remains with the QA tester.'
+      ]
+    };
+  };
+
+  const qaFindingElement = key => {
+    if (!key) return null;
+
+    for (const doc of collectDocuments()) {
+      for (const el of allFields(doc)) {
+        if (fieldKey(el) === key) {
+          return el;
+        }
+      }
+    }
+
+    return null;
+  };
+
+  const navigateQaFinding = key => {
+    const el = qaFindingElement(key);
+
+    if (!el) {
+      state.panel?.setStatus(
+        'The QA field is no longer available. The form may have changed since the audit.'
+      );
+      return false;
+    }
+
+    const target = visualTarget(el) || el;
+
+    try {
+      target.scrollIntoView({
+        behavior: 'auto',
+        block: 'center',
+        inline: 'nearest'
+      });
+    } catch {
+      try { target.scrollIntoView(); } catch {}
+    }
+
+    setTimeout(() => {
+      try { el.focus({ preventScroll: true }); } catch {}
+      flashTarget(target);
+    }, 60);
+
+    state.panel?.setStatus(
+      `QA issue • ${qaHumanLabel(el)}`
+    );
+
+    return true;
+  };
+
+  const exportQaReport = report => {
+    const qa = report || state.qaReport;
+
+    if (!qa) {
+      state.panel?.setStatus('Run a QA Audit before exporting a report.');
+      return null;
+    }
+
+    const stamp = new Date()
+      .toISOString()
+      .replace(/[:.]/g, '-')
+      .slice(0, 19);
+
+    const host = String(
+      qa.page?.hostname ||
+      location.hostname ||
+      'form'
+    )
+      .replace(/[^a-z0-9.-]+/gi, '_')
+      .slice(0, 60);
+
+    downloadTextFile(
+      `Smart_FormSense_QA_${host}_${stamp}.json`,
+      JSON.stringify(qa, null, 2)
+    );
+
+    state.panel?.setStatus(
+      `QA report exported • Score ${qa.score}/100 • ${qa.findings.length} finding(s)`
+    );
+
+    return qa;
   };
 
 
@@ -13171,6 +13759,94 @@
       }
     };
 
+
+  const runSmartQaAudit = async () => {
+    if (!IS_TOP || state.running) return;
+
+    state.workspace = 'qa';
+    state.running = true;
+    state.stopRequested = false;
+    state.panel?.setBusy(true);
+    state.panel?.setStatus('Locating the active form for QA Audit...');
+    state.panel?.setMode('qa');
+
+    try {
+      const context = await chooseExecutionContext();
+
+      if (context.kind === 'remote') {
+        const result = await sendRemoteCommand(
+          context.agent,
+          'qa-audit'
+        );
+
+        if (result?.qaReport) {
+          state.qaReport = result.qaReport;
+          state.panel?.setQaReport?.(result.qaReport);
+        }
+
+        return state.qaReport;
+      }
+
+      if (context.kind === 'none') {
+        const report = buildQaAuditReport();
+        state.qaReport = report;
+        state.panel?.setQaReport?.(report);
+        state.panel?.setStatus(
+          'QA Audit completed, but no meaningful active form was detected.'
+        );
+        return report;
+      }
+
+      state.lastRemoteAgentId = null;
+
+      const report = buildQaAuditReport();
+      state.qaReport = report;
+      state.panel?.setQaReport?.(report);
+      state.panel?.setStatus(
+        `QA Audit completed • Readiness ${report.score}/100 • ${report.counts.critical} critical • ${report.counts.warning} warning(s)`
+      );
+
+      return report;
+    } catch (error) {
+      state.panel?.setStatus(
+        `QA Audit stopped safely: ${error?.message || 'unknown error'}`
+      );
+      return null;
+    } finally {
+      state.running = false;
+      state.activeRemoteAgentId = null;
+      state.activeRemoteRequestId = null;
+      state.activeRemoteAction = null;
+      state.panel?.setBusy(false);
+    }
+  };
+
+  const navigateSmartQaFinding = key => {
+    const agent = remoteAgentById(
+      state.lastRemoteAgentId
+    );
+
+    if (agent?.source) {
+      try {
+        agent.source.postMessage(
+          bridgePayload(
+            'NAVIGATE_QA',
+            {
+              sessionId: bridge.sessionId,
+              agentId: agent.id,
+              fieldKey: key
+            }
+          ),
+          '*'
+        );
+
+        return true;
+      } catch {}
+    }
+
+    return navigateQaFinding(key);
+  };
+
   const requestSmartStop = () => {
     state.stopRequested =
       true;
@@ -13507,6 +14183,13 @@
               );
             }
 
+            if (data.qaReport) {
+              state.qaReport = data.qaReport;
+              state.panel?.setQaReport?.(
+                data.qaReport
+              );
+            }
+
             state.running =
               false;
 
@@ -13758,6 +14441,17 @@
 
         if (
           data.type ===
+          'NAVIGATE_QA'
+        ) {
+          navigateQaFinding(
+            data.fieldKey
+          );
+
+          return;
+        }
+
+        if (
+          data.type ===
           'UNDO'
         ) {
           undo();
@@ -13812,6 +14506,8 @@
           loadProfile();
 
         try {
+          let qaReport = null;
+
           if (
             agent.action ===
             'fill'
@@ -13830,6 +14526,11 @@
             'recheck'
           ) {
             await recheckAndCorrect();
+          } else if (
+            agent.action ===
+            'qa-audit'
+          ) {
+            qaReport = buildQaAuditReport();
           }
 
           send(
@@ -13840,8 +14541,11 @@
                 agent.action,
               counters:
                 counters(),
+              qaReport,
               status:
-                `Embedded ${agent.action} completed • Filled ${state.stats.filled.size} • Errors ${state.stats.errors.size} • Manual ${state.stats.manual.size}`
+                agent.action === 'qa-audit' && qaReport
+                  ? `Embedded QA Audit completed • Readiness ${qaReport.score}/100 • ${qaReport.counts.critical} critical • ${qaReport.counts.warning} warning(s)`
+                  : `Embedded ${agent.action} completed • Filled ${state.stats.filled.size} • Errors ${state.stats.errors.size} • Manual ${state.stats.manual.size}`
             }
           );
         } catch (error) {
@@ -14000,6 +14704,90 @@
           padding:9px;
           background:linear-gradient(180deg,#fff 0%,#faf9ff 100%)
         }
+        .tagline{font-size:8px;opacity:.88;margin-top:2px;font-weight:650}
+        .modeTabs{
+          display:grid;
+          grid-template-columns:1fr 1fr;
+          gap:5px;
+          margin-bottom:8px;
+          padding:3px;
+          border-radius:11px;
+          background:#f0edfb
+        }
+        .modeTab{
+          border:0;
+          border-radius:8px;
+          padding:7px 5px;
+          background:transparent;
+          color:#69627d;
+          font-size:9px;
+          font-weight:850;
+          cursor:pointer
+        }
+        .modeTab.active{
+          background:#fff;
+          color:#5b4bff;
+          box-shadow:0 3px 10px rgba(70,50,140,.12)
+        }
+        .workspace{display:none}
+        .workspace.active{display:block}
+        .qaScoreCard{
+          border:1px solid #e4defb;
+          border-radius:12px;
+          padding:10px;
+          text-align:center;
+          background:linear-gradient(135deg,#f8f7ff,#fff7fb);
+          margin-bottom:7px
+        }
+        .qaScoreLabel{font-size:9px;color:#777084;font-weight:750}
+        .qaScore{font-size:26px;line-height:1.05;font-weight:900;color:#4f46e5;margin-top:3px}
+        .qaRating{font-size:9px;color:#6b7280;margin-top:3px}
+        .qaStats{
+          display:grid;
+          grid-template-columns:repeat(4,1fr);
+          gap:4px;
+          margin:7px 0
+        }
+        .qaStat{
+          border:1px solid #e7e3f5;
+          border-radius:9px;
+          padding:6px 2px;
+          text-align:center;
+          background:#fff
+        }
+        .qaStat b{display:block;font-size:13px;line-height:1}
+        .qaStat span{display:block;font-size:7px;margin-top:3px;color:#777084;font-weight:750}
+        .qaCritical b{color:#dc2626}
+        .qaWarning b{color:#d97706}
+        .qaObservation b{color:#2563eb}
+        .qaPassed b{color:#15803d}
+        .qaIssues{
+          max-height:190px;
+          overflow:auto;
+          display:grid;
+          gap:5px;
+          margin-top:7px
+        }
+        .qaIssue{
+          width:100%;
+          border:1px solid #e7e3f5;
+          border-radius:9px;
+          background:#fff;
+          padding:7px 8px;
+          text-align:left;
+          cursor:pointer
+        }
+        .qaIssue:disabled{cursor:default;opacity:1}
+        .qaIssueTop{display:flex;align-items:center;gap:5px}
+        .qaPill{font-size:7px;font-weight:900;text-transform:uppercase;padding:2px 5px;border-radius:999px}
+        .qaPill.critical{background:#fff1f2;color:#dc2626}
+        .qaPill.warning{background:#fff7ed;color:#d97706}
+        .qaPill.observation{background:#eff6ff;color:#2563eb}
+        .qaIssueTitle{font-size:9px;font-weight:850;color:#312e46;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+        .qaIssueField{font-size:8px;color:#665e78;margin-top:4px;font-weight:750}
+        .qaIssueMessage{font-size:8px;color:#7b7488;margin-top:2px;line-height:1.35}
+        .qaEmpty{font-size:9px;color:#777084;text-align:center;padding:12px 8px;border:1px dashed #ddd6fe;border-radius:9px;background:#fff}
+        .qaHint{font-size:8px;color:#8a8fa0;line-height:1.35;margin-top:5px}
         .modeRow{
           display:flex;
           justify-content:space-between;
@@ -14280,7 +15068,7 @@
       <div class="panel" id="panel">
         <div class="hero">
           <div class="top">
-            <div class="title">✦ Smart Form Filler</div>
+            <div><div class="title">✦ Smart FormSense</div><div class="tagline">Intelligent Form Filling & QA Testing</div></div>
             <div class="windowBtns">
               <button class="windowBtn" id="minimize" title="Minimize">−</button>
               <button class="windowBtn" id="close" title="Close">×</button>
@@ -14295,55 +15083,90 @@
         </div>
 
         <div class="body">
-          <div class="modeRow">
-            <span class="badge" id="mode">READY</span>
-            <span class="elapsed" id="elapsed">0.0s</span>
+          <div class="modeTabs">
+            <button class="modeTab active" id="fillTab">⚡ Form Filling</button>
+            <button class="modeTab" id="qaTab">🧪 QA Testing</button>
           </div>
 
-          <div class="progress">
-            <div class="bar" id="bar"></div>
+          <div class="workspace active" id="fillWorkspace">
+            <div class="modeRow">
+              <span class="badge" id="mode">READY</span>
+              <span class="elapsed" id="elapsed">0.0s</span>
+            </div>
+
+            <div class="progress">
+              <div class="bar" id="bar"></div>
+            </div>
+
+            <div class="stage" id="stage">Ready</div>
+
+            <div class="stats">
+              <div class="stat green" id="filledCard" title="Click to jump through filled fields">
+                <b id="filled">0</b>
+                <span>Filled</span>
+              </div>
+
+              <div class="stat blue" id="preservedCard" title="Click to jump through already-filled/preserved fields">
+                <b id="preserved">0</b>
+                <span>Existing</span>
+              </div>
+
+              <div class="stat amber" id="reviewCard" title="Click to jump through review fields">
+                <b id="review">0</b>
+                <span>Review</span>
+              </div>
+
+              <div class="stat red" id="errorsCard" title="Click to jump through error fields">
+                <b id="errors">0</b>
+                <span>Errors</span>
+              </div>
+
+              <div class="stat purple" id="manualCard" title="Click to jump through manual-required fields">
+                <b id="manual">0</b>
+                <span>Manual</span>
+              </div>
+            </div>
+
+            <button class="primary" id="fillBtn">Fill Form</button>
+
+            <div class="grid">
+              <button class="secondary" id="correctBtn">Recheck & Correct</button>
+              <button class="secondary" id="validateBtn">Validate</button>
+            </div>
+
+            <div class="utilityGrid">
+              <button class="secondary" id="undoBtn">Undo</button>
+              <button class="secondary" id="newBtn">New Applicant</button>
+              <button class="secondary" id="debugBtn" title="Download a troubleshooting report">Export Debug</button>
+            </div>
           </div>
 
-          <div class="stage" id="stage">Ready</div>
-
-          <div class="stats">
-            <div class="stat green" id="filledCard" title="Click to jump through filled fields">
-              <b id="filled">0</b>
-              <span>Filled</span>
+          <div class="workspace" id="qaWorkspace">
+            <div class="qaScoreCard">
+              <div class="qaScoreLabel">FORM READINESS</div>
+              <div class="qaScore" id="qaScore">--</div>
+              <div class="qaRating" id="qaRating">Run an audit to check this form</div>
             </div>
 
-            <div class="stat blue" id="preservedCard" title="Click to jump through already-filled/preserved fields">
-              <b id="preserved">0</b>
-              <span>Existing</span>
+            <button class="primary" id="qaRunBtn">Run QA Audit</button>
+
+            <div class="qaStats">
+              <div class="qaStat qaCritical"><b id="qaCritical">0</b><span>Critical</span></div>
+              <div class="qaStat qaWarning"><b id="qaWarning">0</b><span>Warnings</span></div>
+              <div class="qaStat qaObservation"><b id="qaObservation">0</b><span>Observations</span></div>
+              <div class="qaStat qaPassed"><b id="qaPassed">0</b><span>Passed</span></div>
             </div>
 
-            <div class="stat amber" id="reviewCard" title="Click to jump through review fields">
-              <b id="review">0</b>
-              <span>Review</span>
+            <div class="qaIssues" id="qaIssues">
+              <div class="qaEmpty">Run QA Audit to inspect required fields, validations, dropdown dependencies and form readiness.</div>
             </div>
 
-            <div class="stat red" id="errorsCard" title="Click to jump through error fields">
-              <b id="errors">0</b>
-              <span>Errors</span>
+            <div class="grid">
+              <button class="secondary" id="qaExportBtn" disabled>Export QA Report</button>
+              <button class="secondary" id="qaRefreshBtn">Run Again</button>
             </div>
 
-            <div class="stat purple" id="manualCard" title="Click to jump through manual-required fields">
-              <b id="manual">0</b>
-              <span>Manual</span>
-            </div>
-          </div>
-
-          <button class="primary" id="fillBtn">Fill Form</button>
-
-          <div class="grid">
-            <button class="secondary" id="correctBtn">Recheck & Correct</button>
-            <button class="secondary" id="validateBtn">Validate</button>
-          </div>
-
-          <div class="utilityGrid">
-            <button class="secondary" id="undoBtn">Undo</button>
-            <button class="secondary" id="newBtn">New Applicant</button>
-            <button class="secondary" id="debugBtn" title="Download a troubleshooting report">Export Debug</button>
+            <div class="qaHint">Safe audit mode: no final submission and no deliberate invalid-value injection.</div>
           </div>
 
           <div class="status" id="status">
@@ -14370,7 +15193,7 @@
       <div class="mini" id="mini" title="Click to restore">
         <div class="miniIcon">✦</div>
         <div class="miniText">
-          <strong>Smart Form Filler</strong>
+          <strong>Smart FormSense</strong>
           <span id="miniStatus">Ready</span>
         </div>
         <div class="miniCount" id="miniCount">0</div>
@@ -14413,6 +15236,20 @@
       undoBtn: $('undoBtn'),
       newBtn: $('newBtn'),
       debugBtn: $('debugBtn'),
+      fillTab: $('fillTab'),
+      qaTab: $('qaTab'),
+      fillWorkspace: $('fillWorkspace'),
+      qaWorkspace: $('qaWorkspace'),
+      qaRunBtn: $('qaRunBtn'),
+      qaExportBtn: $('qaExportBtn'),
+      qaRefreshBtn: $('qaRefreshBtn'),
+      qaIssues: $('qaIssues'),
+      qaScore: $('qaScore'),
+      qaRating: $('qaRating'),
+      qaCritical: $('qaCritical'),
+      qaWarning: $('qaWarning'),
+      qaObservation: $('qaObservation'),
+      qaPassed: $('qaPassed'),
       creatorEmail: $('creatorEmail'),
       mode: $('mode'),
       elapsed: $('elapsed'),
@@ -14504,6 +15341,22 @@
       });
     };
 
+    const showWorkspace = workspace => {
+      const next = workspace === 'qa' ? 'qa' : 'fill';
+      state.workspace = next;
+
+      refs.fillTab?.classList.toggle('active', next === 'fill');
+      refs.qaTab?.classList.toggle('active', next === 'qa');
+      refs.fillWorkspace?.classList.toggle('active', next === 'fill');
+      refs.qaWorkspace?.classList.toggle('active', next === 'qa');
+
+      if (next === 'qa' && state.qaReport) {
+        state.panel?.setQaReport?.(state.qaReport);
+      }
+
+      setTimeout(fitPanelToViewport, 0);
+    };
+
     const minimize = () => {
       refs.panel.style.display = 'none';
       refs.mini.style.display = 'flex';
@@ -14543,7 +15396,69 @@
             ? 'MINIMUM FILL'
             : mode === 'all'
               ? 'FULL FILL'
-              : 'READY';
+              : mode === 'qa'
+                ? 'QA AUDIT'
+                : 'READY';
+      },
+
+      setQaReport(report) {
+        if (!report) return;
+
+        state.qaReport = report;
+
+        if (refs.qaScore) {
+          refs.qaScore.textContent = `${Number(report.score || 0)}/100`;
+        }
+
+        if (refs.qaRating) {
+          refs.qaRating.textContent = `${report.rating || 'Review'} • ${Number(report.fieldsAudited || 0)} field(s) audited`;
+        }
+
+        const counts = report.counts || {};
+
+        if (refs.qaCritical) refs.qaCritical.textContent = Number(counts.critical || 0);
+        if (refs.qaWarning) refs.qaWarning.textContent = Number(counts.warning || 0);
+        if (refs.qaObservation) refs.qaObservation.textContent = Number(counts.observation || 0);
+        if (refs.qaPassed) refs.qaPassed.textContent = Number(counts.passed || 0);
+        if (refs.qaExportBtn) refs.qaExportBtn.disabled = false;
+
+        const findings = Array.isArray(report.findings)
+          ? report.findings
+          : [];
+
+        if (!refs.qaIssues) return;
+
+        if (!findings.length) {
+          refs.qaIssues.innerHTML = '<div class="qaEmpty">No QA findings were surfaced by this audit.</div>';
+          return;
+        }
+
+        const escape = value => String(value ?? '')
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;')
+          .replace(/'/g, '&#039;');
+
+        refs.qaIssues.innerHTML = findings
+          .map(item => {
+            const severity = ['critical', 'warning', 'observation'].includes(item.severity)
+              ? item.severity
+              : 'observation';
+            const clickable = !!item.fieldKey;
+
+            return `
+              <button class="qaIssue" ${clickable ? `data-qa-field="${escape(item.fieldKey)}"` : 'disabled'}>
+                <div class="qaIssueTop">
+                  <span class="qaPill ${severity}">${escape(severity)}</span>
+                  <span class="qaIssueTitle">${escape(item.title || 'QA finding')}</span>
+                </div>
+                ${item.field ? `<div class="qaIssueField">${escape(item.field)}</div>` : ''}
+                ${item.message ? `<div class="qaIssueMessage">${escape(item.message)}</div>` : ''}
+              </button>
+            `;
+          })
+          .join('');
       },
 
       setCounters(c) {
@@ -14568,6 +15483,11 @@
         refs.undoBtn.disabled = busy;
         refs.newBtn.disabled = busy;
         refs.debugBtn.disabled = busy;
+        if (refs.qaRunBtn) refs.qaRunBtn.disabled = busy;
+        if (refs.qaRefreshBtn) refs.qaRefreshBtn.disabled = busy;
+        if (refs.qaExportBtn) refs.qaExportBtn.disabled = busy || !state.qaReport;
+        if (refs.fillTab) refs.fillTab.disabled = busy;
+        if (refs.qaTab) refs.qaTab.disabled = busy;
 
         if (busy) {
           refs.fillBtn.disabled = false;
@@ -14585,6 +15505,16 @@
           refs.fillBtn.textContent = 'Fill Form';
           refs.fillBtn.classList.remove('danger');
           refs.fillBtn.onclick = showModeDialog;
+          if (refs.qaRunBtn) {
+            refs.qaRunBtn.textContent = 'Run QA Audit';
+            refs.qaRunBtn.onclick = runSmartQaAudit;
+          }
+          if (refs.qaRefreshBtn) {
+            refs.qaRefreshBtn.onclick = runSmartQaAudit;
+          }
+          if (refs.qaExportBtn) {
+            refs.qaExportBtn.disabled = !state.qaReport;
+          }
         }
       },
 
@@ -14592,6 +15522,7 @@
         refs.modal.style.display = 'flex';
       },
 
+      showWorkspace,
       minimize,
       restore
     };
@@ -14621,6 +15552,29 @@
 
     refs.debugBtn.onclick =
       smartDebugExport;
+
+    refs.fillTab.onclick = () =>
+      showWorkspace('fill');
+
+    refs.qaTab.onclick = () =>
+      showWorkspace('qa');
+
+    refs.qaRunBtn.onclick =
+      runSmartQaAudit;
+
+    refs.qaRefreshBtn.onclick =
+      runSmartQaAudit;
+
+    refs.qaExportBtn.onclick = () =>
+      exportQaReport(state.qaReport);
+
+    refs.qaIssues.addEventListener('click', event => {
+      const button = event.target?.closest?.('[data-qa-field]');
+      if (!button) return;
+      navigateSmartQaFinding(
+        button.getAttribute('data-qa-field')
+      );
+    });
 
     $('filledCard').onclick = () => navigateSmartStat('filled');
     $('preservedCard').onclick = () => navigateSmartStat('preserved');
@@ -14726,6 +15680,10 @@
     });
 
     state.panel.refreshProfile();
+    showWorkspace(state.workspace || 'fill');
+    if (state.qaReport) {
+      state.panel.setQaReport(state.qaReport);
+    }
     updateCounters();
   };
 
@@ -14796,7 +15754,7 @@
     installTopBridge();
 
     GM_registerMenuCommand(
-      'Activate Smart Form Filler',
+      'Activate Smart FormSense',
       mountPanel
     );
 
