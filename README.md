@@ -6,7 +6,7 @@ Smart FormSense is a Tampermonkey userscript for authorized form filling and QA 
 
 ## Current version
 
-**17.8.0**
+**17.9.0**
 
 ## Two modes
 
@@ -23,12 +23,16 @@ Smart FormSense is a Tampermonkey userscript for authorized form filling and QA 
 ### 🧪 QA Testing
 
 - Run a **non-destructive QA Audit** without submitting the form or deliberately injecting invalid values
-- Produce a **Form Readiness** score
-- Summarize **Critical**, **Warning**, **Observation**, and **Passed** checks
-- Check required-field consistency, field clarity, contradictory constraints, dropdown/dependency readiness, current validation state, and manual QA requirements
-- Click QA findings to navigate to the related field when supported
+- Produce a weighted **Form Readiness** score that accounts for passed checks and finding severity instead of allowing repeated low-severity findings to collapse the score
+- Summarize **Critical**, **Warning**, **Observation**, and **Checks Passed** results
+- Detect native, ARIA, and common framework/custom required-field signals while treating visual-only required markers as manual confirmation points rather than automatic configuration failures
+- Audit radio groups once instead of reporting each option separately
+- Use stronger row/column context for academic and table-based field labels
+- Check required-field consistency, field clarity, contradictory constraints, dropdown/dependency readiness, current validation state, duplicate IDs, and manual QA requirements
+- Group repeated findings in the panel and keep findings navigable to the affected field when supported
 - Support embedded/cross-origin forms through the existing child-frame agent bridge
-- Export a structured QA report for review and troubleshooting
+- Export a human-readable **HTML QA Report** with score, risk summary, grouped findings, affected fields, guidance, and printable details
+- Export a separate **QA Debug JSON** with detailed field signals, constraints, validity information, runtime diagnostics, and the standard Smart FormSense debug data for troubleshooting
 
 The QA readiness score is an advisory testing aid, not a production certification.
 
