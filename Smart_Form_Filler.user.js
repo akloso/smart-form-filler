@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Smart FormSense
 // @namespace    smart-form-filler
-// @version      17.8.0
+// @version      17.9.0
 // @description  Intelligent form filling and QA testing for authorized web-form validation, readiness checks, embedded forms, safe repair, and synthetic test data.
 // @author       Akash Singh
 // @match        *://*/*
@@ -185,7 +185,7 @@
     );
 
     console.error(
-      `Smart FormSense V17.8 [${stage}]`,
+      `Smart FormSense V17.9 [${stage}]`,
       error
     );
 
@@ -12320,7 +12320,7 @@
     const report = {
       reportVersion: 1,
       generatedBy:
-        'Smart FormSense V17.8',
+        'Smart FormSense V17.9',
       generatedAt:
         new Date().toISOString(),
       mode:
@@ -12440,7 +12440,7 @@
           .slice(0, 60);
 
       const filename =
-        `Smart_FormSense_V17_8_Debug_${host}_${stamp}.json`;
+        `Smart_FormSense_V17_9_Debug_${host}_${stamp}.json`;
 
       downloadTextFile(
         filename,
@@ -12458,7 +12458,7 @@
       return report;
     } catch (error) {
       console.error(
-        'Smart FormSense V17.8 debug export:',
+        'Smart FormSense V17.9 debug export:',
         error
       );
 
@@ -12474,25 +12474,123 @@
   // ==========================================================
   // Smart FormSense QA audit
   // ==========================================================
-  const qaTechnicalRequired = el => {
-    if (!el) return false;
-
-    if (el.type === 'radio') {
-      return radioGroupMembers(el).some(
-        item =>
-          item.required ||
-          item.getAttribute?.('aria-required') === 'true'
-      );
+  const qaRequiredSignals = el => {
+    if (!el) {
+      return {
+        native: false,
+        aria: false,
+        customAttribute: false,
+        customClass: false,
+        configured: false,
+        visible: false,
+        sources: []
+      };
     }
 
-    return !!(
-      el.required ||
-      el.getAttribute?.('aria-required') === 'true'
-    );
-  };
+    const inspectOne = item => {
+      const sources = [];
+      const native = !!item.required;
+      const aria = item.getAttribute?.('aria-required') === 'true';
 
-  const qaVisibleRequiredMarker = el => {
-    if (!el) return false;
+      if (native) sources.push('native required');
+      if (aria) sources.push('aria-required');
+
+      const customAttributes = [
+        'data-rule-required',
+        'data-val-required',
+        'data-parsley-required',
+        'data-required',
+        'data-validation-required',
+        'ng-required',
+        'x-required'
+      ];
+
+      let customAttribute = false;
+
+      for (const name of customAttributes) {
+        const raw = item.getAttribute?.(name);
+
+        if (
+          raw !== null &&
+          !/^(?:false|0|no|off)$/i.test(String(raw).trim())
+        ) {
+          customAttribute = true;
+          sources.push(name);
+        }
+      }
+
+      const validateRaw =
+        item.getAttribute?.('data-validate') ||
+        item.getAttribute?.('v-validate') ||
+        '';
+
+      if (
+        validateRaw &&
+        /\brequired\b/i.test(String(validateRaw))
+      ) {
+        customAttribute = true;
+        sources.push(
+          item.hasAttribute?.('v-validate')
+            ? 'v-validate'
+            : 'data-validate'
+        );
+      }
+
+      const customClass = !!(
+        item.classList?.contains('required') ||
+        item.classList?.contains('mandatory') ||
+        item.classList?.contains('validate-required')
+      );
+
+      if (customClass) {
+        sources.push('required class');
+      }
+
+      return {
+        native,
+        aria,
+        customAttribute,
+        customClass,
+        configured:
+          native ||
+          aria ||
+          customAttribute ||
+          customClass,
+        sources
+      };
+    };
+
+    let combined = inspectOne(el);
+
+    if (el.type === 'radio') {
+      const members = radioGroupMembers(el);
+
+      for (const item of members) {
+        const next = inspectOne(item);
+
+        combined = {
+          native:
+            combined.native ||
+            next.native,
+          aria:
+            combined.aria ||
+            next.aria,
+          customAttribute:
+            combined.customAttribute ||
+            next.customAttribute,
+          customClass:
+            combined.customClass ||
+            next.customClass,
+          configured:
+            combined.configured ||
+            next.configured,
+          sources: [
+            ...combined.sources,
+            ...next.sources
+          ]
+        };
+      }
+    }
 
     const human = [
       explicitLabelContext(el),
@@ -12502,36 +12600,92 @@
       .filter(Boolean)
       .join(' ');
 
-    if (/\*|\brequired\b|\bmandatory\b/i.test(human)) {
-      return true;
-    }
+    const container =
+      fieldContainerFor(el);
 
-    const container = fieldContainerFor(el);
-
-    return !!(
-      container &&
+    const visible = !!(
+      /\*|\brequired\b|\bmandatory\b/i.test(human) ||
       (
-        container.classList.contains('required') ||
-        container.querySelector?.(
-          ':scope > .required,:scope > .mandatory,:scope > [data-required="true"]'
+        container &&
+        (
+          container.classList.contains('required') ||
+          container.classList.contains('mandatory') ||
+          container.querySelector?.(
+            ':scope > .required,:scope > .mandatory,:scope > [data-required="true"]'
+          )
         )
       )
     );
+
+    return {
+      ...combined,
+      visible,
+      sources: [...new Set(combined.sources)]
+    };
   };
 
+  const qaTechnicalRequired = el =>
+    !!qaRequiredSignals(el).configured;
+
+  const qaVisibleRequiredMarker = el =>
+    !!qaRequiredSignals(el).visible;
+
   const qaHumanLabel = el => {
-    const value = [
+    if (!el) return 'Unnamed field';
+
+    const row =
+      String(
+        tableRowLabelContext(el) ||
+        ''
+      )
+        .replace(/\s+/g, ' ')
+        .trim();
+
+    const column =
+      String(
+        tableHeaderContext(el) ||
+        ''
+      )
+        .replace(/\s+/g, ' ')
+        .trim();
+
+    if (
+      row &&
+      column &&
+      normalize(row) !==
+        normalize(column) &&
+      !/^(?:text field|select option|input|field)$/i.test(column)
+    ) {
+      return `${row} — ${column}`
+        .slice(0, 120);
+    }
+
+    const candidates = [
       explicitLabelContext(el),
       questionContext(el),
-      tableHeaderContext(el),
+      column,
       el.getAttribute?.('aria-label'),
       el.getAttribute?.('placeholder')
     ]
       .filter(Boolean)
-      .map(item => String(item).replace(/\s+/g, ' ').trim())
-      .find(Boolean);
+      .map(item =>
+        String(item)
+          .replace(/\s+/g, ' ')
+          .trim()
+      )
+      .filter(
+        item =>
+          item &&
+          !/^(?:text field|select option|input|field)$/i.test(item)
+      );
 
-    if (value) return value.slice(0, 120);
+    if (candidates.length) {
+      return candidates[0].slice(0, 120);
+    }
+
+    if (row) {
+      return row.slice(0, 120);
+    }
 
     const technical = [
       el.getAttribute?.('name'),
@@ -12573,15 +12727,63 @@
     }
   };
 
+  const qaBuildSummary = (
+    score,
+    counts,
+    fieldsAudited,
+    checksRun
+  ) => {
+    let riskLevel = 'Low';
+    let headline =
+      'No major readiness problems were detected.';
+    let recommendation =
+      'Review the observations, then continue with normal functional testing.';
+
+    if (counts.critical > 0) {
+      riskLevel = 'High';
+      headline =
+        `${counts.critical} critical blocker${counts.critical === 1 ? '' : 's'} should be resolved before go-live.`;
+      recommendation =
+        'Fix the critical findings first, rerun the audit, and then review warnings.';
+    } else if (counts.warning > 0) {
+      riskLevel = 'Moderate';
+      headline =
+        `No critical blockers found. ${counts.warning} warning${counts.warning === 1 ? '' : 's'} need review.`;
+      recommendation =
+        'Review the warnings and confirm the affected fields behave correctly before go-live.';
+    } else if (counts.observation > 0) {
+      riskLevel = 'Low';
+      headline =
+        `No critical blockers or warnings found. ${counts.observation} observation${counts.observation === 1 ? '' : 's'} remain for manual confirmation.`;
+      recommendation =
+        'The form looks structurally healthy. Confirm the observations during normal functional QA.';
+    }
+
+    return {
+      riskLevel,
+      headline,
+      recommendation,
+      fieldsAudited,
+      checksRun,
+      score
+    };
+  };
+
   const buildQaAuditReport = () => {
-    const generatedAt = new Date().toISOString();
+    const generatedAt =
+      new Date().toISOString();
+
     const findings = [];
     const seen = new Set();
+    const auditedRadioGroups =
+      new Set();
+
     let passed = 0;
     let fields = [];
 
     try {
-      fields = visibleFillableFields();
+      fields =
+        visibleFillableFields();
     } catch {}
 
     const addFinding = ({
@@ -12591,10 +12793,15 @@
       message = '',
       el = null,
       expected = '',
-      actual = ''
+      actual = '',
+      guidance = ''
     }) => {
-      const fieldKeyValue = el ? fieldKey(el) : null;
-      const label = el ? qaHumanLabel(el) : '';
+      const fieldKeyValue =
+        el ? fieldKey(el) : null;
+
+      const label =
+        el ? qaHumanLabel(el) : '';
+
       const signature = [
         severity,
         category,
@@ -12603,19 +12810,26 @@
         message
       ].join('|');
 
-      if (seen.has(signature)) return;
+      if (seen.has(signature)) {
+        return;
+      }
+
       seen.add(signature);
 
       findings.push({
-        id: `qa_${findings.length + 1}`,
+        id:
+          `qa_${findings.length + 1}`,
         severity,
         category,
         title,
         message,
-        fieldKey: fieldKeyValue,
-        field: label,
+        fieldKey:
+          fieldKeyValue,
+        field:
+          label,
         expected,
-        actual
+        actual,
+        guidance
       });
     };
 
@@ -12623,288 +12837,586 @@
       fields.length >= 2 ||
       (
         fields.length >= 1 &&
-        fields.some(el => isRequired(el))
+        fields.some(
+          el =>
+            isRequired(el)
+        )
       );
 
     if (!meaningful) {
       addFinding({
         severity: 'critical',
         category: 'Form Detection',
-        title: 'No meaningful active form detected',
-        message: 'Smart FormSense could not find a meaningful visible form in this execution context.',
-        expected: 'A meaningful operational form with fillable controls',
-        actual: `${fields.length} operational field(s) detected`
+        title:
+          'No meaningful active form detected',
+        message:
+          'Smart FormSense could not find a meaningful visible form in this execution context.',
+        expected:
+          'A meaningful operational form with fillable controls',
+        actual:
+          `${fields.length} operational field(s) detected`,
+        guidance:
+          'Confirm the form has loaded completely and that the correct page or embedded frame is active.'
       });
     }
 
-    const activeIds = new Map();
+    const activeIds =
+      new Map();
 
     for (const el of fields) {
-      if (!el || isLikelyInternalField(el)) continue;
+      if (
+        !el ||
+        isLikelyInternalField(el)
+      ) {
+        continue;
+      }
 
-      const technicalRequired = qaTechnicalRequired(el);
-      const visibleRequired = qaVisibleRequiredMarker(el);
-      const hasValue = fieldHasValue(el);
-      const label = qaHumanLabel(el);
-      const type = normalize(el.type);
-      const context = fieldContext(el);
+      if (el.type === 'radio') {
+        const groupKey =
+          `${el.ownerDocument?.URL || ''}|${el.name || fieldKey(el)}`;
 
-      // Label/readability check.
-      const humanLabel = normalize(
-        [
-          explicitLabelContext(el),
-          questionContext(el),
-          tableHeaderContext(el),
-          el.getAttribute?.('aria-label'),
-          el.getAttribute?.('placeholder')
-        ].filter(Boolean).join(' ')
-      );
+        if (
+          auditedRadioGroups.has(
+            groupKey
+          )
+        ) {
+          continue;
+        }
 
-      if (!humanLabel && !['hidden', 'submit', 'button', 'reset'].includes(type)) {
+        auditedRadioGroups.add(
+          groupKey
+        );
+      }
+
+      const requiredSignals =
+        qaRequiredSignals(el);
+
+      const configuredRequired =
+        requiredSignals.configured;
+
+      const visibleRequired =
+        requiredSignals.visible;
+
+      const businessRequired =
+        !!(
+          configuredRequired ||
+          visibleRequired ||
+          isRequired(el)
+        );
+
+      const hasValue =
+        fieldHasValue(el);
+
+      const label =
+        qaHumanLabel(el);
+
+      const type =
+        normalize(el.type);
+
+      const context =
+        fieldContext(el);
+
+      // Field clarity / accessibility.
+      const humanLabel =
+        normalize(
+          [
+            explicitLabelContext(el),
+            questionContext(el),
+            tableHeaderContext(el),
+            tableRowLabelContext(el),
+            el.getAttribute?.(
+              'aria-label'
+            ),
+            el.getAttribute?.(
+              'placeholder'
+            )
+          ]
+            .filter(Boolean)
+            .join(' ')
+        );
+
+      if (
+        !humanLabel &&
+        ![
+          'hidden',
+          'submit',
+          'button',
+          'reset'
+        ].includes(type)
+      ) {
         addFinding({
-          severity: 'observation',
-          category: 'Field Clarity',
-          title: 'Field has no clear user-facing label',
-          message: `${label} may be difficult to identify consistently during QA or accessibility review.`,
+          severity:
+            'observation',
+          category:
+            'Field Clarity',
+          title:
+            'Field has no clear user-facing label',
+          message:
+            `${label} may be difficult to identify consistently during QA or accessibility review.`,
           el,
-          expected: 'Visible label, question, ARIA label, table heading, or placeholder',
-          actual: 'No clear user-facing label detected'
+          expected:
+            'Visible label, question, ARIA label, table heading, row context, or placeholder',
+          actual:
+            'No clear user-facing label detected',
+          guidance:
+            'Add or verify a clear field label or accessible name.'
         });
       } else {
         passed++;
       }
 
-      // Required-field consistency check. Visual markers alone are not treated
-      // as proof that browser/custom validation is correctly configured.
-      if (visibleRequired && !technicalRequired) {
+      // Required-rule consistency.
+      // A visible asterisk without native "required" is common in JS-driven
+      // forms, so it is an observation unless stronger evidence shows a
+      // broken rule. This avoids treating framework choice as a defect.
+      if (
+        visibleRequired &&
+        !configuredRequired
+      ) {
         addFinding({
-          severity: 'warning',
-          category: 'Required Fields',
-          title: 'Required marker without required constraint',
-          message: `${label} looks mandatory to the user, but no native/ARIA required constraint was detected. Verify the configured validation before go-live.`,
+          severity:
+            'observation',
+          category:
+            'Required Fields',
+          title:
+            'Required rule should be functionally confirmed',
+          message:
+            `${label} is visibly marked as required, but Smart FormSense could not confirm the rule from native, ARIA, or common validator attributes. The form may still enforce it through JavaScript.`,
           el,
-          expected: 'Visible mandatory indicator backed by a required constraint',
-          actual: 'Mandatory indicator detected; required constraint not detected'
+          expected:
+            'A visible required indicator with an enforceable required rule',
+          actual:
+            'Required indicator detected; declarative/common validator rule not detected',
+          guidance:
+            'Leave this field empty once during functional QA and confirm the form blocks progression with a clear message.'
         });
-      } else if (technicalRequired && !visibleRequired) {
+      } else if (
+        configuredRequired &&
+        !visibleRequired
+      ) {
         addFinding({
-          severity: 'warning',
-          category: 'Required Fields',
-          title: 'Required field is not visibly marked',
-          message: `${label} is technically required but Smart FormSense could not find a visible required/mandatory indicator.`,
+          severity:
+            'warning',
+          category:
+            'Required Fields',
+          title:
+            'Required field is not visibly marked',
+          message:
+            `${label} appears to be technically required but Smart FormSense could not find a visible required/mandatory indicator.`,
           el,
-          expected: 'Required field clearly indicated to the user',
-          actual: 'Required constraint detected without a clear visual marker'
+          expected:
+            'Required field clearly indicated to the user',
+          actual:
+            `Required rule detected via ${requiredSignals.sources.join(', ') || 'configuration'} without a clear visual marker`,
+          guidance:
+            'Make the required state visible and understandable to the user.'
         });
       } else {
         passed++;
       }
 
       if (
-        technicalRequired &&
-        (el.disabled || el.readOnly) &&
+        businessRequired &&
+        (
+          el.disabled ||
+          el.readOnly
+        ) &&
         !hasValue
       ) {
+        const dependencyLike =
+          /state|province|district|city|town|course|program|programme|speciali[sz]ation|branch|campus/.test(
+            context
+          );
+
         addFinding({
-          severity: 'critical',
-          category: 'Field Behaviour',
-          title: 'Required field cannot currently be completed',
-          message: `${label} is required but is ${el.disabled ? 'disabled' : 'read-only'} and currently empty.`,
+          severity:
+            dependencyLike
+              ? 'observation'
+              : 'critical',
+          category:
+            'Field Behaviour',
+          title:
+            dependencyLike
+              ? 'Required dependent field is waiting for a parent selection'
+              : 'Required field cannot currently be completed',
+          message:
+            dependencyLike
+              ? `${label} is currently ${el.disabled ? 'disabled' : 'read-only'} and empty. This may be expected until a parent field is selected.`
+              : `${label} is required but is ${el.disabled ? 'disabled' : 'read-only'} and currently empty.`,
           el,
-          expected: 'Required field should be completable or pre-populated',
-          actual: `${el.disabled ? 'Disabled' : 'Read-only'} and empty`
+          expected:
+            dependencyLike
+              ? 'Field becomes available after the relevant parent selection'
+              : 'Required field should be completable or pre-populated',
+          actual:
+            `${el.disabled ? 'Disabled' : 'Read-only'} and empty`,
+          guidance:
+            dependencyLike
+              ? 'Verify the dependency chain by selecting the parent field and confirming this field loads correctly.'
+              : 'Fix the field state or ensure it is populated automatically before the user reaches it.'
         });
       } else {
         passed++;
       }
 
       // Constraint contradictions.
-      const minLengthRaw = el.getAttribute?.('minlength');
-      const maxLengthRaw = el.getAttribute?.('maxlength');
-      const minLength = minLengthRaw !== null && minLengthRaw !== '' ? Number(minLengthRaw) : null;
-      const maxLength = maxLengthRaw !== null && maxLengthRaw !== '' ? Number(maxLengthRaw) : null;
+      const minLengthRaw =
+        el.getAttribute?.(
+          'minlength'
+        );
+
+      const maxLengthRaw =
+        el.getAttribute?.(
+          'maxlength'
+        );
+
+      const minLength =
+        minLengthRaw !== null &&
+        minLengthRaw !== ''
+          ? Number(minLengthRaw)
+          : null;
+
+      const maxLength =
+        maxLengthRaw !== null &&
+        maxLengthRaw !== ''
+          ? Number(maxLengthRaw)
+          : null;
 
       if (
-        Number.isFinite(minLength) &&
-        Number.isFinite(maxLength) &&
+        Number.isFinite(
+          minLength
+        ) &&
+        Number.isFinite(
+          maxLength
+        ) &&
         minLength > maxLength
       ) {
         addFinding({
           severity: 'critical',
-          category: 'Validation Rules',
-          title: 'Contradictory length validation',
-          message: `${label} has minlength ${minLength} but maxlength ${maxLength}.`,
+          category:
+            'Validation Rules',
+          title:
+            'Contradictory length validation',
+          message:
+            `${label} has minlength ${minLength} but maxlength ${maxLength}.`,
           el,
-          expected: 'Minimum length should not exceed maximum length',
-          actual: `minlength=${minLength}, maxlength=${maxLength}`
+          expected:
+            'Minimum length should not exceed maximum length',
+          actual:
+            `minlength=${minLength}, maxlength=${maxLength}`,
+          guidance:
+            'Correct the minimum/maximum length rule before testing submissions.'
         });
       } else {
         passed++;
       }
 
-      const minRaw = el.getAttribute?.('min');
-      const maxRaw = el.getAttribute?.('max');
+      const minRaw =
+        el.getAttribute?.('min');
+
+      const maxRaw =
+        el.getAttribute?.('max');
 
       if (
-        ['number', 'range'].includes(type) &&
-        minRaw !== null && minRaw !== '' &&
-        maxRaw !== null && maxRaw !== '' &&
-        Number.isFinite(Number(minRaw)) &&
-        Number.isFinite(Number(maxRaw)) &&
-        Number(minRaw) > Number(maxRaw)
+        ['number', 'range'].includes(
+          type
+        ) &&
+        minRaw !== null &&
+        minRaw !== '' &&
+        maxRaw !== null &&
+        maxRaw !== '' &&
+        Number.isFinite(
+          Number(minRaw)
+        ) &&
+        Number.isFinite(
+          Number(maxRaw)
+        ) &&
+        Number(minRaw) >
+          Number(maxRaw)
       ) {
         addFinding({
           severity: 'critical',
-          category: 'Validation Rules',
-          title: 'Contradictory numeric range',
-          message: `${label} has minimum ${minRaw} greater than maximum ${maxRaw}.`,
+          category:
+            'Validation Rules',
+          title:
+            'Contradictory numeric range',
+          message:
+            `${label} has minimum ${minRaw} greater than maximum ${maxRaw}.`,
           el,
-          expected: 'Minimum value should not exceed maximum value',
-          actual: `min=${minRaw}, max=${maxRaw}`
+          expected:
+            'Minimum value should not exceed maximum value',
+          actual:
+            `min=${minRaw}, max=${maxRaw}`,
+          guidance:
+            'Correct the numeric validation range.'
         });
       } else if (
-        ['date', 'month', 'time', 'datetime-local'].includes(type) &&
+        [
+          'date',
+          'month',
+          'time',
+          'datetime-local'
+        ].includes(type) &&
         minRaw &&
         maxRaw &&
-        String(minRaw) > String(maxRaw)
+        String(minRaw) >
+          String(maxRaw)
       ) {
         addFinding({
           severity: 'critical',
-          category: 'Validation Rules',
-          title: 'Contradictory date/time range',
-          message: `${label} has minimum ${minRaw} after maximum ${maxRaw}.`,
+          category:
+            'Validation Rules',
+          title:
+            'Contradictory date/time range',
+          message:
+            `${label} has minimum ${minRaw} after maximum ${maxRaw}.`,
           el,
-          expected: 'Minimum date/time should not be after maximum date/time',
-          actual: `min=${minRaw}, max=${maxRaw}`
+          expected:
+            'Minimum date/time should not be after maximum date/time',
+          actual:
+            `min=${minRaw}, max=${maxRaw}`,
+          guidance:
+            'Correct the date/time validation range.'
         });
       } else {
         passed++;
       }
 
       // Dropdown and dependency readiness.
-      if (el.tagName === 'SELECT') {
-        const options = validOptions(el);
+      if (
+        el.tagName ===
+        'SELECT'
+      ) {
+        const options =
+          validOptions(el);
 
-        if (technicalRequired && !el.disabled && !options.length) {
+        if (
+          businessRequired &&
+          !el.disabled &&
+          !options.length
+        ) {
           addFinding({
             severity: 'critical',
-            category: 'Dropdown & Dependencies',
-            title: 'Required dropdown has no selectable options',
-            message: `${label} is required but currently has no valid selectable option.`,
+            category:
+              'Dropdown & Dependencies',
+            title:
+              'Required dropdown has no selectable options',
+            message:
+              `${label} is required but currently has no valid selectable option.`,
             el,
-            expected: 'At least one valid selectable option',
-            actual: '0 valid options'
+            expected:
+              'At least one valid selectable option',
+            actual:
+              '0 valid options',
+            guidance:
+              'Check the dropdown data source, dependency, and loading state.'
           });
         } else if (
           el.disabled &&
           !hasValue &&
-          /state|province|district|city|town|course|program|programme|speciali[sz]ation|branch|campus/.test(context)
+          /state|province|district|city|town|course|program|programme|speciali[sz]ation|branch|campus/.test(
+            context
+          )
         ) {
           addFinding({
-            severity: technicalRequired ? 'warning' : 'observation',
-            category: 'Dropdown & Dependencies',
-            title: 'Dependent dropdown is not ready',
-            message: `${label} is disabled and empty. Verify that its parent selection enables and loads this field correctly.`,
+            severity:
+              businessRequired
+                ? 'observation'
+                : 'observation',
+            category:
+              'Dropdown & Dependencies',
+            title:
+              'Dependent dropdown is not ready yet',
+            message:
+              `${label} is disabled and empty at audit time. This may be correct until its parent selection is made.`,
             el,
-            expected: 'Dependent field should become available after its parent condition is satisfied',
-            actual: 'Disabled and empty at audit time'
+            expected:
+              'Dependent field becomes available after its parent condition is satisfied',
+            actual:
+              'Disabled and empty at audit time',
+            guidance:
+              'Verify the parent-child selection flow during functional QA.'
           });
         } else {
           passed++;
         }
       }
 
-      // Manual actions are intentionally surfaced rather than faked.
-      if (type === 'file' && technicalRequired && !el.files?.length) {
+      // Manual browser actions are surfaced instead of being faked.
+      if (
+        type === 'file' &&
+        businessRequired &&
+        !el.files?.length
+      ) {
         addFinding({
-          severity: 'observation',
-          category: 'Manual QA',
-          title: 'Required file upload needs manual QA',
-          message: `${label} requires a real browser file selection and remains a manual test step.`,
+          severity:
+            'observation',
+          category:
+            'Manual QA',
+          title:
+            'Required file upload needs manual QA',
+          message:
+            `${label} requires a real browser file selection and remains a manual test step.`,
           el,
-          expected: 'QA tester manually verifies allowed files, size/type validation, upload and removal behaviour',
-          actual: 'Manual browser action required'
+          expected:
+            'QA tester manually verifies allowed files, size/type validation, upload and removal behaviour',
+          actual:
+            'Manual browser action required',
+          guidance:
+            'Upload a valid and invalid sample file manually and verify type, size, removal, and error handling.'
         });
       }
 
-      // Existing invalid values can be surfaced without changing the field or
-      // triggering a form submission.
-      const validity = qaNativeValiditySummary(el);
-      const ariaInvalid = el.getAttribute?.('aria-invalid') === 'true';
+      // Existing populated invalid states can be surfaced without changing the
+      // field or triggering a final submission.
+      const validity =
+        qaNativeValiditySummary(
+          el
+        );
 
-      if (hasValue && (validity || ariaInvalid)) {
+      const ariaInvalid =
+        el.getAttribute?.(
+          'aria-invalid'
+        ) === 'true';
+
+      if (
+        hasValue &&
+        (
+          validity ||
+          ariaInvalid
+        )
+      ) {
         addFinding({
-          severity: 'warning',
-          category: 'Current Validation State',
-          title: 'Current field value is invalid',
-          message: `${label} is currently reporting an invalid state${validity ? ` (${validity})` : ''}.`,
+          severity:
+            'warning',
+          category:
+            'Current Validation State',
+          title:
+            'Current field value is invalid',
+          message:
+            `${label} is currently reporting an invalid state${validity ? ` (${validity})` : ''}.`,
           el,
-          expected: 'Current populated value should satisfy configured validation',
-          actual: validity || 'aria-invalid=true'
+          expected:
+            'Current populated value should satisfy configured validation',
+          actual:
+            validity ||
+            'aria-invalid=true',
+          guidance:
+            'Correct the current value and confirm the validation message clears.'
         });
       } else {
         passed++;
       }
-
     }
 
+    // Duplicate IDs can break labels, validation targeting, and scripting.
     try {
-      for (const doc of collectDocuments()) {
-        for (const el of queryFieldsDeep(doc)) {
+      for (
+        const doc
+        of collectDocuments()
+      ) {
+        for (
+          const el
+          of queryFieldsDeep(doc)
+        ) {
           if (
             !isLogicalField(el) ||
-            !isFieldOperationallyVisible(el) ||
+            !isFieldOperationallyVisible(
+              el
+            ) ||
             !el.id
           ) {
             continue;
           }
 
-          const id = String(el.id);
-          const items = activeIds.get(id) || [];
+          const id =
+            String(el.id);
+
+          const items =
+            activeIds.get(id) ||
+            [];
+
           items.push(el);
-          activeIds.set(id, items);
+          activeIds.set(
+            id,
+            items
+          );
         }
       }
     } catch {}
 
-    for (const [id, items] of activeIds.entries()) {
-      if (items.length <= 1) continue;
+    for (
+      const [id, items]
+      of activeIds.entries()
+    ) {
+      if (
+        items.length <= 1
+      ) {
+        continue;
+      }
 
       for (const el of items) {
         addFinding({
           severity: 'warning',
-          category: 'Form Structure',
-          title: 'Duplicate active field ID',
-          message: `${qaHumanLabel(el)} shares the DOM id "${id}" with another active field. This can cause label, validation, or scripting ambiguity.`,
+          category:
+            'Form Structure',
+          title:
+            'Duplicate active field ID',
+          message:
+            `${qaHumanLabel(el)} shares the DOM id "${id}" with another active field. This can cause label, validation, or scripting ambiguity.`,
           el,
-          expected: 'Unique DOM id for active controls',
-          actual: `${items.length} active controls use id="${id}"`
+          expected:
+            'Unique DOM id for active controls',
+          actual:
+            `${items.length} active controls use id="${id}"`,
+          guidance:
+            'Assign a unique id to each active form control and update its associated label/validation target.'
         });
       }
     }
 
-    // Hidden/inactive required controls are observations only because dynamic
-    // forms legitimately keep required templates hidden until a dependency is met.
+    // Hidden/inactive technically required controls are observations because
+    // dynamic forms legitimately keep required templates hidden until needed.
     try {
-      for (const doc of collectDocuments()) {
-        for (const el of allFields(doc)) {
+      for (
+        const doc
+        of collectDocuments()
+      ) {
+        for (
+          const el
+          of allFields(doc)
+        ) {
           if (
-            isFieldOperationallyVisible(el) ||
+            isFieldOperationallyVisible(
+              el
+            ) ||
             el.disabled ||
-            isLikelyInternalField(el) ||
-            !qaTechnicalRequired(el)
+            isLikelyInternalField(
+              el
+            ) ||
+            !qaTechnicalRequired(
+              el
+            )
           ) {
             continue;
           }
 
           addFinding({
-            severity: 'observation',
-            category: 'Dynamic Fields',
-            title: 'Inactive required field detected',
-            message: `${qaHumanLabel(el)} is required in markup but is not currently active/visible. Verify that inactive states do not block progression unexpectedly.`,
+            severity:
+              'observation',
+            category:
+              'Dynamic Fields',
+            title:
+              'Inactive required field detected',
+            message:
+              `${qaHumanLabel(el)} is required in markup/configuration but is not currently active or visible. This may be valid for a conditional field.`,
             el,
-            expected: 'Inactive conditional fields should not block the current journey',
-            actual: 'Required constraint exists while field is inactive'
+            expected:
+              'Inactive conditional fields should not block the current journey',
+            actual:
+              'Required rule exists while field is inactive',
+            guidance:
+              'Verify this field only becomes required when its condition is active.'
           });
         }
       }
@@ -12916,59 +13428,155 @@
       observation: 2
     };
 
-    findings.sort((a, b) =>
-      (rank[a.severity] ?? 9) - (rank[b.severity] ?? 9)
+    findings.sort(
+      (a, b) =>
+        (
+          rank[a.severity] ??
+          9
+        ) -
+        (
+          rank[b.severity] ??
+          9
+        )
     );
 
     const counts = {
-      critical: findings.filter(item => item.severity === 'critical').length,
-      warning: findings.filter(item => item.severity === 'warning').length,
-      observation: findings.filter(item => item.severity === 'observation').length,
+      critical:
+        findings.filter(
+          item =>
+            item.severity ===
+            'critical'
+        ).length,
+      warning:
+        findings.filter(
+          item =>
+            item.severity ===
+            'warning'
+        ).length,
+      observation:
+        findings.filter(
+          item =>
+            item.severity ===
+            'observation'
+        ).length,
       passed
     };
 
-    const score = meaningful
-      ? clamp(
-      100 -
-        counts.critical * 18 -
-        counts.warning * 6 -
-        counts.observation,
-      0,
-      100
-    )
-      : 0;
+    const checksRun =
+      passed +
+      counts.critical +
+      counts.warning +
+      counts.observation;
+
+    const weightedIssues =
+      counts.critical * 10 +
+      counts.warning * 3 +
+      counts.observation * 0.75;
+
+    let score =
+      meaningful
+        ? Math.round(
+            clamp(
+              (
+                passed /
+                Math.max(
+                  1,
+                  passed +
+                    weightedIssues
+                )
+              ) *
+                100,
+              0,
+              100
+            )
+          )
+        : 0;
+
+    // A critical blocker should prevent an otherwise large form from looking
+    // "green" just because it has hundreds of passing checks.
+    if (
+      counts.critical > 0
+    ) {
+      score =
+        Math.min(
+          score,
+          counts.critical >= 3
+            ? 59
+            : 79
+        );
+    }
 
     const rating =
-      score >= 90
+      score >= 92
         ? 'Strong'
-        : score >= 75
+        : score >= 82
           ? 'Good'
-          : score >= 60
+          : score >= 70
             ? 'Needs Review'
             : 'Needs Attention';
 
+    const categoryCounts = {};
+
+    for (
+      const item
+      of findings
+    ) {
+      const key =
+        item.category ||
+        'General';
+
+      categoryCounts[key] =
+        (
+          categoryCounts[key] ||
+          0
+        ) + 1;
+    }
+
+    const summary =
+      qaBuildSummary(
+        score,
+        counts,
+        fields.length,
+        checksRun
+      );
+
     return {
-      reportVersion: 1,
-      product: 'Smart FormSense',
-      productVersion: '17.8.0',
+      reportVersion: 2,
+      product:
+        'Smart FormSense',
+      productVersion:
+        '17.9.0',
       generatedAt,
-      auditType: 'Non-destructive Form Readiness Audit',
+      auditType:
+        'Non-destructive Form Readiness Audit',
       page: {
-        url: location.href,
-        hostname: location.hostname,
-        pathname: location.pathname,
-        title: document.title || ''
+        url:
+          location.href,
+        hostname:
+          location.hostname,
+        pathname:
+          location.pathname,
+        title:
+          document.title ||
+          ''
       },
-      formSignature: formTechnicalSignature(),
-      fieldsAudited: fields.length,
+      formSignature:
+        formTechnicalSignature(),
+      fieldsAudited:
+        fields.length,
+      checksRun,
       score,
       rating,
+      summary,
       counts,
+      categoryCounts,
       findings,
       notes: [
         'This audit does not submit the form.',
+        'The readiness score is weighted against all checks performed; repeated low-severity observations no longer reduce a large form to 0/100.',
+        'A visible required marker without a standard/common validator attribute is treated as an observation because many JavaScript form frameworks enforce rules outside native HTML attributes.',
         'This release performs non-destructive readiness checks; it does not deliberately inject invalid boundary values.',
-        'Observations are review prompts and may be valid for conditional/dynamic form designs.',
+        'Observations are review prompts and may be valid for conditional or dynamic form designs.',
         'Final go-live approval remains with the QA tester.'
       ]
     };
@@ -12977,9 +13585,17 @@
   const qaFindingElement = key => {
     if (!key) return null;
 
-    for (const doc of collectDocuments()) {
-      for (const el of allFields(doc)) {
-        if (fieldKey(el) === key) {
+    for (
+      const doc
+      of collectDocuments()
+    ) {
+      for (
+        const el
+        of allFields(doc)
+      ) {
+        if (
+          fieldKey(el) === key
+        ) {
           return el;
         }
       }
@@ -12989,16 +13605,20 @@
   };
 
   const navigateQaFinding = key => {
-    const el = qaFindingElement(key);
+    const el =
+      qaFindingElement(key);
 
     if (!el) {
       state.panel?.setStatus(
         'The QA field is no longer available. The form may have changed since the audit.'
       );
+
       return false;
     }
 
-    const target = visualTarget(el) || el;
+    const target =
+      visualTarget(el) ||
+      el;
 
     try {
       target.scrollIntoView({
@@ -13007,13 +13627,25 @@
         inline: 'nearest'
       });
     } catch {
-      try { target.scrollIntoView(); } catch {}
+      try {
+        target.scrollIntoView();
+      } catch {}
     }
 
-    setTimeout(() => {
-      try { el.focus({ preventScroll: true }); } catch {}
-      flashTarget(target);
-    }, 60);
+    setTimeout(
+      () => {
+        try {
+          el.focus({
+            preventScroll: true
+          });
+        } catch {}
+
+        flashTarget(
+          target
+        );
+      },
+      60
+    );
 
     state.panel?.setStatus(
       `QA issue • ${qaHumanLabel(el)}`
@@ -13022,37 +13654,621 @@
     return true;
   };
 
-  const exportQaReport = report => {
-    const qa = report || state.qaReport;
+  const qaEscapeHtml = value =>
+    String(
+      value ??
+      ''
+    )
+      .replace(
+        /&/g,
+        '&amp;'
+      )
+      .replace(
+        /</g,
+        '&lt;'
+      )
+      .replace(
+        />/g,
+        '&gt;'
+      )
+      .replace(
+        /"/g,
+        '&quot;'
+      )
+      .replace(
+        /'/g,
+        '&#039;'
+      );
+
+  const qaGroupedFindings = report => {
+    const groups =
+      new Map();
+
+    for (
+      const item
+      of report?.findings ||
+      []
+    ) {
+      const key = [
+        item.severity ||
+          'observation',
+        item.category ||
+          'General',
+        item.title ||
+          'QA finding',
+        item.expected ||
+          '',
+        item.actual ||
+          '',
+        item.guidance ||
+          ''
+      ].join('|');
+
+      const existing =
+        groups.get(key) || {
+          severity:
+            item.severity ||
+            'observation',
+          category:
+            item.category ||
+            'General',
+          title:
+            item.title ||
+            'QA finding',
+          message:
+            item.message ||
+            '',
+          expected:
+            item.expected ||
+            '',
+          actual:
+            item.actual ||
+            '',
+          guidance:
+            item.guidance ||
+            '',
+          fields: []
+        };
+
+      if (item.field) {
+        existing.fields.push(
+          item.field
+        );
+      }
+
+      groups.set(
+        key,
+        existing
+      );
+    }
+
+    return [
+      ...groups.values()
+    ];
+  };
+
+  const buildQaFriendlyHtml = report => {
+    const qa =
+      report ||
+      state.qaReport;
 
     if (!qa) {
-      state.panel?.setStatus('Run a QA Audit before exporting a report.');
+      return '';
+    }
+
+    const counts =
+      qa.counts || {};
+
+    const summary =
+      qa.summary ||
+      qaBuildSummary(
+        Number(qa.score || 0),
+        counts,
+        Number(
+          qa.fieldsAudited ||
+          0
+        ),
+        Number(
+          qa.checksRun ||
+          0
+        )
+      );
+
+    const grouped =
+      qaGroupedFindings(qa);
+
+    const sectionHtml =
+      severity => {
+        const items =
+          grouped.filter(
+            item =>
+              item.severity ===
+              severity
+          );
+
+        if (!items.length) {
+          return '';
+        }
+
+        const label =
+          severity ===
+          'critical'
+            ? 'Critical blockers'
+            : severity ===
+                'warning'
+              ? 'Warnings to review'
+              : 'Observations to confirm';
+
+        return `
+          <section class="section">
+            <h2>${qaEscapeHtml(label)} <span>${items.length} grouped item${items.length === 1 ? '' : 's'}</span></h2>
+            ${items
+              .map(item => {
+                const fields = [
+                  ...new Set(
+                    item.fields
+                  )
+                ];
+
+                const preview =
+                  fields.slice(
+                    0,
+                    8
+                  );
+
+                const more =
+                  Math.max(
+                    0,
+                    fields.length -
+                      preview.length
+                  );
+
+                return `
+                  <article class="finding ${qaEscapeHtml(severity)}">
+                    <div class="findingHead">
+                      <div>
+                        <span class="pill ${qaEscapeHtml(severity)}">${qaEscapeHtml(severity)}</span>
+                        <span class="category">${qaEscapeHtml(item.category)}</span>
+                      </div>
+                      ${fields.length ? `<strong>${fields.length} affected field${fields.length === 1 ? '' : 's'}</strong>` : ''}
+                    </div>
+
+                    <h3>${qaEscapeHtml(item.title)}</h3>
+                    ${item.message ? `<p>${qaEscapeHtml(item.message)}</p>` : ''}
+
+                    ${fields.length ? `
+                      <div class="fields">
+                        ${preview.map(field => `<span>${qaEscapeHtml(field)}</span>`).join('')}
+                        ${more ? `<span>+${more} more</span>` : ''}
+                      </div>
+                      ${more ? `
+                        <details>
+                          <summary>Show all affected fields</summary>
+                          <ul>${fields.map(field => `<li>${qaEscapeHtml(field)}</li>`).join('')}</ul>
+                        </details>
+                      ` : ''}
+                    ` : ''}
+
+                    ${item.guidance ? `
+                      <div class="action">
+                        <b>What to do:</b>
+                        ${qaEscapeHtml(item.guidance)}
+                      </div>
+                    ` : ''}
+
+                    ${(item.expected || item.actual) ? `
+                      <details class="technical">
+                        <summary>Expected vs detected</summary>
+                        ${item.expected ? `<div><b>Expected:</b> ${qaEscapeHtml(item.expected)}</div>` : ''}
+                        ${item.actual ? `<div><b>Detected:</b> ${qaEscapeHtml(item.actual)}</div>` : ''}
+                      </details>
+                    ` : ''}
+                  </article>
+                `;
+              })
+              .join('')}
+          </section>
+        `;
+      };
+
+    const safeTitle =
+      qa.page?.title ||
+      'Form';
+
+    const safeHost =
+      qa.page?.hostname ||
+      location.hostname ||
+      '';
+
+    const generated =
+      (() => {
+        try {
+          return new Date(
+            qa.generatedAt
+          ).toLocaleString();
+        } catch {
+          return qa.generatedAt ||
+            '';
+        }
+      })();
+
+    return `<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Smart FormSense QA Report</title>
+<style>
+  :root{color-scheme:light;font-family:Inter,Segoe UI,Arial,sans-serif}
+  *{box-sizing:border-box}
+  body{margin:0;background:#f6f7fb;color:#202334}
+  .wrap{max-width:1040px;margin:0 auto;padding:28px 18px 48px}
+  .hero{background:linear-gradient(135deg,#5145ff,#9b5cff,#ec4899);color:#fff;border-radius:22px;padding:26px;box-shadow:0 18px 48px rgba(70,50,150,.18)}
+  .brand{font-size:13px;font-weight:800;opacity:.95}
+  h1{margin:7px 0 6px;font-size:28px;line-height:1.15}
+  .meta{font-size:13px;opacity:.9;line-height:1.55}
+  .scoreRow{display:grid;grid-template-columns:180px 1fr;gap:18px;margin-top:22px;align-items:stretch}
+  .score{background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.28);border-radius:18px;padding:18px;text-align:center}
+  .score strong{display:block;font-size:48px;line-height:1}
+  .score span{display:block;font-size:13px;margin-top:7px;font-weight:700}
+  .summary{background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.24);border-radius:18px;padding:18px}
+  .summary h2{margin:0 0 7px;font-size:18px}
+  .summary p{margin:6px 0;font-size:13px;line-height:1.55}
+  .cards{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:18px 0}
+  .card{background:#fff;border:1px solid #e7e8ef;border-radius:14px;padding:15px;box-shadow:0 5px 18px rgba(20,25,50,.04)}
+  .card strong{display:block;font-size:24px}
+  .card span{font-size:11px;color:#6f7484;font-weight:700}
+  .critical strong{color:#dc2626}.warning strong{color:#d97706}.observation strong{color:#2563eb}.passed strong{color:#15803d}
+  .section{margin-top:22px}
+  .section>h2{font-size:18px;margin:0 0 10px}
+  .section>h2 span{font-size:11px;color:#777;font-weight:600;margin-left:6px}
+  .finding{background:#fff;border:1px solid #e6e7ee;border-left:5px solid #cbd5e1;border-radius:14px;padding:16px;margin:10px 0;box-shadow:0 5px 18px rgba(20,25,50,.035)}
+  .finding.critical{border-left-color:#dc2626}.finding.warning{border-left-color:#d97706}.finding.observation{border-left-color:#2563eb}
+  .findingHead{display:flex;justify-content:space-between;gap:12px;align-items:center;font-size:11px;color:#717687}
+  .pill{display:inline-block;border-radius:999px;padding:4px 8px;font-size:10px;font-weight:900;text-transform:uppercase;margin-right:6px}
+  .pill.critical{background:#fff1f2;color:#dc2626}.pill.warning{background:#fff7ed;color:#b45309}.pill.observation{background:#eff6ff;color:#2563eb}
+  .category{font-weight:700}.finding h3{margin:10px 0 5px;font-size:16px}.finding p{margin:0;color:#5d6272;line-height:1.55;font-size:13px}
+  .fields{display:flex;flex-wrap:wrap;gap:6px;margin-top:11px}.fields span{background:#f4f4f8;border:1px solid #e5e7eb;border-radius:999px;padding:5px 8px;font-size:11px}
+  .action{margin-top:12px;background:#f7f7ff;border-radius:10px;padding:10px 12px;font-size:12px;line-height:1.5}
+  details{margin-top:10px;font-size:12px;color:#5d6272}summary{cursor:pointer;font-weight:700;color:#4e5363}
+  details ul{columns:2;padding-left:20px}.technical div{margin-top:6px}
+  .scope{background:#fff;border:1px solid #e6e7ee;border-radius:14px;padding:16px;margin-top:24px;font-size:12px;color:#656a79;line-height:1.6}
+  .scope h2{color:#252839;font-size:16px;margin:0 0 7px}
+  .footer{text-align:center;color:#8a8e9b;font-size:11px;margin-top:24px}
+  @media(max-width:700px){.scoreRow{grid-template-columns:1fr}.cards{grid-template-columns:repeat(2,1fr)}details ul{columns:1}}
+  @media print{body{background:#fff}.wrap{max-width:none;padding:0}.hero,.card,.finding,.scope{box-shadow:none}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="hero">
+    <div class="brand">✦ Smart FormSense • QA Readiness Report</div>
+    <h1>${qaEscapeHtml(safeTitle)}</h1>
+    <div class="meta">${qaEscapeHtml(safeHost)}<br>Generated ${qaEscapeHtml(generated)} • Smart FormSense ${qaEscapeHtml(qa.productVersion || '17.9.0')}</div>
+
+    <div class="scoreRow">
+      <div class="score">
+        <strong>${Number(qa.score || 0)}</strong>
+        <span>${qaEscapeHtml(qa.rating || 'Review')} • out of 100</span>
+      </div>
+
+      <div class="summary">
+        <h2>${qaEscapeHtml(summary.headline || '')}</h2>
+        <p><b>Risk level:</b> ${qaEscapeHtml(summary.riskLevel || 'Review')}</p>
+        <p>${qaEscapeHtml(summary.recommendation || '')}</p>
+        <p>${Number(qa.fieldsAudited || 0)} fields inspected • ${Number(qa.checksRun || 0)} readiness checks performed</p>
+      </div>
+    </div>
+  </header>
+
+  <div class="cards">
+    <div class="card critical"><strong>${Number(counts.critical || 0)}</strong><span>Critical blockers</span></div>
+    <div class="card warning"><strong>${Number(counts.warning || 0)}</strong><span>Warnings</span></div>
+    <div class="card observation"><strong>${Number(counts.observation || 0)}</strong><span>Observations</span></div>
+    <div class="card passed"><strong>${Number(counts.passed || 0)}</strong><span>Checks passed</span></div>
+  </div>
+
+  ${sectionHtml('critical')}
+  ${sectionHtml('warning')}
+  ${sectionHtml('observation')}
+
+  ${!grouped.length ? `
+    <section class="section">
+      <article class="finding">
+        <h3>No readiness findings were surfaced</h3>
+        <p>The non-destructive audit did not identify any issue that needs to be listed in this report. Continue with normal functional and submission testing.</p>
+      </article>
+    </section>
+  ` : ''}
+
+  <section class="scope">
+    <h2>How to read this report</h2>
+    <b>Critical:</b> likely blocker that should be fixed before go-live.<br>
+    <b>Warning:</b> behaviour or configuration that needs review.<br>
+    <b>Observation:</b> a manual confirmation point; it may be valid for a dynamic/custom form.<br><br>
+    This is a non-destructive readiness audit. Smart FormSense does not submit the final form and does not deliberately inject invalid boundary values during this audit. Final go-live approval remains with the QA tester.
+  </section>
+
+  <div class="footer">Created with love ❤️ Akash Singh • Smart FormSense</div>
+</div>
+</body>
+</html>`;
+  };
+
+  const exportQaReport = report => {
+    const qa =
+      report ||
+      state.qaReport;
+
+    if (!qa) {
+      state.panel?.setStatus(
+        'Run a QA Audit before exporting a report.'
+      );
+
       return null;
     }
 
-    const stamp = new Date()
-      .toISOString()
-      .replace(/[:.]/g, '-')
-      .slice(0, 19);
+    const stamp =
+      new Date()
+        .toISOString()
+        .replace(
+          /[:.]/g,
+          '-'
+        )
+        .slice(0, 19);
 
-    const host = String(
-      qa.page?.hostname ||
-      location.hostname ||
-      'form'
-    )
-      .replace(/[^a-z0-9.-]+/gi, '_')
-      .slice(0, 60);
+    const host =
+      String(
+        qa.page?.hostname ||
+        location.hostname ||
+        'form'
+      )
+        .replace(
+          /[^a-z0-9.-]+/gi,
+          '_'
+        )
+        .slice(0, 60);
+
+    const html =
+      buildQaFriendlyHtml(
+        qa
+      );
 
     downloadTextFile(
-      `Smart_FormSense_QA_${host}_${stamp}.json`,
-      JSON.stringify(qa, null, 2)
+      `Smart_FormSense_QA_Report_${host}_${stamp}.html`,
+      html,
+      'text/html;charset=utf-8'
     );
 
     state.panel?.setStatus(
-      `QA report exported • Score ${qa.score}/100 • ${qa.findings.length} finding(s)`
+      `Readable QA report exported • Score ${qa.score}/100 • ${qa.findings.length} finding(s)`
     );
 
     return qa;
+  };
+
+  const buildQaDebugReport = () => {
+    let fields = [];
+
+    try {
+      fields =
+        visibleFillableFields();
+    } catch {}
+
+    const qa =
+      state.qaReport ||
+      buildQaAuditReport();
+
+    const qaFields =
+      fields.map(el => {
+        const signals =
+          qaRequiredSignals(el);
+
+        return {
+          fieldKey:
+            fieldKey(el),
+          label:
+            qaHumanLabel(el),
+          tag:
+            normalize(
+              el.tagName
+            ),
+          type:
+            normalize(
+              el.type
+            ),
+          name:
+            el.getAttribute?.(
+              'name'
+            ) || '',
+          id:
+            el.id || '',
+          className:
+            String(
+              el.className ||
+              ''
+            ).slice(
+              0,
+              300
+            ),
+          visible:
+            isFieldOperationallyVisible(
+              el
+            ),
+          disabled:
+            !!el.disabled,
+          readOnly:
+            !!el.readOnly,
+          hasValue:
+            fieldHasValue(el),
+          requiredSignals:
+            signals,
+          nativeValidity:
+            qaNativeValiditySummary(
+              el
+            ),
+          ariaInvalid:
+            el.getAttribute?.(
+              'aria-invalid'
+            ) || '',
+          validationText:
+            (() => {
+              try {
+                return String(
+                  validationText(el) ||
+                  ''
+                ).slice(
+                  0,
+                  500
+                );
+              } catch {
+                return '';
+              }
+            })(),
+          optionCount:
+            el.tagName ===
+            'SELECT'
+              ? validOptions(el).length
+              : null,
+          constraints: {
+            pattern:
+              el.getAttribute?.(
+                'pattern'
+              ) || '',
+            min:
+              el.getAttribute?.(
+                'min'
+              ) || '',
+            max:
+              el.getAttribute?.(
+                'max'
+              ) || '',
+            minlength:
+              el.getAttribute?.(
+                'minlength'
+              ) || '',
+            maxlength:
+              el.getAttribute?.(
+                'maxlength'
+              ) || '',
+            step:
+              el.getAttribute?.(
+                'step'
+              ) || '',
+            inputmode:
+              el.getAttribute?.(
+                'inputmode'
+              ) || '',
+            autocomplete:
+              el.getAttribute?.(
+                'autocomplete'
+              ) || ''
+          },
+          debugSnapshot:
+            debugFieldSnapshot(
+              el
+            )
+        };
+      });
+
+    return {
+      reportVersion: 2,
+      product:
+        'Smart FormSense',
+      productVersion:
+        '17.9.0',
+      generatedAt:
+        new Date().toISOString(),
+      purpose:
+        'Technical QA troubleshooting export',
+      page: {
+        title:
+          document.title ||
+          '',
+        hostname:
+          location.hostname,
+        pathname:
+          location.pathname,
+        url:
+          location.href
+      },
+      qaAudit:
+        qa,
+      qaFieldDiagnostics:
+        qaFields,
+      technicalDiagnostics:
+        buildDebugReport(),
+      runtime: {
+        isTop:
+          IS_TOP,
+        isFrame:
+          IS_FRAME,
+        lastRemoteAgentId:
+          state.lastRemoteAgentId ||
+          null,
+        lastRuntimeError:
+          state.lastRuntimeError ||
+          null
+      },
+      notes: [
+        'This file is intentionally technical and is meant to be shared for troubleshooting Smart FormSense QA detection.',
+        'It can contain page/form metadata and synthetic test values. Review it before sharing outside the QA/development team.',
+        'Preserved user-entered values remain subject to the redaction rules used by the standard debug exporter.'
+      ]
+    };
+  };
+
+  const exportQaDebugReport = () => {
+    try {
+      const report =
+        buildQaDebugReport();
+
+      const stamp =
+        new Date()
+          .toISOString()
+          .replace(
+            /[:.]/g,
+            '-'
+          )
+          .slice(0, 19);
+
+      const host =
+        String(
+          location.hostname ||
+          'form'
+        )
+          .replace(
+            /[^a-z0-9.-]+/gi,
+            '_'
+          )
+          .slice(0, 60);
+
+      downloadTextFile(
+        `Smart_FormSense_QA_Debug_${host}_${stamp}.json`,
+        JSON.stringify(
+          report,
+          null,
+          2
+        )
+      );
+
+      state.panel?.setStatus(
+        `QA debug exported • ${report.qaFieldDiagnostics.length} field diagnostic(s) • ${report.qaAudit?.findings?.length || 0} QA finding(s)`
+      );
+
+      return report;
+    } catch (error) {
+      console.error(
+        'Smart FormSense V17.9 QA debug export:',
+        error
+      );
+
+      state.panel?.setStatus(
+        `QA debug export failed: ${error?.message || 'unknown error'}`
+      );
+
+      return null;
+    }
   };
 
 
@@ -13982,6 +15198,40 @@
     exportDebugReport();
   };
 
+  const smartQaDebugExport = () => {
+    const agent =
+      remoteAgentById(
+        state.lastRemoteAgentId
+      );
+
+    if (
+      agent?.source
+    ) {
+      try {
+        agent.source.postMessage(
+          bridgePayload(
+            'QA_DEBUG',
+            {
+              sessionId:
+                bridge.sessionId,
+              agentId:
+                agent.id
+            }
+          ),
+          '*'
+        );
+
+        state.panel?.setStatus(
+          'QA debug export requested from embedded form.'
+        );
+
+        return;
+      } catch {}
+    }
+
+    exportQaDebugReport();
+  };
+
   const installTopBridge = () => {
     if (!IS_TOP) {
       return;
@@ -14485,6 +15735,15 @@
         }
 
         if (
+          data.type ===
+          'QA_DEBUG'
+        ) {
+          exportQaDebugReport();
+
+          return;
+        }
+
+        if (
           data.type !==
           'COMMAND' ||
           state.running
@@ -14531,6 +15790,7 @@
             'qa-audit'
           ) {
             qaReport = buildQaAuditReport();
+            state.qaReport = qaReport;
           }
 
           send(
@@ -14783,7 +16043,8 @@
         .qaPill.critical{background:#fff1f2;color:#dc2626}
         .qaPill.warning{background:#fff7ed;color:#d97706}
         .qaPill.observation{background:#eff6ff;color:#2563eb}
-        .qaIssueTitle{font-size:9px;font-weight:850;color:#312e46;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+        .qaIssueTitle{font-size:9px;font-weight:850;color:#312e46;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1}
+        .qaIssueCount{font-size:7px;font-weight:900;color:#6d4aff;background:#f3f0ff;border-radius:999px;padding:2px 5px;flex:0 0 auto}
         .qaIssueField{font-size:8px;color:#665e78;margin-top:4px;font-weight:750}
         .qaIssueMessage{font-size:8px;color:#7b7488;margin-top:2px;line-height:1.35}
         .qaEmpty{font-size:9px;color:#777084;text-align:center;padding:12px 8px;border:1px dashed #ddd6fe;border-radius:9px;background:#fff}
@@ -15154,15 +16415,16 @@
               <div class="qaStat qaCritical"><b id="qaCritical">0</b><span>Critical</span></div>
               <div class="qaStat qaWarning"><b id="qaWarning">0</b><span>Warnings</span></div>
               <div class="qaStat qaObservation"><b id="qaObservation">0</b><span>Observations</span></div>
-              <div class="qaStat qaPassed"><b id="qaPassed">0</b><span>Passed</span></div>
+              <div class="qaStat qaPassed"><b id="qaPassed">0</b><span>Checks Passed</span></div>
             </div>
 
             <div class="qaIssues" id="qaIssues">
               <div class="qaEmpty">Run QA Audit to inspect required fields, validations, dropdown dependencies and form readiness.</div>
             </div>
 
-            <div class="grid">
-              <button class="secondary" id="qaExportBtn" disabled>Export QA Report</button>
+            <div class="utilityGrid">
+              <button class="secondary" id="qaExportBtn" disabled title="Download a readable HTML report">Export Report</button>
+              <button class="secondary" id="qaDebugBtn" disabled title="Download technical QA diagnostics for troubleshooting">Export Debug</button>
               <button class="secondary" id="qaRefreshBtn">Run Again</button>
             </div>
 
@@ -15242,6 +16504,7 @@
       qaWorkspace: $('qaWorkspace'),
       qaRunBtn: $('qaRunBtn'),
       qaExportBtn: $('qaExportBtn'),
+      qaDebugBtn: $('qaDebugBtn'),
       qaRefreshBtn: $('qaRefreshBtn'),
       qaIssues: $('qaIssues'),
       qaScore: $('qaScore'),
@@ -15411,7 +16674,7 @@
         }
 
         if (refs.qaRating) {
-          refs.qaRating.textContent = `${report.rating || 'Review'} • ${Number(report.fieldsAudited || 0)} field(s) audited`;
+          refs.qaRating.textContent = `${report.rating || 'Review'} • ${Number(report.fieldsAudited || 0)} field(s) • ${Number(report.checksRun || 0)} check(s)`;
         }
 
         const counts = report.counts || {};
@@ -15421,6 +16684,7 @@
         if (refs.qaObservation) refs.qaObservation.textContent = Number(counts.observation || 0);
         if (refs.qaPassed) refs.qaPassed.textContent = Number(counts.passed || 0);
         if (refs.qaExportBtn) refs.qaExportBtn.disabled = false;
+        if (refs.qaDebugBtn) refs.qaDebugBtn.disabled = false;
 
         const findings = Array.isArray(report.findings)
           ? report.findings
@@ -15440,21 +16704,52 @@
           .replace(/"/g, '&quot;')
           .replace(/'/g, '&#039;');
 
-        refs.qaIssues.innerHTML = findings
-          .map(item => {
-            const severity = ['critical', 'warning', 'observation'].includes(item.severity)
-              ? item.severity
-              : 'observation';
-            const clickable = !!item.fieldKey;
+        const displayGroups = new Map();
+
+        for (const item of findings) {
+          const severity = ['critical', 'warning', 'observation'].includes(item.severity)
+            ? item.severity
+            : 'observation';
+
+          const key = [
+            severity,
+            item.category || 'General',
+            item.title || 'QA finding'
+          ].join('|');
+
+          const group = displayGroups.get(key) || {
+            severity,
+            title: item.title || 'QA finding',
+            message: item.message || '',
+            guidance: item.guidance || '',
+            firstFieldKey: item.fieldKey || '',
+            fields: []
+          };
+
+          if (item.field) group.fields.push(item.field);
+          if (!group.firstFieldKey && item.fieldKey) group.firstFieldKey = item.fieldKey;
+
+          displayGroups.set(key, group);
+        }
+
+        refs.qaIssues.innerHTML = [...displayGroups.values()]
+          .map(group => {
+            const fields = [...new Set(group.fields)];
+            const clickable = !!group.firstFieldKey;
+            const fieldPreview = fields.length
+              ? `${fields[0]}${fields.length > 1 ? ` + ${fields.length - 1} more` : ''}`
+              : '';
 
             return `
-              <button class="qaIssue" ${clickable ? `data-qa-field="${escape(item.fieldKey)}"` : 'disabled'}>
+              <button class="qaIssue" ${clickable ? `data-qa-field="${escape(group.firstFieldKey)}"` : 'disabled'}>
                 <div class="qaIssueTop">
-                  <span class="qaPill ${severity}">${escape(severity)}</span>
-                  <span class="qaIssueTitle">${escape(item.title || 'QA finding')}</span>
+                  <span class="qaPill ${group.severity}">${escape(group.severity)}</span>
+                  <span class="qaIssueTitle">${escape(group.title)}</span>
+                  ${fields.length > 1 ? `<span class="qaIssueCount">×${fields.length}</span>` : ''}
                 </div>
-                ${item.field ? `<div class="qaIssueField">${escape(item.field)}</div>` : ''}
-                ${item.message ? `<div class="qaIssueMessage">${escape(item.message)}</div>` : ''}
+                ${fieldPreview ? `<div class="qaIssueField">${escape(fieldPreview)}</div>` : ''}
+                ${group.message ? `<div class="qaIssueMessage">${escape(group.message)}</div>` : ''}
+                ${group.guidance ? `<div class="qaIssueMessage"><b>Check:</b> ${escape(group.guidance)}</div>` : ''}
               </button>
             `;
           })
@@ -15486,6 +16781,7 @@
         if (refs.qaRunBtn) refs.qaRunBtn.disabled = busy;
         if (refs.qaRefreshBtn) refs.qaRefreshBtn.disabled = busy;
         if (refs.qaExportBtn) refs.qaExportBtn.disabled = busy || !state.qaReport;
+        if (refs.qaDebugBtn) refs.qaDebugBtn.disabled = busy || !state.qaReport;
         if (refs.fillTab) refs.fillTab.disabled = busy;
         if (refs.qaTab) refs.qaTab.disabled = busy;
 
@@ -15514,6 +16810,9 @@
           }
           if (refs.qaExportBtn) {
             refs.qaExportBtn.disabled = !state.qaReport;
+          }
+          if (refs.qaDebugBtn) {
+            refs.qaDebugBtn.disabled = !state.qaReport;
           }
         }
       },
@@ -15567,6 +16866,9 @@
 
     refs.qaExportBtn.onclick = () =>
       exportQaReport(state.qaReport);
+
+    refs.qaDebugBtn.onclick =
+      smartQaDebugExport;
 
     refs.qaIssues.addEventListener('click', event => {
       const button = event.target?.closest?.('[data-qa-field]');
