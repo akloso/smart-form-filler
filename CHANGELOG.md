@@ -2,6 +2,23 @@
 
 All notable public changes to Smart FormSense are documented here.
 
+## 17.9.0
+
+QA accuracy and reporting refinement release.
+
+- Reworked the **Form Readiness** score to use weighted issue severity alongside passed checks, preventing repeated low-severity observations from incorrectly collapsing healthy forms to 0/100
+- Expanded required-field detection to include native `required`, ARIA, and common framework/custom validation attributes and classes
+- Changed visual-only required markers to **Observations** that request functional confirmation instead of automatically treating them as configuration warnings
+- Audited radio groups once instead of generating duplicate findings for each option
+- Improved field naming for academic and table layouts by using stronger row/column context
+- Added smarter handling for dependent disabled required fields, hidden/inactive required fields, required file uploads, and duplicate IDs
+- Grouped repeated QA findings in the panel for easier review
+- Renamed the positive counter to **Checks Passed** for clearer meaning
+- Added a human-readable, printable **HTML QA Report** with score, risk level, summary, grouped findings, affected fields, guidance, and plain-language severity explanations
+- Added a separate **QA Debug JSON** export containing detailed per-field required signals, constraints, validation state, runtime information, and standard Smart FormSense diagnostics for troubleshooting
+- Added QA Debug export support for embedded/cross-origin form execution contexts
+- Form Filling behavior and final manual-submission safeguards remain unchanged
+
 ## 17.8.0
 
 Smart FormSense dual-mode release.
