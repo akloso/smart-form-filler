@@ -30,7 +30,7 @@ jobs:
           curl -fsSL "$base/.github/release-direct/builder.gz.b64.02" -o builder.02
 
           cat builder.00 builder.01 builder.02 > builder.gz.b64
-          echo "0b73b9a3a5ae7d2cbb7f82a2666a1b45447f1ad5720157c75ad938f02769ee22  builder.gz.b64" | sha256sum -c -
+          echo "008576c6d876ad3852b4af36f2a096589846e77562592960c6b521698d6d8062  builder.gz.b64" | sha256sum -c -
 
           base64 --decode builder.gz.b64 > builder.py.gz
           gzip --decompress --stdout builder.py.gz > build_formsense_17_8.py
