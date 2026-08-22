@@ -1,45 +1,63 @@
-# Smart Form Filler
+# Smart FormSense
 
-Smart Form Filler is a generic Tampermonkey userscript for authorized QA/testing of web forms with synthetic test data.
+*Intelligent Form Filling & QA Testing*
+
+Smart FormSense is a Tampermonkey userscript for authorized form filling and QA testing with synthetic test data. It combines fast completion-first form automation with a safe, non-destructive QA audit for form readiness checks.
 
 ## Current version
 
-**17.7.0**
+**17.8.0**
 
-## What it does
+## Two modes
 
-- Fills required fields or all supported fields
-- Preserves existing user-entered values by default
-- Uses labels, placeholders, attributes, table context, options, constraints, and validation messages to understand fields
-- Repairs common validation failures where possible
-- Supports native controls and common dynamic/custom form controls
-- Supports embedded and cross-origin forms through top-page/child-frame userscript agents
-- Marks required file uploads and other genuinely manual actions as **Manual Required**
-- Provides Fill, Validate, Recheck & Correct, Stop, Undo, New Applicant, and Debug Export tools
-- Does not intentionally submit the final form
+### ⚡ Form Filling
+
+- Fill **Minimum Required Fields** or **Fill All Fields**
+- Preserve existing user-entered values by default
+- Understand fields using labels, placeholders, attributes, table context, options, constraints, and validation messages
+- Repair many common validation failures where possible
+- Support native controls, dynamic/custom controls, dependent fields, and embedded/cross-origin forms
+- Keep required file uploads and other genuinely manual actions as **Manual Required**
+- Provide Validate, Recheck & Correct, Stop, Undo, New Applicant, and Debug Export tools
+
+### 🧪 QA Testing
+
+- Run a **non-destructive QA Audit** without submitting the form or deliberately injecting invalid values
+- Produce a **Form Readiness** score
+- Summarize **Critical**, **Warning**, **Observation**, and **Passed** checks
+- Check required-field consistency, field clarity, contradictory constraints, dropdown/dependency readiness, current validation state, and manual QA requirements
+- Click QA findings to navigate to the related field when supported
+- Support embedded/cross-origin forms through the existing child-frame agent bridge
+- Export a structured QA report for review and troubleshooting
+
+The QA readiness score is an advisory testing aid, not a production certification.
 
 ## Installation
 
-Public installation will be provided through Greasy Fork after the repository setup is complete.
+Public installation is available through Greasy Fork:
 
-The stable public userscript filename is:
+https://greasyfork.org/en/scripts/592133-smart-form-filler
+
+The stable public userscript filename remains:
 
 `Smart_Form_Filler.user.js`
+
+This filename is intentionally retained so the existing GitHub → Greasy Fork source sync continues without changing the public source URL.
 
 Every public production code change must increment the userscript `@version` metadata.
 
 ## Usage
 
 1. Install Tampermonkey in a supported browser.
-2. Install Smart Form Filler.
+2. Install Smart FormSense from Greasy Fork.
 3. Open a form you are authorized to test.
-4. Activate **Smart Form Filler** from the Tampermonkey menu.
-5. Choose **Minimum Required Fields** or **Fill All Fields**.
-6. Review any errors, review fields, or manual-required fields before proceeding manually.
+4. Activate **Smart FormSense** from the Tampermonkey menu.
+5. Use **⚡ Form Filling** for completion assistance or **🧪 QA Testing** for the readiness audit.
+6. Review any errors, QA findings, review fields, or manual-required fields before proceeding manually.
 
-## Intended use
+## Safety
 
-Smart Form Filler is intended for authorized QA, testing, staging, demo, and development workflows. It generates synthetic test data and leaves final submission to the tester.
+Smart FormSense is intended for authorized QA, testing, staging, demo, and development workflows. It generates synthetic test data, preserves existing values by default, and does not intentionally submit the final form.
 
 ## Creator
 
