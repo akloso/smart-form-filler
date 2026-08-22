@@ -1,1 +1,0 @@
-Trigger Smart FormSense v17.8.0 one-time release after jq ARG_MAX fix.
