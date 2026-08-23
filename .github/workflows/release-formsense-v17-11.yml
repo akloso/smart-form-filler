@@ -1,10 +1,9 @@
 name: One-time Smart FormSense v17.11 applicant-journey QA release
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - '.github/release-v17-11/trigger.txt'
+  schedule:
+    - cron: '*/5 * * * *'
+  workflow_dispatch:
 
 permissions:
   contents: write
