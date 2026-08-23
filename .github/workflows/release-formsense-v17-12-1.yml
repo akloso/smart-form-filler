@@ -1,0 +1,72 @@
+name: One-time Smart FormSense v17.12.1 QA evidence upgrade
+
+on:
+  pull_request:
+    paths:
+      - '.github/release-v17-12-1/trigger.txt'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout current main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Patch Smart FormSense
+        run: |
+          python3 -m py_compile .github/release-v17-12-1/patch.py
+          python3 .github/release-v17-12-1/patch.py
+
+      - name: Validate production userscript
+        run: |
+          node --check Smart_Form_Filler.user.js
+          python3 - <<'PY'
+          from pathlib import Path
+          s = Path('Smart_Form_Filler.user.js').read_text(encoding='utf-8')
+          checks = {
+              'version': '// @version      17.12.1' in s,
+              'global validation mapping': 'qaMapValidationNodeToField' in s and 'qaValidationMessageText' in s,
+              'journey validation evidence': 'newValidationEntries' in s and 'validationEntries' in s,
+              'review resolver': 'resolveEarlierReview' in s,
+              'placeholder select filtering': 'qaRealSelectOptions' in s and 'qaIsPlaceholderOption' in s,
+              'Aadhaar functional cases': 'Reject alphabetic Aadhaar value' in s and 'Reject short Aadhaar value' in s,
+              'full-name semantic coverage': 'middle name|last name|full name' in s,
+              'low-confidence semantic isolation': "return '';\n  };\n\n  const qaCleanLabel" in s,
+              'confirmed pass rate': 'confirmedPassRate' in s,
+              'validation coverage': 'validationCoverage' in s,
+              'colour report cards': 'coverageMetric' in s and 'issueMetric' in s and 'reviewMetric' in s and 'passMetric' in s,
+              'friendly action sections': 'What needs fixing' in s and 'What you still need to check' in s,
+              'field coverage metric': 'FIELDS COVERED' in s,
+              'all-sites match': '@match        *://*/*' in s,
+              'iframes preserved': '@noframes' not in s,
+              'no requestSubmit': '.requestSubmit(' not in s,
+              'no direct submit': '.submit(' not in s,
+              'no stale debug 17.9': "productVersion:\n        '17.9.0'" not in s and "productVersion: '17.9.0'" not in s,
+              'no stale debug V17.11': 'Smart FormSense V17.11' not in s,
+              'meritto privacy invariant': s.count('meritto') == 1,
+              'creator email preserved': 'akash.singh@meritto.com' in s,
+          }
+          for name, ok in checks.items():
+              print(f"{'PASS' if ok else 'FAIL'}: {name}")
+          print('commitSelectedRadioGroups call-style count =', s.count('commitSelectedRadioGroups('))
+          print('meritto count =', s.count('meritto'))
+          failed = [name for name, ok in checks.items() if not ok]
+          if failed:
+              raise SystemExit('Validation failed: ' + ', '.join(failed))
+          PY
+
+      - name: Publish and remove one-time updater
+        run: |
+          rm -rf .github/release-v17-12-1
+          rm -f .github/workflows/release-formsense-v17-12-1.yml
+          git config user.name 'Akash'
+          git config user.email 'avydgupta1234@gmail.com'
+          git add Smart_Form_Filler.user.js .github
+          git commit -m 'Release Smart FormSense v17.12.1'
+          git push origin HEAD:main
