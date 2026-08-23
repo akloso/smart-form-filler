@@ -23,6 +23,21 @@ jobs:
         run: |
           set -euo pipefail
           python .github/release-v17-11/patch_core.py
+          python - <<'PY'
+          from pathlib import Path
+          s = Path('Smart_Form_Filler.user.js').read_text(encoding='utf-8')
+          print('post-core length', len(s))
+          for term in [
+              'buildQaFunctionalReport',
+              'qaGroupedFindings',
+              'buildQaFriendlyHtml',
+              'const severity',
+              'findings.push({',
+              'qaRunJourneyChecks',
+              'qaAttemptUserEntry'
+          ]:
+              print(term, s.find(term), 'count', s.count(term))
+          PY
           python .github/release-v17-11/patch_severity.py
           python .github/release-v17-11/patch_report_v3.py
 
