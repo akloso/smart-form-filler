@@ -1,0 +1,56 @@
+name: One-time Smart FormSense v17.12 QA coverage upgrade
+
+on:
+  pull_request:
+    paths:
+      - '.github/release-v17-12/trigger.txt'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout current main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Patch Smart FormSense
+        run: |
+          python3 -m py_compile .github/release-v17-12/patch.py
+          python3 .github/release-v17-12/patch.py
+
+      - name: Validate production userscript
+        run: |
+          node --check Smart_Form_Filler.user.js
+          grep -q '// @version      17.12.0' Smart_Form_Filler.user.js
+          grep -q 'qaRunDiscoverySweep' Smart_Form_Filler.user.js
+          grep -q 'qaWaitForDependentSelect' Smart_Form_Filler.user.js
+          grep -q 'Manual step: click Continue / Submit on the form' Smart_Form_Filler.user.js
+          grep -q 'Final full-form missed-field sweep' Smart_Form_Filler.user.js
+          grep -q 'FIELDS COVERED' Smart_Form_Filler.user.js
+          grep -q 'What you still need to check' Smart_Form_Filler.user.js
+          grep -q 'fieldCoverage' Smart_Form_Filler.user.js
+          grep -q '@match        \*://\*/\*' Smart_Form_Filler.user.js
+          ! grep -q '@noframes' Smart_Form_Filler.user.js
+          ! grep -q '\.requestSubmit(' Smart_Form_Filler.user.js
+          ! grep -q '\.submit(' Smart_Form_Filler.user.js
+          ! grep -q 'FUNCTIONAL QA SCORE' Smart_Form_Filler.user.js
+          ! grep -q 'AUTO COVERAGE' Smart_Form_Filler.user.js
+          ! grep -q "productVersion:[[:space:]]*'17.9.0'" Smart_Form_Filler.user.js
+          test "$(grep -o 'commitSelectedRadioGroups(' Smart_Form_Filler.user.js | wc -l)" -eq 1
+          test "$(grep -o 'meritto' Smart_Form_Filler.user.js | wc -l)" -eq 1
+          grep -q 'akash.singh@meritto.com' Smart_Form_Filler.user.js
+
+      - name: Publish and remove one-time updater
+        run: |
+          rm -rf .github/release-v17-12
+          rm -f .github/workflows/release-formsense-v17-12.yml
+          git config user.name 'Akash'
+          git config user.email 'avydgupta1234@gmail.com'
+          git add Smart_Form_Filler.user.js .github
+          git commit -m 'Release Smart FormSense v17.12.0'
+          git push origin HEAD:main
