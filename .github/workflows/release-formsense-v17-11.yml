@@ -23,7 +23,7 @@ jobs:
         run: |
           set -euo pipefail
           python .github/release-v17-11/patch_core.py
-          python .github/release-v17-11/patch_report.py
+          python .github/release-v17-11/patch_report_v2.py
 
       - name: Validate production userscript
         shell: bash
@@ -53,6 +53,10 @@ jobs:
           assert 'ISSUE TYPES' in s
           assert 'final submit/payment stays protected' in s
           assert "productVersion: '17.11.0'" in s
+          assert "status === 'blocker'" in s
+          assert "status === 'failed'" in s
+          assert 'Similar findings are grouped into one issue with affected fields listed.' in s
+          assert 'qaGroupedFindings' in s
           print('Smart FormSense v17.11 validation passed')
           PY
 
@@ -66,7 +70,8 @@ jobs:
           git rm -f .github/release-v17-11/upgrade.py.gz.b64
           git rm -f .github/release-v17-11/trigger.txt
           git rm .github/release-v17-11/patch_core.py
-          git rm .github/release-v17-11/patch_report.py
+          git rm -f .github/release-v17-11/patch_report.py
+          git rm .github/release-v17-11/patch_report_v2.py
           git add Smart_Form_Filler.user.js
           git commit -m "Release Smart FormSense v17.11.0"
           git push origin main
