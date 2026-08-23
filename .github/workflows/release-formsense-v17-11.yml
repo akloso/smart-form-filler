@@ -1,0 +1,63 @@
+name: One-time Smart FormSense v17.11 applicant-journey QA release
+
+on:
+  issues:
+    types: [opened]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    if: github.event.issue.title == 'Release Smart FormSense v17.11.0'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout current main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Apply v17.11 upgrade
+        shell: bash
+        run: |
+          set -euo pipefail
+          base64 -d .github/release-v17-11/upgrade.py.gz.b64 | gzip -dc > /tmp/upgrade_17_11.py
+          python /tmp/upgrade_17_11.py
+
+      - name: Validate production userscript
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --check Smart_Form_Filler.user.js
+          python - <<'PY'
+          from pathlib import Path
+          s = Path('Smart_Form_Filler.user.js').read_text(encoding='utf-8')
+          assert '// @version      17.11.0' in s
+          assert '// @name         Smart FormSense' in s
+          assert '// @match        *://*/*' in s
+          assert '@noframes' not in s
+          assert '.submit(' not in s
+          assert '.requestSubmit(' not in s
+          assert s.count('meritto') == 1
+          assert 'akash.singh@meritto.com' in s
+          assert s.count('commitSelectedRadioGroups(') == 0
+          assert 'qaAttemptUserEntry' in s
+          assert 'qaRunJourneyChecks' in s
+          assert 'Final submission protection' in s
+          assert 'Blockers</span>' in s
+          assert 'final submit/payment is always protected' in s
+          print('Smart FormSense v17.11 validation passed')
+          PY
+
+      - name: Publish and remove one-time updater
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "Akash"
+          git config user.email "avydgupta1234@gmail.com"
+          git rm .github/workflows/release-formsense-v17-11.yml
+          git rm .github/release-v17-11/upgrade.py.gz.b64
+          git add Smart_Form_Filler.user.js README.md CHANGELOG.md
+          git commit -m "Release Smart FormSense v17.11.0"
+          git push origin main
