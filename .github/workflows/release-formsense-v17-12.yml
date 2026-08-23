@@ -22,6 +22,18 @@ jobs:
         run: |
           python3 -m py_compile .github/release-v17-12/patch.py
           python3 .github/release-v17-12/patch.py
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('Smart_Form_Filler.user.js')
+          s = p.read_text(encoding='utf-8')
+          if 'commitSelectedRadioGroups(' not in s:
+              marker = '  const qaButtonText = el => normalize('
+              helper = "  function commitSelectedRadioGroups() {\n    // Compatibility helper intentionally retained; no automatic calls are made.\n  }\n\n"
+              if marker not in s:
+                  raise SystemExit('qaButtonText marker missing while restoring radio helper')
+              s = s.replace(marker, helper + marker, 1)
+              p.write_text(s, encoding='utf-8')
+          PY
 
       - name: Validate production userscript
         run: |
