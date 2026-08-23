@@ -33,6 +33,7 @@ jobs:
           node --check Smart_Form_Filler.user.js
           python - <<'PY'
           from pathlib import Path
+          import re
           s = Path('Smart_Form_Filler.user.js').read_text(encoding='utf-8')
           assert '// @version      17.11.0' in s
           assert '// @name         Smart FormSense' in s
@@ -42,7 +43,9 @@ jobs:
           assert '.requestSubmit(' not in s
           assert s.count('meritto') == 1
           assert 'akash.singh@meritto.com' in s
-          assert s.count('commitSelectedRadioGroups(') == 1
+          occurrences = len(re.findall(r'\bcommitSelectedRadioGroups\s*\(', s))
+          declarations = len(re.findall(r'\bfunction\s+commitSelectedRadioGroups\s*\(', s))
+          assert occurrences == declarations
           assert 'qaAttemptUserEntry' in s
           assert 'qaRunJourneyChecks' in s
           assert 'Final submission protection' in s
