@@ -5,7 +5,7 @@ p = Path('Smart_Form_Filler.user.js')
 s = p.read_text(encoding='utf-8')
 
 # Group one issue once, then list every affected field.
-group_pattern = re.compile(r"  const qaGroupedFindings = report => \{.*?\n  \};\n\n  const buildQaFriendlyHtml", re.S)
+group_pattern = re.compile(r"  const qaGroupedFindings = report => \{.*?\n  \};\s*\n\s*const buildQaFriendlyHtml", re.S)
 group_repl = r'''  const qaGroupedFindings = report => {
     const groups = new Map();
     for (const item of report?.findings || []) {
@@ -30,10 +30,10 @@ group_repl = r'''  const qaGroupedFindings = report => {
 
   const buildQaFriendlyHtml'''
 s, n = group_pattern.subn(group_repl, s, count=1)
-assert n == 1
+assert n == 1, f'qaGroupedFindings patch matched {n} times'
 
 # Minimal report: summary, confirmed issues, review areas, passed count.
-html_pattern = re.compile(r"  const buildQaFriendlyHtml = report => \{.*?\n  \};\n\n  const exportQaReport", re.S)
+html_pattern = re.compile(r"  const buildQaFriendlyHtml = report => \{.*?\n  \};\s*\n\s*const exportQaReport", re.S)
 html_repl = r'''  const buildQaFriendlyHtml = report => {
     const qa = report || state.qaReport;
     if (!qa) return '';
@@ -90,7 +90,7 @@ ${section('Needs Review', review, 'review')}
 
   const exportQaReport'''
 s, n = html_pattern.subn(html_repl, s, count=1)
-assert n == 1
+assert n == 1, f'buildQaFriendlyHtml patch matched {n} times'
 
 # Keep the panel equally compact: grouped titles, corrected status names and coverage.
 s = s.replace('<div class="qaStat qaCritical"><b id="qaCritical">0</b><span>Failed</span></div>', '<div class="qaStat qaCritical"><b id="qaCritical">0</b><span>Blockers</span></div>', 1)
