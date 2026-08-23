@@ -1,15 +1,15 @@
 name: One-time Smart FormSense v17.11 applicant-journey QA release
 
 on:
-  schedule:
-    - cron: '*/5 * * * *'
-  workflow_dispatch:
+  pull_request:
+    types: [opened]
 
 permissions:
   contents: write
 
 jobs:
   release:
+    if: github.head_ref == 'release/v17-11-trigger'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout current main
