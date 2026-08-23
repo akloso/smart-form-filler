@@ -1,16 +1,15 @@
 name: One-time Smart FormSense v17.11 applicant-journey QA release
 
 on:
-  workflow_dispatch:
-  push:
-    paths:
-      - '.github/release-v17-11/trigger.txt'
+  issues:
+    types: [opened]
 
 permissions:
   contents: write
 
 jobs:
   release:
+    if: github.event.issue.title == 'Release Smart FormSense v17.11.0 Final'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout current main
@@ -59,7 +58,7 @@ jobs:
           git config user.email "avydgupta1234@gmail.com"
           git rm .github/workflows/release-formsense-v17-11.yml
           git rm .github/release-v17-11/upgrade.py.gz.b64
-          git rm .github/release-v17-11/trigger.txt
+          git rm -f .github/release-v17-11/trigger.txt
           git add Smart_Form_Filler.user.js README.md CHANGELOG.md
           git commit -m "Release Smart FormSense v17.11.0"
           git push origin main
