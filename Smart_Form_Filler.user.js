@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Smart FormSense
 // @namespace    smart-form-filler
-// @version      17.11.0
+// @version      17.11.1
 // @description  Intelligent form filling and QA testing for authorized web-form validation, readiness checks, embedded forms, safe repair, and synthetic test data.
 // @author       Akash Singh
 // @match        *://*/*
@@ -48,6 +48,7 @@
   const FRAME_DISCOVERY_HARD_MS = 2600;
   const FRAME_AGENT_STALE_MS = 12000;
   const REMOTE_COMMAND_TIMEOUT_MS = 42000;
+  const QA_REMOTE_COMMAND_TIMEOUT_MS = 300000;
 
   const state = {
     running: false,
@@ -100,7 +101,8 @@
     activeRemoteAction: null,
     workspace: 'fill',
     qaReport: null,
-    qaNavIndex: 0
+    qaNavIndex: 0,
+    qaProgressPercent: 0
   };
 
   const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
@@ -185,7 +187,7 @@
     );
 
     console.error(
-      `Smart FormSense V17.11 [${stage}]`,
+      `Smart FormSense V17.11.1 [${stage}]`,
       error
     );
 
@@ -12440,7 +12442,7 @@
           .slice(0, 60);
 
       const filename =
-        `Smart_FormSense_V17_11_Debug_${host}_${stamp}.json`;
+        `Smart_FormSense_V17_11_1_Debug_${host}_${stamp}.json`;
 
       downloadTextFile(
         filename,
@@ -12458,7 +12460,7 @@
       return report;
     } catch (error) {
       console.error(
-        'Smart FormSense V17.11 debug export:',
+        'Smart FormSense V17.11.1 debug export:',
         error
       );
 
@@ -13541,11 +13543,11 @@
       );
 
     return {
-      reportVersion: 2,
+      reportVersion: 3,
       product:
         'Smart FormSense',
       productVersion:
-        '17.9.0',
+        '17.11.1',
       generatedAt,
       auditType:
         'Non-destructive Form Readiness Audit',
@@ -13729,7 +13731,9 @@
       catch { return qa.generatedAt || ''; }
     })();
 
-    const status = blockers.length
+    const status = qa.incomplete
+      ? (qa.runState === 'stopped' ? 'Partial Report • Stopped' : 'Partial Report • Interrupted')
+      : blockers.length
       ? 'Blockers Found'
       : failed.length
         ? 'Needs Attention'
@@ -13764,7 +13768,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Smart FormSense QA Report</title>
 <style>
-*{box-sizing:border-box}body{margin:0;background:#f7f7fa;color:#242633;font-family:Inter,Segoe UI,Arial,sans-serif}.wrap{max-width:850px;margin:auto;padding:28px 18px 44px}.top{background:#fff;border:1px solid #e7e7ee;border-radius:16px;padding:20px}.brand{font-size:13px;font-weight:850;color:#5b4bff}.top h1{font-size:22px;margin:5px 0}.meta{font-size:12px;color:#747887;line-height:1.5}.status{display:inline-block;margin-top:13px;padding:6px 10px;border-radius:999px;background:#f2efff;color:#5b4bff;font-size:12px;font-weight:850}.summary{display:grid;grid-template-columns:repeat(5,1fr);gap:7px;margin-top:15px}.metric{border:1px solid #e8e8ef;border-radius:10px;padding:10px 7px;text-align:center}.metric b{display:block;font-size:19px}.metric span{font-size:9px;color:#777b88;font-weight:750}.blockerText{color:#b91c1c}.failedText{color:#c2410c}.reviewText{color:#a16207}section{margin-top:24px}h2{font-size:16px;margin:0 0 9px}h2 span{font-size:10px;background:#ececf2;border-radius:999px;padding:3px 6px;color:#666}.item{background:#fff;border:1px solid #e7e7ee;border-left:4px solid #cbd5e1;border-radius:11px;padding:13px;margin:8px 0}.item.blocker{border-left-color:#b91c1c}.item.failed{border-left-color:#ea580c}.item.review{border-left-color:#d97706}.itemTitle{font-size:14px;font-weight:850}.fields,.what,.action{margin-top:6px;font-size:11px;line-height:1.5;color:#606473}.action{background:#f7f7fb;border-radius:8px;padding:8px 9px}.passed{margin-top:24px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:11px;padding:12px;font-size:12px;color:#166534}.note{margin-top:18px;font-size:10px;line-height:1.55;color:#858895}.footer{text-align:center;margin-top:24px;font-size:10px;color:#9295a1}@media(max-width:650px){.summary{grid-template-columns:repeat(2,1fr)}}@media print{body{background:#fff}.wrap{padding:0}}
+*{box-sizing:border-box}body{margin:0;background:#f7f7fa;color:#242633;font-family:Inter,Segoe UI,Arial,sans-serif}.wrap{max-width:850px;margin:auto;padding:28px 18px 44px}.top{background:#fff;border:1px solid #e7e7ee;border-radius:16px;padding:20px}.brand{font-size:13px;font-weight:850;color:#5b4bff}.top h1{font-size:22px;margin:5px 0}.meta{font-size:12px;color:#747887;line-height:1.5}.status{display:inline-block;margin-top:13px;padding:6px 10px;border-radius:999px;background:#f2efff;color:#5b4bff;font-size:12px;font-weight:850}.summary{display:grid;grid-template-columns:repeat(5,1fr);gap:7px;margin-top:15px}.metric{border:1px solid #e8e8ef;border-radius:10px;padding:10px 7px;text-align:center}.metric b{display:block;font-size:19px}.metric span{font-size:9px;color:#777b88;font-weight:750}.blockerText{color:#b91c1c}.failedText{color:#c2410c}.reviewText{color:#a16207}section{margin-top:24px}h2{font-size:16px;margin:0 0 9px}h2 span{font-size:10px;background:#ececf2;border-radius:999px;padding:3px 6px;color:#666}.item{background:#fff;border:1px solid #e7e7ee;border-left:4px solid #cbd5e1;border-radius:11px;padding:13px;margin:8px 0}.item.blocker{border-left-color:#b91c1c}.item.failed{border-left-color:#ea580c}.item.review{border-left-color:#d97706}.itemTitle{font-size:14px;font-weight:850}.fields,.what,.action{margin-top:6px;font-size:11px;line-height:1.5;color:#606473}.action{background:#f7f7fb;border-radius:8px;padding:8px 9px}.partial{margin-top:14px;background:#fff7ed;border:1px solid #fed7aa;border-radius:11px;padding:10px 12px;font-size:11px;line-height:1.45;color:#9a3412}.passed{margin-top:24px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:11px;padding:12px;font-size:12px;color:#166534}.note{margin-top:18px;font-size:10px;line-height:1.55;color:#858895}.footer{text-align:center;margin-top:24px;font-size:10px;color:#9295a1}@media(max-width:650px){.summary{grid-template-columns:repeat(2,1fr)}}@media print{body{background:#fff}.wrap{padding:0}}
 </style>
 </head>
 <body>
@@ -13772,16 +13776,18 @@
   <div class="top">
     <div class="brand">✦ Smart FormSense QA</div>
     <h1>${esc(qa.page?.title || 'Form')}</h1>
-    <div class="meta">${esc(qa.page?.hostname || location.hostname || '')}<br>${esc(generated)} • v${esc(qa.productVersion || '17.11.0')}</div>
+    <div class="meta">${esc(qa.page?.hostname || location.hostname || '')}<br>${esc(generated)} • v${esc(qa.productVersion || '17.11.1')}</div>
     <div class="status">${esc(status)}</div>
     <div class="summary">
-      <div class="metric"><b>${Number(qa.fieldsAudited || 0)}</b><span>FIELDS CHECKED</span></div>
+      <div class="metric"><b>${Number(qa.incomplete ? (qa.fieldsChecked || 0) : (qa.fieldsAudited || 0))}</b><span>FIELDS CHECKED</span></div>
       <div class="metric"><b class="blockerText">${blockers.length}</b><span>BLOCKER TYPES</span></div>
       <div class="metric"><b class="failedText">${failed.length}</b><span>ISSUE TYPES</span></div>
       <div class="metric"><b class="reviewText">${review.length}</b><span>REVIEW AREAS</span></div>
       <div class="metric"><b>${Number(qa.coverage ?? qa.summary?.coverage ?? 0)}%</b><span>AUTO COVERAGE</span></div>
     </div>
   </div>
+
+  ${qa.incomplete ? `<div class="partial"><b>Partial report.</b> ${esc(qa.summary?.headline || 'QA did not complete.')} ${qa.stopReason ? `<br>${esc(qa.stopReason)}` : ''}</div>` : ''}
 
   ${section('Blockers', blockers, 'blocker')}
   ${section('Issues to Fix', failed, 'failed')}
@@ -14008,7 +14014,14 @@
           null,
         lastRuntimeError:
           state.lastRuntimeError ||
-          null
+          null,
+        qaRunState:
+          state.qaReport?.runState ||
+          null,
+        qaIncomplete:
+          !!state.qaReport?.incomplete,
+        qaProgressPercent:
+          Number(state.qaProgressPercent || 0)
       },
       notes: [
         'This file is intentionally technical and is meant to be shared for troubleshooting Smart FormSense QA detection.',
@@ -14059,7 +14072,7 @@
       return report;
     } catch (error) {
       console.error(
-        'Smart FormSense V17.11 QA debug export:',
+        'Smart FormSense V17.11.1 QA debug export:',
         error
       );
 
@@ -14628,7 +14641,9 @@
                   )
                 );
               },
-              REMOTE_COMMAND_TIMEOUT_MS
+              action === 'qa-audit'
+                ? QA_REMOTE_COMMAND_TIMEOUT_MS
+                : REMOTE_COMMAND_TIMEOUT_MS
             );
 
           bridge.pending.set(
@@ -15114,7 +15129,7 @@
   const qaFindJourneyButtons = () => {
     const safe = [];
     const protectedFinal = [];
-    const nodes = [...document.querySelector(
+    const nodes = [...document.querySelectorAll(
       'button,input[type="button"],input[type="submit"],a,[role="button"]'
     )];
 
@@ -15195,6 +15210,7 @@
 
     try {
       for (let i = 0; i < chain.length - 1; i++) {
+        if (state.stopRequested) break;
         const parent = chain[i];
         const child = chain[i + 1];
         const options = validOptions(parent);
@@ -15255,6 +15271,7 @@
 
   const qaRunJourneyChecks = async (fields, candidates) => {
     const rows = [];
+    if (state.stopRequested) return rows;
     const buttons = qaFindJourneyButtons();
 
     if (buttons.protectedFinal.length) {
@@ -15346,6 +15363,7 @@
     }
 
     for (const candidate of candidates.slice(0, 3)) {
+      if (state.stopRequested) break;
       const el = candidate.el;
       if (!el?.isConnected || !button?.isConnected) continue;
 
@@ -15743,6 +15761,69 @@
     };
   };
 
+  const qaMarkReportIncomplete = (report, runState = 'stopped', reason = '') => {
+    const base = report && typeof report === 'object'
+      ? report
+      : {
+          reportVersion: 5,
+          product: 'Smart FormSense',
+          productVersion: '17.11.1',
+          generatedAt: new Date().toISOString(),
+          auditType: 'Black-box Functional Form QA',
+          page: {
+            url: location.href,
+            hostname: location.hostname,
+            pathname: location.pathname,
+            title: document.title || ''
+          },
+          formSignature: state.currentFormSignature || null,
+          fieldsAudited: 0,
+          fieldsChecked: 0,
+          checksRun: 0,
+          score: 0,
+          rating: 'Partial',
+          coverage: 0,
+          summary: {
+            riskLevel: 'Review',
+            headline: 'QA did not complete. Review the partial results below.',
+            recommendation: 'Use the completed checks below, then rerun QA for the remaining fields.',
+            fieldsAudited: 0,
+            fieldsChecked: 0,
+            checksRun: 0,
+            completed: 0,
+            coverage: 0,
+            score: 0
+          },
+          counts: { critical: 0, warning: 0, observation: 0, passed: 0 },
+          categoryCounts: {},
+          findings: [],
+          testCases: [],
+          notes: []
+        };
+
+    const cleanReason = String(reason || '').slice(0, 500);
+    return {
+      ...base,
+      productVersion: '17.11.1',
+      reportVersion: Math.max(5, Number(base.reportVersion || 0)),
+      runState,
+      incomplete: runState !== 'completed',
+      stopReason: cleanReason,
+      completedAt: new Date().toISOString(),
+      notes: [
+        ...(Array.isArray(base.notes) ? base.notes : []),
+        runState === 'stopped'
+          ? 'This is a partial report because the QA run was stopped by the user. All completed checks are retained.'
+          : runState === 'failed'
+            ? 'This is a partial report because the QA run was interrupted. All completed checks are retained.'
+            : ''
+      ].filter(Boolean)
+    };
+  };
+
+  const qaFallbackPartialReport = (runState, reason) =>
+    qaMarkReportIncomplete(null, runState, reason);
+
   const buildQaFunctionalReport = async () => {
     const generatedAt = new Date().toISOString();
     const findings = [];
@@ -15758,6 +15839,132 @@
         !['hidden', 'submit', 'button', 'reset'].includes(normalize(el.type))
       );
     } catch {}
+
+    const assembleReport = (runState = 'running', stopReason = '') => {
+      const blockers = testCases.filter(item => item.status === 'blocker').length;
+      const failed = testCases.filter(item => item.status === 'failed').length;
+      const review = testCases.filter(item => ['review', 'manual', 'warning'].includes(item.status)).length;
+      const passed = testCases.filter(item => item.status === 'passed').length;
+      const counts = { critical: blockers, warning: failed, observation: review, passed };
+      const checksRun = testCases.length;
+      const completed = blockers + failed + passed;
+      const score = completed
+        ? Math.round(clamp((passed / completed) * 100, 0, 100))
+        : 0;
+      const coverage = checksRun
+        ? Math.round(clamp((completed / checksRun) * 100, 0, 100))
+        : 0;
+      const checkedKeys = new Set(
+        testCases.map(item => item.fieldKey).filter(Boolean)
+      );
+      const fieldsChecked = Math.min(fields.length, checkedKeys.size);
+      const incomplete = runState !== 'completed';
+      const rating = incomplete
+        ? (runState === 'failed' ? 'Interrupted' : runState === 'stopped' ? 'Stopped' : 'Running')
+        : blockers > 0
+          ? 'Blocked'
+          : failed > 0
+            ? 'Needs Attention'
+            : review > 0
+              ? 'Needs Review'
+              : 'Strong';
+
+      const summary = {
+        riskLevel: blockers > 0
+          ? 'High'
+          : failed > 0
+            ? 'Moderate'
+            : review > 0 || incomplete
+              ? 'Review'
+              : 'Low',
+        headline: incomplete
+          ? `${fieldsChecked} of ${fields.length} field${fields.length === 1 ? '' : 's'} have usable QA results so far.`
+          : blockers > 0
+            ? `${blockers} blocker${blockers === 1 ? '' : 's'} need attention before go-live.`
+            : failed > 0
+              ? `${failed} confirmed issue${failed === 1 ? '' : 's'} should be fixed before go-live.`
+              : review > 0
+                ? `No confirmed failure was reproduced. ${review} check${review === 1 ? '' : 's'} still need review.`
+                : 'No applicant-facing issue was reproduced in the completed automated checks.',
+        recommendation: incomplete
+          ? 'Use this partial report for completed checks, then rerun QA to cover the remaining fields.'
+          : blockers > 0 || failed > 0
+            ? 'Fix the confirmed applicant-facing issues, rerun QA, then complete the remaining manual checks.'
+            : review > 0
+              ? 'Complete only the listed manual/review checks before final sign-off.'
+              : 'Complete a brief final human journey check before sign-off.',
+        fieldsAudited: fields.length,
+        fieldsChecked,
+        checksRun,
+        completed,
+        coverage,
+        score
+      };
+
+      const categoryCounts = {};
+      for (const item of findings) {
+        categoryCounts[item.category] = (categoryCounts[item.category] || 0) + 1;
+      }
+
+      return {
+        reportVersion: 5,
+        product: 'Smart FormSense',
+        productVersion: '17.11.1',
+        generatedAt,
+        completedAt: runState === 'completed' || runState === 'stopped' || runState === 'failed'
+          ? new Date().toISOString()
+          : null,
+        auditType: 'Black-box Functional Form QA',
+        runState,
+        incomplete,
+        stopReason: String(stopReason || '').slice(0, 500),
+        page: {
+          url: location.href,
+          hostname: location.hostname,
+          pathname: location.pathname,
+          title: document.title || ''
+        },
+        formSignature: state.currentFormSignature || null,
+        fieldsAudited: fields.length,
+        fieldsChecked,
+        checksRun,
+        score,
+        rating,
+        coverage,
+        summary,
+        counts,
+        categoryCounts,
+        findings: [...findings],
+        testCases: [...testCases],
+        notes: [
+          'Smart FormSense tests the finished form from the applicant/user point of view; it does not audit backend implementation choices.',
+          'Field values are temporarily changed for safe black-box tests and restored after each test case.',
+          'Safe Next/Continue/Save & Next actions may be tested after field checks; final submit/payment/generate-application actions are always protected.',
+          'A field-level negative test is not called a defect unless stronger applicant-journey evidence confirms it.',
+          'File uploads, final submission, and some widget-specific behaviours remain manual QA steps.',
+          incomplete ? 'This report is partial. Completed checks are preserved even when QA is stopped or interrupted.' : ''
+        ].filter(Boolean)
+      };
+    };
+
+    const publishPartial = (runState = 'running', stopReason = '', forceUi = false) => {
+      const report = assembleReport(runState, stopReason);
+      state.qaReport = report;
+      if (
+        forceUi ||
+        testCases.length <= 1 ||
+        testCases.length % 3 === 0 ||
+        runState !== 'running'
+      ) {
+        state.panel?.setQaReport?.(report);
+      }
+      return report;
+    };
+
+    // Export is useful from the first moment of a QA run, even if the run is
+    // later stopped or interrupted.
+    publishPartial('running', '', true);
+    state.panel?.setQaProgress?.(2, `Preparing ${fields.length} field(s)`);
 
     const addCase = ({
       el = null,
@@ -15786,7 +15993,10 @@
       };
 
       testCases.push(row);
-      if (status === 'passed') return;
+      if (status === 'passed') {
+        publishPartial('running');
+        return;
+      }
 
       const severity =
         status === 'blocker'
@@ -15814,6 +16024,8 @@
         attemptedValue,
         evidence
       });
+
+      publishPartial('running');
     };
 
     if (!fields.length) {
@@ -15842,6 +16054,10 @@
         seenRadioGroups.add(key);
       }
 
+      const fieldPercent = fields.length
+        ? Math.round(5 + ((index + 1) / fields.length) * 75)
+        : 80;
+      state.panel?.setQaProgress?.(fieldPercent, `Checking ${index + 1}/${fields.length} • ${label}`);
       state.panel?.setStatus?.(`Functional QA • ${index + 1}/${fields.length} • ${label}`);
 
       const requiredSignals = qaRequiredSignals(el);
@@ -15986,7 +16202,11 @@
       await yieldToUI();
     }
 
-    for (const row of await qaRunDependencyChain(fields)) {
+    if (!state.stopRequested) {
+      state.panel?.setQaProgress?.(84, 'Checking field dependencies');
+    }
+
+    for (const row of state.stopRequested ? [] : await qaRunDependencyChain(fields)) {
       addCase({
         el: row.el || null,
         category: 'Dependencies',
@@ -16000,7 +16220,11 @@
       });
     }
 
-    for (const row of await qaRunJourneyChecks(fields, journeyCandidates)) {
+    if (!state.stopRequested) {
+      state.panel?.setQaProgress?.(92, 'Checking Next / Continue journey validation');
+    }
+
+    for (const row of state.stopRequested ? [] : await qaRunJourneyChecks(fields, journeyCandidates)) {
       addCase({
         el: row.el || null,
         category: 'Journey Validation',
@@ -16017,96 +16241,16 @@
       });
     }
 
-    const blockers = testCases.filter(item => item.status === 'blocker').length;
-    const failed = testCases.filter(item => item.status === 'failed').length;
-    const review = testCases.filter(item => ['review', 'manual', 'warning'].includes(item.status)).length;
-    const passed = testCases.filter(item => item.status === 'passed').length;
-    const counts = {
-      critical: blockers,
-      warning: failed,
-      observation: review,
-      passed
-    };
-
-    const checksRun = testCases.length;
-    const completed = blockers + failed + passed;
-    const score = completed
-      ? Math.round(clamp((passed / completed) * 100, 0, 100))
-      : 0;
-    const coverage = checksRun
-      ? Math.round(clamp((completed / checksRun) * 100, 0, 100))
-      : 0;
-    const rating = blockers > 0
-      ? 'Blocked'
-      : failed > 0
-        ? 'Needs Attention'
-        : review > 0
-          ? 'Needs Review'
-          : 'Strong';
-
-    const summary = {
-      riskLevel: blockers > 0
-        ? 'High'
-        : failed > 0
-          ? 'Moderate'
-          : review > 0
-            ? 'Review'
-            : 'Low',
-      headline: blockers > 0
-        ? `${blockers} blocker${blockers === 1 ? '' : 's'} need attention before go-live.`
-        : failed > 0
-          ? `${failed} confirmed issue${failed === 1 ? '' : 's'} should be fixed before go-live.`
-          : review > 0
-            ? `No confirmed failure was reproduced. ${review} check${review === 1 ? '' : 's'} still need review.`
-            : 'No applicant-facing issue was reproduced in the completed automated checks.',
-      recommendation: blockers > 0 || failed > 0
-        ? 'Fix the confirmed applicant-facing issues, rerun QA, then complete the remaining manual checks.'
-        : review > 0
-          ? 'Complete only the listed manual/review checks before final sign-off.'
-          : 'Complete a brief final human journey check before sign-off.',
-      fieldsAudited: fields.length,
-      checksRun,
-      completed,
-      coverage,
-      score
-    };
-
-    const categoryCounts = {};
-    for (const item of findings) {
-      categoryCounts[item.category] = (categoryCounts[item.category] || 0) + 1;
-    }
-
-    return {
-      reportVersion: 4,
-      product: 'Smart FormSense',
-      productVersion: '17.11.0',
-      generatedAt,
-      auditType: 'Black-box Functional Form QA',
-      page: {
-        url: location.href,
-        hostname: location.hostname,
-        pathname: location.pathname,
-        title: document.title || ''
-      },
-      formSignature: state.currentFormSignature || null,
-      fieldsAudited: fields.length,
-      checksRun,
-      score,
-      rating,
-      coverage,
-      summary,
-      counts,
-      categoryCounts,
-      findings,
-      testCases,
-      notes: [
-        'Smart FormSense tests the finished form from the applicant/user point of view; it does not audit backend implementation choices.',
-        'Field values are temporarily changed for safe black-box tests and restored after each test case.',
-        'Safe Next/Continue/Save & Next actions may be tested after field checks; final submit/payment/generate-application actions are always protected.',
-        'A field-level negative test is not called a defect unless stronger applicant-journey evidence confirms it.',
-        'File uploads, final submission, and some widget-specific behaviours remain manual QA steps.'
-      ]
-    };
+    const finalState = state.stopRequested ? 'stopped' : 'completed';
+    const finalReason = state.stopRequested ? 'Stopped by user' : '';
+    const report = publishPartial(finalState, finalReason, true);
+    state.panel?.setQaProgress?.(
+      finalState === 'completed' ? 100 : Math.max(1, Number(state.qaProgressPercent || 0)),
+      finalState === 'completed'
+        ? 'QA completed'
+        : `Stopped • ${report.fieldsChecked} of ${report.fieldsAudited} fields have results`
+    );
+    return report;
   };
 
   const runSmartQaAudit = async () => {
@@ -16116,6 +16260,7 @@
     state.running = true;
     state.stopRequested = false;
     state.panel?.setBusy(true);
+    state.panel?.setQaProgress?.(1, 'Locating the active form');
     state.panel?.setStatus('Locating the active form for QA Audit...');
     state.panel?.setMode('qa');
 
@@ -16152,15 +16297,31 @@
       state.qaReport = report;
       state.panel?.setQaReport?.(report);
       state.panel?.setStatus(
-        `Functional QA completed • Score ${report.score}/100 • ${report.counts.critical} critical • ${report.counts.warning} warning(s)`
+        report.incomplete
+          ? `Functional QA stopped • Partial report • ${report.fieldsChecked}/${report.fieldsAudited} fields with results`
+          : `Functional QA completed • Score ${report.score}/100 • ${report.counts.critical} blocker(s) • ${report.counts.warning} failed`
       );
 
       return report;
     } catch (error) {
-      state.panel?.setStatus(
-        `QA Audit stopped safely: ${error?.message || 'unknown error'}`
+      const reason = error?.message || 'unknown error';
+      const partial = qaMarkReportIncomplete(
+        state.qaReport || qaFallbackPartialReport('failed', reason),
+        'failed',
+        reason
       );
-      return null;
+      state.qaReport = partial;
+      state.panel?.setQaReport?.(partial);
+      state.panel?.setQaProgress?.(
+        Number(partial.summary?.fieldsAudited || partial.fieldsAudited || 0)
+          ? Math.max(1, Math.round((Number(partial.fieldsChecked || 0) / Math.max(1, Number(partial.fieldsAudited || 0))) * 80))
+          : 1,
+        `Interrupted • partial report available`
+      );
+      state.panel?.setStatus(
+        `QA interrupted safely: ${reason} • Partial report is available.`
+      );
+      return partial;
     } finally {
       state.running = false;
       state.activeRemoteAgentId = null;
@@ -16456,6 +16617,7 @@
             state.activeRemoteAgentId &&
           [
             'REMOTE_PROGRESS',
+            'REMOTE_QA_PROGRESS',
             'REMOTE_STATUS',
             'REMOTE_COUNTERS',
             'REMOTE_ELAPSED',
@@ -16476,6 +16638,18 @@
             Number(
               data.percent || 0
             ),
+            data.text || ''
+          );
+
+          return;
+        }
+
+        if (
+          data.type ===
+          'REMOTE_QA_PROGRESS'
+        ) {
+          state.panel?.setQaProgress?.(
+            Number(data.percent || 0),
             data.text || ''
           );
 
@@ -16676,6 +16850,30 @@
             text
           }
         );
+      },
+
+      setQaProgress(percent, text) {
+        state.qaProgressPercent = clamp(Number(percent || 0), 0, 100);
+        send(
+          'REMOTE_QA_PROGRESS',
+          {
+            percent,
+            text
+          }
+        );
+      },
+
+      setQaProgress(percent, text) {
+        const value = clamp(Number(percent || 0), 0, 100);
+        state.qaProgressPercent = value;
+        if (refs.qaProgressBar) refs.qaProgressBar.style.width = `${value}%`;
+        if (refs.qaProgressPct) refs.qaProgressPct.textContent = `${Math.round(value)}%`;
+        if (refs.qaProgressText) refs.qaProgressText.textContent = text || 'Working…';
+      },
+
+      setQaReport(report) {
+        if (!report) return;
+        state.qaReport = report;
       },
 
       setElapsed(text) {
@@ -16942,6 +17140,16 @@
             }
           );
         } catch (error) {
+          const reason = error?.message || 'unknown error';
+          const partialQa = agent.action === 'qa-audit'
+            ? qaMarkReportIncomplete(
+                state.qaReport || qaFallbackPartialReport('failed', reason),
+                'failed',
+                reason
+              )
+            : null;
+          if (partialQa) state.qaReport = partialQa;
+
           send(
             'REMOTE_RESULT',
             {
@@ -16950,8 +17158,11 @@
                 agent.action,
               counters:
                 counters(),
+              qaReport: partialQa,
               status:
-                `Embedded ${agent.action} stopped safely: ${error?.message || 'unknown error'}`
+                partialQa
+                  ? `Embedded Functional QA interrupted safely • Partial report available`
+                  : `Embedded ${agent.action} stopped safely: ${reason}`
             }
           );
         } finally {
@@ -17135,6 +17346,12 @@
         .qaScoreLabel{font-size:9px;color:#777084;font-weight:750}
         .qaScore{font-size:26px;line-height:1.05;font-weight:900;color:#4f46e5;margin-top:3px}
         .qaRating{font-size:9px;color:#6b7280;margin-top:3px}
+        .qaProgressBox{margin:7px 0 3px;padding:7px 8px;border:1px solid #e7e3f5;border-radius:10px;background:#fff}
+        .qaProgressMeta{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:8px;color:#706a7f;margin-bottom:5px}
+        .qaProgressMeta span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+        .qaProgressMeta b{font-size:9px;color:#5b4bff;flex:0 0 auto}
+        .qaProgressTrack{height:8px;background:#eeeafe;border-radius:999px;overflow:hidden}
+        .qaProgressBar{height:100%;width:0%;border-radius:999px;background:linear-gradient(90deg,#5b4bff,#a855f7,#ec4899);transition:width .2s ease}
         .qaStats{
           display:grid;
           grid-template-columns:repeat(4,1fr);
@@ -17544,6 +17761,16 @@
 
             <button class="primary" id="qaRunBtn">Run Functional QA</button>
 
+            <div class="qaProgressBox">
+              <div class="qaProgressMeta">
+                <span id="qaProgressText">Ready</span>
+                <b id="qaProgressPct">0%</b>
+              </div>
+              <div class="qaProgressTrack">
+                <div class="qaProgressBar" id="qaProgressBar"></div>
+              </div>
+            </div>
+
             <div class="qaStats">
               <div class="qaStat qaCritical"><b id="qaCritical">0</b><span>Blockers</span></div>
               <div class="qaStat qaWarning"><b id="qaWarning">0</b><span>Failed</span></div>
@@ -17557,7 +17784,7 @@
 
             <div class="utilityGrid">
               <button class="secondary" id="qaExportBtn" disabled title="Download a readable HTML report">Export Report</button>
-              <button class="secondary" id="qaDebugBtn" disabled title="Download technical QA diagnostics for troubleshooting">Export Debug</button>
+              <button class="secondary" id="qaDebugBtn" title="Download technical QA diagnostics for troubleshooting">Export Debug</button>
               <button class="secondary" id="qaRefreshBtn">Run Again</button>
             </div>
 
@@ -17642,6 +17869,9 @@
       qaIssues: $('qaIssues'),
       qaScore: $('qaScore'),
       qaRating: $('qaRating'),
+      qaProgressText: $('qaProgressText'),
+      qaProgressPct: $('qaProgressPct'),
+      qaProgressBar: $('qaProgressBar'),
       qaCritical: $('qaCritical'),
       qaWarning: $('qaWarning'),
       qaObservation: $('qaObservation'),
@@ -17807,7 +18037,10 @@
         }
 
         if (refs.qaRating) {
-          refs.qaRating.textContent = `${report.rating || 'Review'} • ${Number(report.fieldsAudited || 0)} fields • ${Number(report.coverage ?? report.summary?.coverage ?? 0)}% auto coverage`;
+          const fieldText = report.incomplete
+            ? `${Number(report.fieldsChecked || 0)}/${Number(report.fieldsAudited || 0)} fields checked`
+            : `${Number(report.fieldsAudited || 0)} fields`;
+          refs.qaRating.textContent = `${report.incomplete ? 'Partial • ' : ''}${report.rating || 'Review'} • ${fieldText} • ${Number(report.coverage ?? report.summary?.coverage ?? 0)}% auto coverage`;
         }
 
         const counts = report.counts || {};
@@ -17914,11 +18147,26 @@
         if (refs.qaRunBtn) refs.qaRunBtn.disabled = busy;
         if (refs.qaRefreshBtn) refs.qaRefreshBtn.disabled = busy;
         if (refs.qaExportBtn) refs.qaExportBtn.disabled = busy || !state.qaReport;
-        if (refs.qaDebugBtn) refs.qaDebugBtn.disabled = busy || !state.qaReport;
+        if (refs.qaDebugBtn) refs.qaDebugBtn.disabled = false;
         if (refs.fillTab) refs.fillTab.disabled = busy;
         if (refs.qaTab) refs.qaTab.disabled = busy;
 
         if (busy) {
+          if (refs.qaRunBtn && state.workspace === 'qa') {
+            refs.qaRunBtn.disabled = false;
+            refs.qaRunBtn.textContent = '■ Stop QA';
+            refs.qaRunBtn.classList.add('danger');
+            refs.qaRunBtn.onclick = () => {
+              requestSmartStop();
+              refs.qaRunBtn.textContent = '■ Stopping…';
+              state.panel?.setQaProgress?.(
+                Number(state.qaProgressPercent || 1),
+                'Stopping after the current check…'
+              );
+              refs.status.textContent = 'Stopping QA safely. Completed checks will remain exportable.';
+            };
+          }
+
           refs.fillBtn.disabled = false;
           refs.fillBtn.textContent = '■ Stop';
           refs.fillBtn.classList.add('danger');
@@ -17936,6 +18184,7 @@
           refs.fillBtn.onclick = showModeDialog;
           if (refs.qaRunBtn) {
             refs.qaRunBtn.textContent = 'Run Functional QA';
+            refs.qaRunBtn.classList.remove('danger');
             refs.qaRunBtn.onclick = runSmartQaAudit;
           }
           if (refs.qaRefreshBtn) {
@@ -17945,7 +18194,7 @@
             refs.qaExportBtn.disabled = !state.qaReport;
           }
           if (refs.qaDebugBtn) {
-            refs.qaDebugBtn.disabled = !state.qaReport;
+            refs.qaDebugBtn.disabled = false;
           }
         }
       },
