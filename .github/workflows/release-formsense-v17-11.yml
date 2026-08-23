@@ -1,15 +1,16 @@
 name: One-time Smart FormSense v17.11 applicant-journey QA release
 
 on:
-  issues:
-    types: [opened]
+  push:
+    branches: [main]
+    paths:
+      - '.github/release-v17-11/trigger.txt'
 
 permissions:
   contents: write
 
 jobs:
   release:
-    if: github.event.issue.title == 'Release Smart FormSense v17.11.0 Final'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout current main
