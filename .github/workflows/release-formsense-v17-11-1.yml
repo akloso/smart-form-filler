@@ -1,0 +1,99 @@
+name: One-time Smart FormSense v17.11.1 reliability release
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    if: github.head_ref == 'release/v17-11-1-trigger'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout current main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Apply v17.11.1 reliability patch
+        shell: bash
+        run: |
+          set -euo pipefail
+          base64 -d .github/release-v17-11-1/patch.py.gz.b64 | gunzip > /tmp/patch_v17_11_1.py
+          python /tmp/patch_v17_11_1.py
+
+      - name: Validate production userscript
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --check Smart_Form_Filler.user.js
+          python - <<'PY'
+          from pathlib import Path
+          import re
+
+          s = Path('Smart_Form_Filler.user.js').read_text(encoding='utf-8')
+
+          assert '// @name         Smart FormSense' in s
+          assert '// @version      17.11.1' in s
+          assert '// @match        *://*/*' in s
+          assert '@noframes' not in s
+          assert '.submit(' not in s
+          assert '.requestSubmit(' not in s
+          assert s.count('meritto') == 1
+          assert 'akash.singh@meritto.com' in s
+
+          occurrences = len(re.findall(r'\bcommitSelectedRadioGroups\s*\(', s))
+          declarations = len(re.findall(r'\bfunction\s+commitSelectedRadioGroups\s*\(', s))
+          assert occurrences == declarations, (occurrences, declarations)
+
+          # Regression fix that caused v17.11 export buttons to stay disabled.
+          assert "const nodes = [...document.querySelectorAll(" in s
+          assert "const nodes = [...document.querySelector(" not in s
+
+          # Partial-report reliability.
+          assert 'qaMarkReportIncomplete' in s
+          assert 'qaFallbackPartialReport' in s
+          assert 'runState' in s
+          assert 'fieldsChecked' in s
+          assert "runState: 'running'" in s or "'running'" in s
+          assert 'Partial Report' in s
+
+          # QA stop + progress UI.
+          assert 'qaProgressBox' in s
+          assert 'qaProgressBar' in s
+          assert 'qaProgressPct' in s
+          assert 'qaProgressText' in s
+          assert '■ Stop QA' in s
+          assert 'setQaProgress' in s
+          assert 'REMOTE_QA_PROGRESS' in s
+
+          # Embedded QA has a longer timeout than ordinary commands.
+          assert re.search(r'QA_REMOTE_COMMAND_TIMEOUT_MS\s*=\s*300000', s)
+
+          # Debug must remain available even without a completed QA report.
+          assert 'id="qaDebugBtn"' in s
+          assert 'id="qaDebugBtn" disabled' not in s
+          assert "productVersion:\n        '17.11.1'" in s or "productVersion: '17.11.1'" in s
+
+          # Existing QA protections stay intact.
+          assert 'qaRunJourneyChecks' in s
+          assert 'qaRunDependencyChain' in s
+          assert 'final submit/payment' in s.lower() or 'final submit, payment' in s.lower()
+
+          print('Smart FormSense v17.11.1 validation passed')
+          PY
+
+      - name: Publish and remove one-time updater
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "Akash"
+          git config user.email "avydgupta1234@gmail.com"
+          git rm .github/workflows/release-formsense-v17-11-1.yml
+          git rm .github/release-v17-11-1/patch.py.gz.b64
+          git add Smart_Form_Filler.user.js
+          git commit -m "Release Smart FormSense v17.11.1"
+          git push origin main
