@@ -41,7 +41,7 @@ jobs:
           assert '.requestSubmit(' not in s
           assert s.count('meritto') == 1
           assert 'akash.singh@meritto.com' in s
-          assert s.count('commitSelectedRadioGroups(') == 0
+          assert s.count('commitSelectedRadioGroups(') == 1
           assert 'qaAttemptUserEntry' in s
           assert 'qaRunJourneyChecks' in s
           assert 'Final submission protection' in s
