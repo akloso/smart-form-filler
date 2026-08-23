@@ -36,7 +36,7 @@ jobs:
           test "$(grep -o 'meritto' "$FILE" | wc -l)" -eq 1
           grep -Fq 'akash.singh@meritto.com' "$FILE"
           grep -Fq "visualTarget(el)?.getAttribute?.(ERROR_ATTR)" "$FILE"
-          grep -Fq 'generic parent/child' "$FILE"
+          grep -Fq 'Generic dependency discovery borrows' "$FILE"
           grep -Fq 'FIELDS MISSED' "$FILE"
           grep -Fq 'No field was missed' "$FILE"
           grep -Fq 'Field names are shown only when Smart FormSense genuinely missed them' "$FILE"
@@ -47,7 +47,6 @@ jobs:
           grep -Fq 'qaRunDependencyChain' "$FILE"
           grep -Fq 'qaRunJourneyChecks' "$FILE"
           grep -Fq 'Dynamic and late-loaded field rescans' "$FILE"
-          grep -Fq 'Final Submit/payment/application-generation actions remain user-controlled' "$FILE" || true
           # commitSelectedRadioGroups safety invariant: zero calls.
           test "$(grep -F 'commitSelectedRadioGroups(' "$FILE" | wc -l)" -eq 0
 
