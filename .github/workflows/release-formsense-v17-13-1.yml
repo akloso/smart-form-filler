@@ -1,0 +1,61 @@
+name: One-time Smart FormSense v17.13.1 export fix
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    if: github.head_ref == 'release/v17-13-1-trigger'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout current main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Patch Smart FormSense
+        run: python .github/release-v17-13-1/patch.py
+
+      - name: Validate production userscript
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --check Smart_Form_Filler.user.js
+          grep -q '// @version      17.13.1' Smart_Form_Filler.user.js
+          grep -q '// @match        \*://\*/\*' Smart_Form_Filler.user.js
+          grep -q '// @grant        GM_openInTab' Smart_Form_Filler.user.js
+          grep -q "QA_DEBUG_DATA" Smart_Form_Filler.user.js
+          grep -q "REMOTE_QA_DEBUG_DATA" Smart_Form_Filler.user.js
+          grep -q "GM_openInTab" Smart_Form_Filler.user.js
+          grep -q "Download PDF" Smart_Form_Filler.user.js
+          grep -q "Open Report" Smart_Form_Filler.user.js
+          ! grep -q '@noframes' Smart_Form_Filler.user.js
+          ! grep -q '\.requestSubmit(' Smart_Form_Filler.user.js
+          test "$(grep -o 'meritto' Smart_Form_Filler.user.js | wc -l)" -eq 1
+          grep -q 'akash.singh@meritto.com' Smart_Form_Filler.user.js
+          python - <<'PY'
+          from pathlib import Path
+          s=Path('Smart_Form_Filler.user.js').read_text()
+          # Existing safety invariant: no calls to commitSelectedRadioGroups.
+          import re
+          calls=[m.start() for m in re.finditer(r'commitSelectedRadioGroups\s*\(',s)]
+          defs=[m.start() for m in re.finditer(r'(?:const|function)\s+commitSelectedRadioGroups',s)]
+          assert len(calls) <= len(defs), (len(calls),len(defs))
+          PY
+
+      - name: Publish and remove one-time updater
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -f .github/workflows/release-formsense-v17-13-1.yml
+          rm -rf .github/release-v17-13-1
+          git config user.name "Akash"
+          git config user.email "avydgupta1234@gmail.com"
+          git add -A
+          git commit -m "Release Smart FormSense v17.13.1"
+          git push origin HEAD:main
