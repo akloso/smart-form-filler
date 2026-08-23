@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Smart FormSense
 // @namespace    smart-form-filler
-// @version      17.13.0
+// @version      17.13.1
 // @description  Intelligent form filling and QA testing for authorized web-form validation, readiness checks, embedded forms, safe repair, and synthetic test data.
 // @author       Akash Singh
 // @match        *://*/*
@@ -9,6 +9,7 @@
 // @grant        GM_getValue
 // @grant        GM_setValue
 // @grant        GM_registerMenuCommand
+// @grant        GM_openInTab
 // ==/UserScript==
 
 (() => {
@@ -187,7 +188,7 @@
     );
 
     console.error(
-      `Smart FormSense V17.12.0 [${stage}]`,
+      `Smart FormSense V17.13.1 [${stage}]`,
       error
     );
 
@@ -12460,7 +12461,7 @@
       return report;
     } catch (error) {
       console.error(
-        'Smart FormSense V17.12.0 debug export:',
+        'Smart FormSense V17.13.1 debug export:',
         error
       );
 
@@ -13845,7 +13846,7 @@
   <div class="hero">
     <div class="brand">✦ SMART FORMSENSE QA</div>
     <h1>${esc(qa.page?.title || 'Form')}</h1>
-    <div class="meta">${esc(qa.page?.hostname || location.hostname || '')}<br>${esc(generated)} • v${esc(qa.productVersion || '17.13.0')}</div>
+    <div class="meta">${esc(qa.page?.hostname || location.hostname || '')}<br>${esc(generated)} • v${esc(qa.productVersion || '17.13.1')}</div>
     <div class="status ${statusClass}">${esc(status)}</div>
     <div class="overview">${esc(overview)}</div>
 
@@ -13886,22 +13887,46 @@
     }
 
     const html = buildQaFriendlyHtml(qa);
-    let opened = null;
+    const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    let opened = false;
 
     try {
-      opened = window.open('', '_blank');
-      if (opened?.document) {
-        opened.document.open();
-        opened.document.write(html);
-        opened.document.close();
-        try { opened.focus(); } catch {}
-        state.panel?.setStatus('QA report opened in a new tab. Use Download PDF at the top of the report.');
-        return qa;
+      if (typeof GM_openInTab === 'function') {
+        GM_openInTab(url, {
+          active: true,
+          insert: true,
+          setParent: true
+        });
+        opened = true;
       }
     } catch {}
 
-    // Browser popup protection can occasionally block a new tab. Keep a
-    // download fallback so the user never loses access to the report.
+    if (!opened) {
+      try {
+        const link = document.createElement('a');
+        link.href = url;
+        link.target = '_blank';
+        link.rel = 'noopener noreferrer';
+        link.style.display = 'none';
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        opened = true;
+      } catch {}
+    }
+
+    if (opened) {
+      setTimeout(() => {
+        try { URL.revokeObjectURL(url); } catch {}
+      }, 120000);
+      state.panel?.setStatus('QA report opened in a new tab. Use Download PDF at the top.');
+      return qa;
+    }
+
+    try { URL.revokeObjectURL(url); } catch {}
+
+    // Last-resort fallback: save the readable HTML locally rather than doing nothing.
     const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
     const host = String(qa.page?.hostname || location.hostname || 'form')
       .replace(/[^a-z0-9.-]+/gi, '_')
@@ -13911,7 +13936,7 @@
       html,
       'text/html;charset=utf-8'
     );
-    state.panel?.setStatus('The browser blocked the report tab, so the HTML report was downloaded instead.');
+    state.panel?.setStatus('Browser blocked the report tab, so the HTML report was downloaded instead.');
     return qa;
   };
 
@@ -14134,7 +14159,7 @@
       return report;
     } catch (error) {
       console.error(
-        'Smart FormSense V17.12.0 QA debug export:',
+        'Smart FormSense V17.13.1 QA debug export:',
         error
       );
 
@@ -16210,7 +16235,7 @@
       : {
           reportVersion: 7,
           product: 'Smart FormSense',
-          productVersion: '17.13.0',
+          productVersion: '17.13.1',
           generatedAt: new Date().toISOString(),
           auditType: 'Black-box Functional Form QA',
           page: {
@@ -16247,7 +16272,7 @@
     const cleanReason = String(reason || '').slice(0, 500);
     return {
       ...base,
-      productVersion: '17.13.0',
+      productVersion: '17.13.1',
       reportVersion: Math.max(5, Number(base.reportVersion || 0)),
       runState,
       incomplete: runState !== 'completed',
@@ -16394,7 +16419,7 @@
       return {
         reportVersion: 7,
         product: 'Smart FormSense',
-        productVersion: '17.13.0',
+        productVersion: '17.13.1',
         generatedAt,
         completedAt: ['completed', 'stopped', 'failed'].includes(runState) ? new Date().toISOString() : null,
         auditType: 'Black-box Functional Form QA',
@@ -17088,32 +17113,21 @@
   };
 
   const smartQaDebugExport = () => {
-    const agent =
-      remoteAgentById(
-        state.lastRemoteAgentId
-      );
+    const agent = remoteAgentById(state.lastRemoteAgentId);
 
-    if (
-      agent?.source
-    ) {
+    if (agent?.source) {
       try {
         agent.source.postMessage(
           bridgePayload(
-            'QA_DEBUG',
+            'QA_DEBUG_DATA',
             {
-              sessionId:
-                bridge.sessionId,
-              agentId:
-                agent.id
+              sessionId: bridge.sessionId,
+              agentId: agent.id
             }
           ),
           '*'
         );
-
-        state.panel?.setStatus(
-          'QA debug export requested from embedded form.'
-        );
-
+        state.panel?.setStatus('Preparing QA debug export from the active form...');
         return;
       } catch {}
     }
@@ -17192,6 +17206,30 @@
             }
           );
 
+          return;
+        }
+
+        if (data.type === 'REMOTE_QA_DEBUG_DATA') {
+          const report = data.debugReport;
+          if (!report || typeof report !== 'object') {
+            state.panel?.setStatus('QA debug export could not be prepared.');
+            return;
+          }
+
+          const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+          const host = String(report.page?.hostname || location.hostname || 'form')
+            .replace(/[^a-z0-9.-]+/gi, '_')
+            .slice(0, 60);
+
+          downloadTextFile(
+            `Smart_FormSense_QA_Debug_${host}_${stamp}.json`,
+            JSON.stringify(report, null, 2),
+            'application/json;charset=utf-8'
+          );
+
+          state.panel?.setStatus(
+            `QA debug exported • ${report.qaFieldDiagnostics?.length || 0} field diagnostic(s) • ${report.qaAudit?.findings?.length || 0} QA finding(s)`
+          );
           return;
         }
 
@@ -17650,6 +17688,27 @@
         ) {
           exportDebugReport();
 
+          return;
+        }
+
+        if (
+          data.type ===
+          'QA_DEBUG_DATA'
+        ) {
+          const debugReport = buildQaDebugReport();
+          try {
+            event.source?.postMessage(
+              bridgePayload(
+                'REMOTE_QA_DEBUG_DATA',
+                {
+                  sessionId: data.sessionId,
+                  agentId: agent.id,
+                  debugReport
+                }
+              ),
+              '*'
+            );
+          } catch {}
           return;
         }
 
