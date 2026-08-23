@@ -1,0 +1,71 @@
+name: One-time Smart FormSense v17.13 report and QA UI upgrade
+
+on:
+  pull_request:
+    paths:
+      - '.github/release-v17-13/trigger.txt'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout current main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Patch Smart FormSense
+        run: |
+          python3 -m py_compile .github/release-v17-13/patch.py
+          python3 .github/release-v17-13/patch.py
+
+      - name: Validate production userscript
+        run: |
+          node --check Smart_Form_Filler.user.js
+          python3 - <<'PY'
+          from pathlib import Path
+          s = Path('Smart_Form_Filler.user.js').read_text(encoding='utf-8')
+          checks = {
+              'version': '// @version      17.13.0' in s,
+              'all-sites match': '@match        *://*/*' in s,
+              'iframes preserved': '@noframes' not in s,
+              'no requestSubmit': '.requestSubmit(' not in s,
+              'no direct submit': '.submit(' not in s,
+              'report opens new tab': "window.open('', '_blank')" in s,
+              'pdf button': 'Download PDF' in s and 'window.print()' in s,
+              'checked things section': 'What Smart FormSense checked' in s,
+              'fields not checked section': 'Fields not checked' in s,
+              'manual fields names only section': 'Fields not fully confirmed' in s,
+              'real issues section': 'REAL ISSUES FOUND' in s,
+              'compact qa mode': 'qaCompactHead' in s and 'qaActions' in s,
+              'confirmed issues panel only': "findings.filter(item => ['critical', 'warning'].includes(item.severity))" in s,
+              'run again removed from QA workspace': 'id="qaRefreshBtn">Run Again</button>' not in s,
+              'progress remains': 'id="qaProgressBar"' in s,
+              'stop behavior remains': '■ Stop QA' in s,
+              'partial report remains': 'Partial report' in s,
+              'dependency wait remains': 'qaWaitForDependentSelect' in s,
+              'validation digest remains': 'qaValidationDigest' in s,
+              'dynamic discovery remains': 'qaRunDiscoverySweep' in s,
+              'meritto privacy invariant': s.count('meritto') == 1,
+              'creator email preserved': 'akash.singh@meritto.com' in s,
+          }
+          for name, ok in checks.items():
+              print(f"{'PASS' if ok else 'FAIL'}: {name}")
+          failed = [name for name, ok in checks.items() if not ok]
+          if failed:
+              raise SystemExit('Validation failed: ' + ', '.join(failed))
+          PY
+
+      - name: Publish and remove one-time updater
+        run: |
+          rm -rf .github/release-v17-13
+          rm -f .github/workflows/release-formsense-v17-13.yml
+          git config user.name 'Akash'
+          git config user.email 'avydgupta1234@gmail.com'
+          git add Smart_Form_Filler.user.js .github
+          git commit -m 'Release Smart FormSense v17.13.0'
+          git push origin HEAD:main
