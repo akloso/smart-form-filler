@@ -18,20 +18,12 @@ jobs:
           ref: main
           fetch-depth: 0
 
-      - name: Apply v17.11 upgrade
+      - name: Apply v17.11 QA patches
         shell: bash
         run: |
           set -euo pipefail
-          python - <<'PY'
-          from pathlib import Path
-          import base64, gzip, re
-          data = Path('.github/release-v17-11/upgrade.py.gz.b64').read_text(encoding='utf-8')
-          clean = re.sub(r'[^A-Za-z0-9+/=]', '', data)
-          clean += '=' * (-len(clean) % 4)
-          raw = base64.b64decode(clean, validate=False)
-          Path('/tmp/upgrade_17_11.py').write_bytes(gzip.decompress(raw))
-          PY
-          python /tmp/upgrade_17_11.py
+          python .github/release-v17-11/patch_core.py
+          python .github/release-v17-11/patch_report.py
 
       - name: Validate production userscript
         shell: bash
@@ -55,9 +47,12 @@ jobs:
           assert occurrences == declarations
           assert 'qaAttemptUserEntry' in s
           assert 'qaRunJourneyChecks' in s
+          assert 'qaRunDependencyChain' in s
           assert 'Final submission protection' in s
           assert 'Blockers</span>' in s
-          assert 'final submit/payment is always protected' in s
+          assert 'ISSUE TYPES' in s
+          assert 'final submit/payment stays protected' in s
+          assert "productVersion: '17.11.0'" in s
           print('Smart FormSense v17.11 validation passed')
           PY
 
@@ -68,8 +63,10 @@ jobs:
           git config user.name "Akash"
           git config user.email "avydgupta1234@gmail.com"
           git rm .github/workflows/release-formsense-v17-11.yml
-          git rm .github/release-v17-11/upgrade.py.gz.b64
+          git rm -f .github/release-v17-11/upgrade.py.gz.b64
           git rm -f .github/release-v17-11/trigger.txt
-          git add Smart_Form_Filler.user.js README.md CHANGELOG.md
+          git rm .github/release-v17-11/patch_core.py
+          git rm .github/release-v17-11/patch_report.py
+          git add Smart_Form_Filler.user.js
           git commit -m "Release Smart FormSense v17.11.0"
           git push origin main
