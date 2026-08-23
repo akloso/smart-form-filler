@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Smart FormSense
 // @namespace    smart-form-filler
-// @version      17.13.2
+// @version      17.13.3
 // @description  Intelligent form filling and QA testing for authorized web-form validation, readiness checks, embedded forms, safe repair, and synthetic test data.
 // @author       Akash Singh
 // @match        *://*/*
@@ -191,7 +191,7 @@
     );
 
     console.error(
-      `Smart FormSense V17.13.2 [${stage}]`,
+      `Smart FormSense V17.13.3 [${stage}]`,
       error
     );
 
@@ -12326,7 +12326,7 @@
     const report = {
       reportVersion: 1,
       generatedBy:
-        'Smart FormSense V17.13.2',
+        'Smart FormSense V17.13.3',
       generatedAt:
         new Date().toISOString(),
       mode:
@@ -12491,7 +12491,7 @@
       return report;
     } catch (error) {
       console.error(
-        'Smart FormSense V17.13.2 debug export:',
+        'Smart FormSense V17.13.3 debug export:',
         error
       );
 
@@ -13578,7 +13578,7 @@
       product:
         'Smart FormSense',
       productVersion:
-        '17.13.2',
+        '17.13.3',
       generatedAt,
       auditType:
         'Non-destructive Form Readiness Audit',
@@ -14103,7 +14103,7 @@
       product:
         'Smart FormSense',
       productVersion:
-        '17.13.2',
+        '17.13.3',
       generatedAt:
         new Date().toISOString(),
       purpose:
@@ -14193,7 +14193,7 @@
       return report;
     } catch (error) {
       console.error(
-        'Smart FormSense V17.13.2 QA debug export:',
+        'Smart FormSense V17.13.3 QA debug export:',
         error
       );
 
@@ -16269,7 +16269,7 @@
       : {
           reportVersion: 7,
           product: 'Smart FormSense',
-          productVersion: '17.13.2',
+          productVersion: '17.13.3',
           generatedAt: new Date().toISOString(),
           auditType: 'Black-box Functional Form QA',
           page: {
@@ -16306,7 +16306,7 @@
     const cleanReason = String(reason || '').slice(0, 500);
     return {
       ...base,
-      productVersion: '17.13.2',
+      productVersion: '17.13.3',
       reportVersion: Math.max(5, Number(base.reportVersion || 0)),
       runState,
       incomplete: runState !== 'completed',
@@ -16453,7 +16453,7 @@
       return {
         reportVersion: 7,
         product: 'Smart FormSense',
-        productVersion: '17.13.2',
+        productVersion: '17.13.3',
         generatedAt,
         completedAt: ['completed', 'stopped', 'failed'].includes(runState) ? new Date().toISOString() : null,
         auditType: 'Black-box Functional Form QA',
@@ -18967,9 +18967,6 @@
       showWorkspace('qa');
 
     refs.qaRunBtn.onclick =
-      runSmartQaAudit;
-
-    refs.qaRefreshBtn.onclick =
       runSmartQaAudit;
 
     const bindQaAction = (button, handler) => {
