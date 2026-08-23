@@ -2,7 +2,7 @@ name: One-time Smart FormSense v17.11 applicant-journey QA release
 
 on:
   pull_request:
-    types: [opened]
+    types: [opened, synchronize]
 
 permissions:
   contents: write
@@ -22,7 +22,15 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          base64 -d .github/release-v17-11/upgrade.py.gz.b64 | gzip -dc > /tmp/upgrade_17_11.py
+          python - <<'PY'
+          from pathlib import Path
+          import base64, gzip, re
+          data = Path('.github/release-v17-11/upgrade.py.gz.b64').read_text(encoding='utf-8')
+          clean = re.sub(r'[^A-Za-z0-9+/=]', '', data)
+          clean += '=' * (-len(clean) % 4)
+          raw = base64.b64decode(clean, validate=False)
+          Path('/tmp/upgrade_17_11.py').write_bytes(gzip.decompress(raw))
+          PY
           python /tmp/upgrade_17_11.py
 
       - name: Validate production userscript
