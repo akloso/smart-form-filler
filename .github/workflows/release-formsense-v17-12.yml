@@ -22,25 +22,16 @@ jobs:
         run: |
           python3 -m py_compile .github/release-v17-12/patch.py
           python3 .github/release-v17-12/patch.py
-          python3 - <<'PY'
-          from pathlib import Path
-          p = Path('Smart_Form_Filler.user.js')
-          s = p.read_text(encoding='utf-8')
-          if 'commitSelectedRadioGroups(' not in s:
-              marker = '  const qaButtonText = el => normalize('
-              helper = "  function commitSelectedRadioGroups() {\n    // Compatibility helper intentionally retained; no automatic calls are made.\n  }\n\n"
-              if marker not in s:
-                  raise SystemExit('qaButtonText marker missing while restoring radio helper')
-              s = s.replace(marker, helper + marker, 1)
-              p.write_text(s, encoding='utf-8')
-          PY
 
       - name: Validate production userscript
         run: |
           node --check Smart_Form_Filler.user.js
           python3 - <<'PY'
           from pathlib import Path
+          import re
           s = Path('Smart_Form_Filler.user.js').read_text(encoding='utf-8')
+          radio_refs = re.findall(r'\bcommitSelectedRadioGroups\b', s)
+          radio_calls = re.findall(r'\bcommitSelectedRadioGroups\s*\(', s)
           checks = {
               'version': '// @version      17.12.0' in s,
               'dynamic discovery': 'qaRunDiscoverySweep' in s,
@@ -57,13 +48,14 @@ jobs:
               'old score label removed': 'FUNCTIONAL QA SCORE' not in s,
               'old auto coverage removed': 'AUTO COVERAGE' not in s,
               'debug version fixed': "productVersion:\n        '17.9.0'" not in s and "productVersion: '17.9.0'" not in s,
-              'radio helper definition preserved once': s.count('commitSelectedRadioGroups(') == 1,
+              'radio helper preserved once': len(radio_refs) == 1,
+              'radio helper never called': len(radio_calls) == 0,
               'meritto privacy invariant': s.count('meritto') == 1,
               'creator email preserved': 'akash.singh@meritto.com' in s,
           }
           for name, ok in checks.items():
               print(f"{'PASS' if ok else 'FAIL'}: {name}")
-          print('commitSelectedRadioGroups count =', s.count('commitSelectedRadioGroups('))
+          print('radio helper refs =', len(radio_refs), 'calls =', len(radio_calls))
           print('meritto count =', s.count('meritto'))
           failed = [name for name, ok in checks.items() if not ok]
           if failed:
