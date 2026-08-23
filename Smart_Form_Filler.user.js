@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Smart FormSense
 // @namespace    smart-form-filler
-// @version      17.13.3
+// @version      17.13.4
 // @description  Intelligent form filling and QA testing for authorized web-form validation, readiness checks, embedded forms, safe repair, and synthetic test data.
 // @author       Akash Singh
 // @match        *://*/*
@@ -191,7 +191,7 @@
     );
 
     console.error(
-      `Smart FormSense V17.13.3 [${stage}]`,
+      `Smart FormSense V17.13.4 [${stage}]`,
       error
     );
 
@@ -8377,7 +8377,7 @@
                   : 'pending-select',
               message:
                 reason === 'ready'
-                  ? 'Dropdown is ready but empty'
+                  ? 'Dropdown has no current selection'
                   : `Dropdown dependency unresolved: ${reason}`,
               repairable: true
             }
@@ -12326,7 +12326,7 @@
     const report = {
       reportVersion: 1,
       generatedBy:
-        'Smart FormSense V17.13.3',
+        'Smart FormSense V17.13.4',
       generatedAt:
         new Date().toISOString(),
       mode:
@@ -12491,7 +12491,7 @@
       return report;
     } catch (error) {
       console.error(
-        'Smart FormSense V17.13.3 debug export:',
+        'Smart FormSense V17.13.4 debug export:',
         error
       );
 
@@ -13578,7 +13578,7 @@
       product:
         'Smart FormSense',
       productVersion:
-        '17.13.3',
+        '17.13.4',
       generatedAt,
       auditType:
         'Non-destructive Form Readiness Audit',
@@ -13763,6 +13763,7 @@
       (detectedCount ? Math.round((checkedCount / detectedCount) * 100) : 0)
     );
     const validationCoverage = Number(qa.validationCoverage ?? qa.summary?.validationCoverage ?? 0);
+    const pendingChecks = Number(qa.counts?.observation || 0);
 
     const generated = (() => {
       try { return new Date(qa.generatedAt).toLocaleString(); }
@@ -13808,7 +13809,7 @@
       ? (qa.runState === 'stopped' ? 'Partial QA • Stopped' : 'Partial QA • Interrupted')
       : confirmed.length
         ? 'Needs Attention'
-        : manualFields.length || uncovered.length || qa.journeyStatus === 'Needs manual check'
+        : pendingChecks || uncovered.length || qa.journeyStatus === 'Needs manual check'
           ? 'Needs Manual Confirmation'
           : 'Ready for Final Sign-off';
 
@@ -13823,9 +13824,9 @@
     const overview = confirmed.length
       ? `${confirmed.length} confirmed issue type${confirmed.length === 1 ? '' : 's'} need attention.`
       : uncovered.length
-        ? `${uncovered.length} field${uncovered.length === 1 ? '' : 's'} were not fully checked.`
-        : manualFields.length
-          ? `${manualFields.length} field${manualFields.length === 1 ? '' : 's'} still need a quick manual check.`
+        ? `${uncovered.length} field${uncovered.length === 1 ? '' : 's'} were not checked.`
+        : pendingChecks
+          ? `${pendingChecks} check${pendingChecks === 1 ? '' : 's'} still need confirmation. No field was missed.`
           : 'The automated checks completed without a confirmed applicant-facing issue.';
 
     const statusTone = value => {
@@ -13849,12 +13850,10 @@
       : '';
 
     const checkedHtml = checkedThings.length
-      ? `<section class="sectionBlock"><div class="sectionHead"><div><span class="eyebrow blueEye">QA COVERAGE</span><h2>What Smart FormSense checked</h2></div><span class="countBadge blueBadge">${checkedThings.length}</span></div><div class="checkedGrid">${checkedThings.map(item => `<div class="checkedCard"><span class="checkDot">✓</span><span>${esc(item)}</span></div>`).join('')}</div></section>`
+      ? `<section class="sectionBlock"><div class="sectionHead"><div><span class="eyebrow blueEye">QA COVERAGE</span><h2>What Smart FormSense checked</h2></div><span class="countBadge blueBadge">${checkedThings.length}</span></div><div class="checkedGrid">${checkedThings.map(item => `<div class="checkedCard"><span class="checkDot">•</span><span>${esc(item)}</span></div>`).join('')}</div></section>`
       : '';
 
-    const manualHtml = manualFields.length
-      ? `<section class="sectionBlock"><div class="sectionHead"><div><span class="eyebrow amberEye">MANUAL CHECK</span><h2>Fields not fully confirmed</h2></div><span class="countBadge amberBadge">${manualFields.length}</span></div><div class="fieldChips">${manualFields.map(item => `<span>${esc(item)}</span>`).join('')}</div></section>`
-      : '';
+    const manualHtml = '';
 
     const uncoveredHtml = uncovered.length
       ? `<section class="sectionBlock"><div class="sectionHead"><div><span class="eyebrow amberEye">MISSED</span><h2>Fields not checked</h2></div><span class="countBadge amberBadge">${uncovered.length}</span></div><div class="fieldChips missedChips">${uncovered.map(item => `<span>${esc(item)}</span>`).join('')}</div></section>`
@@ -13867,7 +13866,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Smart FormSense QA Report</title>
 <style>
-*{box-sizing:border-box}body{margin:0;background:#f5f7fb;color:#202435;font-family:Inter,Segoe UI,Arial,sans-serif}.wrap{max-width:900px;margin:auto;padding:22px 18px 48px}.reportActions{position:sticky;top:10px;z-index:20;display:flex;justify-content:flex-end;margin-bottom:10px}.pdfBtn{border:0;border-radius:11px;padding:10px 15px;background:#4f46e5;color:#fff;font-size:11px;font-weight:900;cursor:pointer;box-shadow:0 8px 22px rgba(79,70,229,.22)}.pdfBtn:hover{background:#4338ca}.hero{background:linear-gradient(135deg,#ffffff 0%,#f7f5ff 58%,#eef7ff 100%);border:1px solid #e5e7f2;border-radius:22px;padding:24px;box-shadow:0 14px 36px rgba(61,50,123,.07)}.brand{font-size:12px;font-weight:900;letter-spacing:.08em;color:#6657e8}.hero h1{font-size:24px;margin:6px 0 4px}.meta{font-size:11px;color:#777d8e;line-height:1.55}.status{display:inline-flex;align-items:center;margin-top:14px;padding:7px 11px;border-radius:999px;font-size:11px;font-weight:900}.goodStatus{background:#dcfce7;color:#166534}.reviewStatus{background:#fef3c7;color:#92400e}.issueStatus{background:#fee2e2;color:#991b1b}.partialStatus{background:#e0e7ff;color:#3730a3}.overview{margin-top:12px;font-size:13px;line-height:1.6;color:#4d5568}.summary{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:18px}.metric{border-radius:14px;padding:13px 10px;border:1px solid}.metric b{display:block;font-size:20px;line-height:1.1}.metric span{display:block;font-size:9px;font-weight:850;letter-spacing:.04em;margin-top:5px}.coverageMetric{background:#eff6ff;border-color:#bfdbfe;color:#1d4ed8}.issueMetric{background:#fff1f2;border-color:#fecdd3;color:#be123c}.reviewMetric{background:#fffbeb;border-color:#fde68a;color:#a16207}.passMetric{background:#f0fdf4;border-color:#bbf7d0;color:#15803d}.coverageBar{height:7px;background:#dbeafe;border-radius:999px;overflow:hidden;margin-top:8px}.coverageFill{height:100%;background:linear-gradient(90deg,#4f46e5,#06b6d4);border-radius:999px}.journeyGrid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:12px}.journeyCard{background:#fff;border:1px solid #e6e8ef;border-radius:13px;padding:11px 12px}.journeyCard span{font-size:9px;color:#7b8190;font-weight:800}.journeyCard b{display:block;margin-top:4px;font-size:11px}.good{color:#15803d}.bad{color:#b91c1c}.reviewTone{color:#a16207}.partial{margin-top:14px;background:#fff7ed;border:1px solid #fed7aa;border-radius:13px;padding:11px 13px;font-size:11px;color:#9a3412}.sectionBlock{margin-top:28px}.sectionHead{display:flex;align-items:end;justify-content:space-between;margin-bottom:10px}.sectionHead h2{font-size:17px;margin:3px 0 0}.eyebrow{font-size:9px;font-weight:900;letter-spacing:.12em}.redEye{color:#dc2626}.amberEye{color:#d97706}.blueEye{color:#2563eb}.countBadge{min-width:28px;height:28px;border-radius:999px;display:grid;place-items:center;font-size:11px;font-weight:900}.redBadge{background:#fee2e2;color:#b91c1c}.amberBadge{background:#fef3c7;color:#92400e}.blueBadge{background:#dbeafe;color:#1d4ed8}.item{display:flex;gap:12px;background:#fff;border:1px solid #e5e7ed;border-radius:15px;padding:14px;margin:9px 0;box-shadow:0 5px 16px rgba(30,41,59,.035)}.item.issue{border-color:#fecaca;background:linear-gradient(135deg,#fff,#fff7f7)}.iconBox{width:28px;height:28px;border-radius:9px;display:grid;place-items:center;font-weight:950;flex:0 0 auto}.issueIcon{background:#fee2e2;color:#b91c1c}.itemBody{min-width:0;flex:1}.itemTitle{font-size:14px;font-weight:900}.fields,.what,.action{margin-top:6px;font-size:11px;line-height:1.58;color:#606778}.fields b,.action b{color:#343949}.action{background:#fff;border:1px solid #fee2e2;border-radius:9px;padding:9px 10px}.checkedGrid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}.checkedCard{display:flex;align-items:center;gap:8px;background:#fff;border:1px solid #dbeafe;border-radius:12px;padding:10px 11px;color:#334155;font-size:11px;font-weight:700}.checkDot{width:20px;height:20px;border-radius:7px;display:grid;place-items:center;background:#dcfce7;color:#15803d;font-size:10px;font-weight:950;flex:0 0 auto}.fieldChips{display:flex;flex-wrap:wrap;gap:7px;background:#fff;border:1px solid #fde68a;border-radius:14px;padding:12px}.fieldChips span{background:#fffbeb;border:1px solid #fde68a;color:#92400e;border-radius:999px;padding:6px 9px;font-size:10px;font-weight:750}.missedChips{border-color:#fecaca}.missedChips span{background:#fff1f2;border-color:#fecaca;color:#991b1b}.passed{margin-top:26px;background:linear-gradient(135deg,#ecfdf5,#f0fdf4);border:1px solid #bbf7d0;border-radius:15px;padding:14px;color:#166534;font-size:12px;font-weight:750}.note{margin-top:18px;background:#fff;border:1px solid #e7e9ef;border-radius:13px;padding:12px;font-size:10px;line-height:1.6;color:#858b99}.footer{text-align:center;margin-top:24px;font-size:10px;color:#979baa}@media(max-width:680px){.summary{grid-template-columns:repeat(2,1fr)}.journeyGrid,.checkedGrid{grid-template-columns:1fr}.hero{padding:18px}}@media print{body{background:#fff}.wrap{padding:0}.reportActions{display:none!important}.hero,.item{box-shadow:none}.sectionBlock{break-inside:avoid}}
+*{box-sizing:border-box}body{margin:0;background:#f5f7fb;color:#202435;font-family:Inter,Segoe UI,Arial,sans-serif}.wrap{max-width:900px;margin:auto;padding:22px 18px 48px}.reportActions{position:sticky;top:10px;z-index:20;display:flex;justify-content:flex-end;margin-bottom:10px}.pdfBtn{border:0;border-radius:11px;padding:10px 15px;background:#4f46e5;color:#fff;font-size:11px;font-weight:900;cursor:pointer;box-shadow:0 8px 22px rgba(79,70,229,.22)}.pdfBtn:hover{background:#4338ca}.hero{background:linear-gradient(135deg,#ffffff 0%,#f7f5ff 58%,#eef7ff 100%);border:1px solid #e5e7f2;border-radius:22px;padding:24px;box-shadow:0 14px 36px rgba(61,50,123,.07)}.brand{font-size:12px;font-weight:900;letter-spacing:.08em;color:#6657e8}.hero h1{font-size:24px;margin:6px 0 4px}.meta{font-size:11px;color:#777d8e;line-height:1.55}.status{display:inline-flex;align-items:center;margin-top:14px;padding:7px 11px;border-radius:999px;font-size:11px;font-weight:900}.goodStatus{background:#dcfce7;color:#166534}.reviewStatus{background:#fef3c7;color:#92400e}.issueStatus{background:#fee2e2;color:#991b1b}.partialStatus{background:#e0e7ff;color:#3730a3}.overview{margin-top:12px;font-size:13px;line-height:1.6;color:#4d5568}.summary{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:18px}.metric{border-radius:14px;padding:13px 10px;border:1px solid}.metric b{display:block;font-size:20px;line-height:1.1}.metric span{display:block;font-size:9px;font-weight:850;letter-spacing:.04em;margin-top:5px}.coverageMetric{background:#eff6ff;border-color:#bfdbfe;color:#1d4ed8}.issueMetric{background:#fff1f2;border-color:#fecdd3;color:#be123c}.reviewMetric{background:#fffbeb;border-color:#fde68a;color:#a16207}.passMetric{background:#f0fdf4;border-color:#bbf7d0;color:#15803d}.coverageBar{height:7px;background:#dbeafe;border-radius:999px;overflow:hidden;margin-top:8px}.coverageFill{height:100%;background:linear-gradient(90deg,#4f46e5,#06b6d4);border-radius:999px}.journeyGrid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:12px}.journeyCard{background:#fff;border:1px solid #e6e8ef;border-radius:13px;padding:11px 12px}.journeyCard span{font-size:9px;color:#7b8190;font-weight:800}.journeyCard b{display:block;margin-top:4px;font-size:11px}.good{color:#15803d}.bad{color:#b91c1c}.reviewTone{color:#a16207}.partial{margin-top:14px;background:#fff7ed;border:1px solid #fed7aa;border-radius:13px;padding:11px 13px;font-size:11px;color:#9a3412}.sectionBlock{margin-top:28px}.sectionHead{display:flex;align-items:end;justify-content:space-between;margin-bottom:10px}.sectionHead h2{font-size:17px;margin:3px 0 0}.eyebrow{font-size:9px;font-weight:900;letter-spacing:.12em}.redEye{color:#dc2626}.amberEye{color:#d97706}.blueEye{color:#2563eb}.countBadge{min-width:28px;height:28px;border-radius:999px;display:grid;place-items:center;font-size:11px;font-weight:900}.redBadge{background:#fee2e2;color:#b91c1c}.amberBadge{background:#fef3c7;color:#92400e}.blueBadge{background:#dbeafe;color:#1d4ed8}.item{display:flex;gap:12px;background:#fff;border:1px solid #e5e7ed;border-radius:15px;padding:14px;margin:9px 0;box-shadow:0 5px 16px rgba(30,41,59,.035)}.item.issue{border-color:#fecaca;background:linear-gradient(135deg,#fff,#fff7f7)}.iconBox{width:28px;height:28px;border-radius:9px;display:grid;place-items:center;font-weight:950;flex:0 0 auto}.issueIcon{background:#fee2e2;color:#b91c1c}.itemBody{min-width:0;flex:1}.itemTitle{font-size:14px;font-weight:900}.fields,.what,.action{margin-top:6px;font-size:11px;line-height:1.58;color:#606778}.fields b,.action b{color:#343949}.action{background:#fff;border:1px solid #fee2e2;border-radius:9px;padding:9px 10px}.checkedGrid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}.checkedCard{display:flex;align-items:center;gap:8px;background:#fff;border:1px solid #dbeafe;border-radius:12px;padding:10px 11px;color:#334155;font-size:11px;font-weight:700}.checkDot{width:20px;height:20px;border-radius:7px;display:grid;place-items:center;background:#dbeafe;color:#1d4ed8;font-size:13px;font-weight:950;flex:0 0 auto}.fieldChips{display:flex;flex-wrap:wrap;gap:7px;background:#fff;border:1px solid #fde68a;border-radius:14px;padding:12px}.fieldChips span{background:#fffbeb;border:1px solid #fde68a;color:#92400e;border-radius:999px;padding:6px 9px;font-size:10px;font-weight:750}.missedChips{border-color:#fecaca}.missedChips span{background:#fff1f2;border-color:#fecaca;color:#991b1b}.passed{margin-top:26px;background:linear-gradient(135deg,#ecfdf5,#f0fdf4);border:1px solid #bbf7d0;border-radius:15px;padding:14px;color:#166534;font-size:12px;font-weight:750}.note{margin-top:18px;background:#fff;border:1px solid #e7e9ef;border-radius:13px;padding:12px;font-size:10px;line-height:1.6;color:#858b99}.footer{text-align:center;margin-top:24px;font-size:10px;color:#979baa}@media(max-width:680px){.summary{grid-template-columns:repeat(2,1fr)}.journeyGrid,.checkedGrid{grid-template-columns:1fr}.hero{padding:18px}}@media print{body{background:#fff;font-size:10px}.wrap{padding:0 3mm;max-width:none}.reportActions{display:none!important}.hero,.item{box-shadow:none}.hero{padding:14px;border-radius:14px}.hero h1{font-size:20px}.summary,.journeyGrid{gap:6px}.metric,.journeyCard{padding:8px}.sectionBlock{margin-top:16px;break-inside:avoid}.sectionHead{margin-bottom:6px}.checkedGrid{gap:5px}.checkedCard{padding:7px 9px}.passed{margin-top:14px;padding:10px}.note{margin-top:10px;padding:9px}.footer{margin-top:10px}}
 </style>
 </head>
 <body>
@@ -13876,14 +13875,14 @@
   <div class="hero">
     <div class="brand">✦ SMART FORMSENSE QA</div>
     <h1>${esc(qa.page?.title || 'Form')}</h1>
-    <div class="meta">${esc(qa.page?.hostname || location.hostname || '')}<br>${esc(generated)} • v${esc(qa.productVersion || '17.13.2')}</div>
+    <div class="meta">${esc(qa.page?.hostname || location.hostname || '')}<br>${esc(generated)} • v${esc(qa.productVersion || '17.13.4')}</div>
     <div class="status ${statusClass}">${esc(status)}</div>
     <div class="overview">${esc(overview)}</div>
 
     <div class="summary">
       <div class="metric coverageMetric"><b>${checkedCount}/${detectedCount}</b><span>FIELDS COVERED</span><div class="coverageBar"><div class="coverageFill" style="width:${Math.max(0,Math.min(100,fieldCoverage))}%"></div></div></div>
       <div class="metric issueMetric"><b>${confirmed.length}</b><span>REAL ISSUE TYPES</span></div>
-      <div class="metric reviewMetric"><b>${manualFields.length + uncovered.length}</b><span>FIELDS TO CHECK</span></div>
+      <div class="metric reviewMetric"><b>${uncovered.length}</b><span>FIELDS MISSED</span></div>
       <div class="metric passMetric"><b>${passed}/${checksRun}</b><span>CHECKS CONFIRMED</span></div>
     </div>
 
@@ -13901,7 +13900,7 @@
   ${uncoveredHtml}
 
   <div class="passed">✓ ${passed} automated checks were confirmed OK. Field coverage: ${fieldCoverage}%. Validation coverage: ${validationCoverage}%.</div>
-  <div class="note">Only confirmed issues are explained in detail. Fields that were not fully confirmed or missed are listed by name only. Exact test values and technical evidence remain in <b>Export Debug</b>.</div>
+  <div class="note">Field names are shown only when Smart FormSense genuinely missed them or when a confirmed issue needs attention. Pending checks stay summarized. Exact test values and technical evidence remain in <b>Export Debug</b>.</div>
   <div class="footer">Created with love ❤️ Akash Singh • Smart FormSense</div>
 </div>
 <script>try{document.getElementById("qaDownloadPdf")?.addEventListener("click",function(e){e.preventDefault();window.print();});}catch(e){}</script>
@@ -13927,15 +13926,6 @@
         tab.document.write(html);
         tab.document.close();
 
-        try {
-          const pdfButton = tab.document.getElementById('qaDownloadPdf');
-          if (pdfButton) {
-            pdfButton.addEventListener('click', event => {
-              event.preventDefault();
-              tab.print();
-            });
-          }
-        } catch {}
 
         try { tab.focus(); } catch {}
         state.panel?.setStatus('QA report opened in a new tab. Use Download PDF at the top.');
@@ -14103,7 +14093,7 @@
       product:
         'Smart FormSense',
       productVersion:
-        '17.13.3',
+        '17.13.4',
       generatedAt:
         new Date().toISOString(),
       purpose:
@@ -14193,7 +14183,7 @@
       return report;
     } catch (error) {
       console.error(
-        'Smart FormSense V17.13.3 QA debug export:',
+        'Smart FormSense V17.13.4 QA debug export:',
         error
       );
 
@@ -15080,6 +15070,11 @@
     } catch {}
 
     try {
+      const marked = visualTarget(el)?.getAttribute?.(ERROR_ATTR) || '';
+      if (marked) parts.push(String(marked));
+    } catch {}
+
+    try {
       const container = fieldContainerFor(el) || el.parentElement;
       const selectors = [
         '.error',
@@ -15309,7 +15304,7 @@
       visibleFillableFields().filter(el => !isLikelyInternalField(el))
     );
 
-    while (Date.now() - started < 2600) {
+    while (Date.now() - started < 4200) {
       await sleep(180);
       after = qaJourneyState();
       const currentFields = visibleFillableFields().filter(el => !isLikelyInternalField(el));
@@ -15317,7 +15312,7 @@
       const progressed = before.url !== after.url || before.keys !== after.keys;
       const validationChanged = beforeValidation.signature !== afterValidation.signature;
       if (progressed || validationChanged) {
-        await sleep(260);
+        await sleep(350);
         after = qaJourneyState();
         afterValidation = qaValidationDigest(
           visibleFillableFields().filter(el => !isLikelyInternalField(el))
@@ -15434,6 +15429,11 @@
     for (const el of list) {
       const feedback = qaVisibleFeedback(el);
       if (feedback.invalid) add(el, feedback.text || 'Validation error', 'field');
+
+      try {
+        const marked = visualTarget(el)?.getAttribute?.(ERROR_ATTR) || '';
+        if (marked) add(el, marked, 'formsense-marker');
+      } catch {}
     }
 
     const selectors = [
@@ -15579,98 +15579,210 @@
   };
 
   const qaRunDependencyChain = async fields => {
-    const map = new Map();
-    for (const el of fields || []) {
-      if (el.tagName !== 'SELECT') continue;
-      const semantic = qaSemanticFor(el);
-      if (semantic && !map.has(semantic)) map.set(semantic, el);
-    }
+    const selects = (fields || []).filter(
+      el => el?.isConnected && el.tagName === 'SELECT' && !isLikelyInternalField(el)
+    );
+    if (selects.length < 2) return [];
 
-    const semantics = ['country', 'state', 'district', 'city'];
-    const chain = semantics
-      .map(key => ({ semantic: key, el: map.get(key) }))
-      .filter(item => item.el);
-
-    if (chain.length < 2) return [];
-
-    const snapshots = chain.map(item => [item.el, qaSnapshotFieldValue(item.el)]);
+    const snapshots = selects.map(el => [el, qaSnapshotFieldValue(el)]);
     const results = [];
+    const testedChildren = new Set();
+
+    const ownText = el => normalize([
+      qaCleanLabel(qaHumanLabel(el), el),
+      el?.name,
+      el?.id,
+      el?.getAttribute?.('placeholder')
+    ].filter(Boolean).join(' '));
+
+    const parentScore = (parent, child, parentIndex, childIndex) => {
+      const p = ownText(parent);
+      const c = ownText(child);
+      let score = Math.max(0, 5 - Math.max(0, childIndex - parentIndex));
+
+      const pairs = [
+        [/country/, /state|province/, 30],
+        [/state|province/, /district/, 30],
+        [/district/, /city|town/, 30],
+        [/entry|type|program|programme|course|degree|level/, /course|program|programme|preference|speciali[sz]ation|branch|campus|stream/, 24],
+        [/course|program|programme|degree|qualification/, /speciali[sz]ation|branch|preference|major|minor|stream/, 22],
+        [/category|faculty|school|department/, /course|program|programme|speciali[sz]ation|branch|preference/, 18],
+        [/course preference 1|preference 1/, /course preference 2|preference 2/, 28],
+        [/course preference 2|preference 2/, /course preference 3|preference 3/, 28]
+      ];
+
+      for (const [parentPattern, childPattern, weight] of pairs) {
+        if (parentPattern.test(p) && childPattern.test(c)) score += weight;
+      }
+
+      if (/title|gender|religion|blood|marital|nationality/.test(p)) score -= 18;
+      return score;
+    };
+
+    const exercisePair = async (parent, child, evidenceType = 'generic') => {
+      const parentOptions = qaRealSelectOptions(parent);
+      if (!parentOptions.length || parent.disabled) return null;
+
+      const current = String(parent.value ?? '');
+      const selected = parentOptions.find(option => String(option.value) === current && current.trim());
+      const india = /country/.test(ownText(parent))
+        ? parentOptions.find(option => /india/i.test(String(option.textContent || '')))
+        : null;
+      const attempts = [];
+      if (selected) attempts.push(selected);
+      if (india && !attempts.includes(india)) attempts.push(india);
+      for (const option of parentOptions.slice(0, 3)) {
+        if (!attempts.includes(option)) attempts.push(option);
+      }
+
+      let result = null;
+      let chosen = null;
+      for (const target of attempts.slice(0, 3)) {
+        if (state.stopRequested) break;
+        const before = qaSelectStateSignature(child);
+        parent.value = target.value;
+        qaDispatchInteraction(parent);
+        result = await qaWaitForDependentSelect(child, before, evidenceType === 'geography' ? 8000 : 6000);
+        chosen = target;
+        if (result.ready && result.optionCount > 0) break;
+      }
+
+      if (!result?.ready || Number(result.optionCount || 0) <= 0) return null;
+
+      state.dependencyGraph.set(fieldKey(child), fieldKey(parent));
+      const childOptions = qaRealSelectOptions(child);
+      const childCurrent = String(child.value ?? '');
+      const childSelected = childOptions.find(option => String(option.value) === childCurrent && childCurrent.trim());
+      const childTarget = childSelected || childOptions[0];
+      if (childTarget) {
+        child.value = childTarget.value;
+        qaDispatchInteraction(child);
+        await sleep(300);
+      }
+
+      return {
+        result,
+        chosen,
+        parentLabel: qaCleanLabel(qaHumanLabel(parent), parent),
+        childLabel: qaCleanLabel(qaHumanLabel(child), child)
+      };
+    };
 
     try {
-      for (let i = 0; i < chain.length - 1; i++) {
+      // Keep the explicit geographic path because it is common and deterministic.
+      const bySemantic = new Map();
+      for (const el of selects) {
+        const semantic = qaSemanticFor(el);
+        if (semantic && !bySemantic.has(semantic)) bySemantic.set(semantic, el);
+      }
+      const geo = ['country', 'state', 'district', 'city']
+        .map(key => ({ semantic: key, el: bySemantic.get(key) }))
+        .filter(item => item.el);
+
+      for (let index = 0; index < geo.length - 1; index++) {
         if (state.stopRequested) break;
-        const parentInfo = chain[i];
-        const childInfo = chain[i + 1];
-        const parent = parentInfo.el;
-        const child = childInfo.el;
-        let parentOptions = qaRealSelectOptions(parent);
+        const parentInfo = geo[index];
+        const childInfo = geo[index + 1];
+        const exercised = await exercisePair(parentInfo.el, childInfo.el, 'geography');
+        testedChildren.add(fieldKey(childInfo.el));
 
-        if (!parentOptions.length) {
-          results.push({
-            el: child,
-            status: 'review',
-            name: 'Dependent dropdown could not be exercised',
-            actual: `${qaCleanLabel(qaHumanLabel(parent), parent)} did not have a selectable value available.`,
-            evidence: { parent: parentInfo.semantic, child: childInfo.semantic, waitMs: 0, optionCount: 0 }
-          });
-          break;
-        }
-
-        const current = String(parent.value ?? '');
-        const selected = parentOptions.find(option => String(option.value) === current && current.trim());
-        const india = parentInfo.semantic === 'country'
-          ? parentOptions.find(option => /\bindia\b/i.test(String(option.textContent || '')))
-          : null;
-        const attempts = [];
-        if (selected) attempts.push(selected);
-        if (india && !attempts.includes(india)) attempts.push(india);
-        for (const option of parentOptions.slice(0, 3)) {
-          if (!attempts.includes(option)) attempts.push(option);
-        }
-
-        let result = null;
-        for (const target of attempts.slice(0, 3)) {
-          if (state.stopRequested) break;
-          const before = qaSelectStateSignature(child);
-          parent.value = target.value;
-          qaDispatchInteraction(parent);
-          result = await qaWaitForDependentSelect(child, before, 8000);
-          if (result.ready && result.optionCount > 0) break;
-        }
-
-        const ready = !!result?.ready && Number(result?.optionCount || 0) > 0;
         results.push({
-          el: child,
-          status: ready ? 'passed' : 'review',
-          name: ready ? 'Dependent dropdown loaded' : 'Dependent dropdown needs confirmation',
-          actual: ready
-            ? `${qaCleanLabel(qaHumanLabel(child), child)} became available with ${result.optionCount} option(s) after ${qaCleanLabel(qaHumanLabel(parent), parent)} was selected.`
-            : `${qaCleanLabel(qaHumanLabel(child), child)} did not become ready within ${Math.round((result?.waitedMs || 0) / 100) / 10}s.`,
-          evidence: {
-            parent: parentInfo.semantic,
-            child: childInfo.semantic,
-            waitMs: result?.waitedMs || 0,
-            optionCount: result?.optionCount || 0,
-            reacted: !!result?.reacted
-          }
+          el: childInfo.el,
+          status: exercised ? 'passed' : 'review',
+          name: exercised ? 'Dependent dropdown loaded' : 'Dependent dropdown needs confirmation',
+          actual: exercised
+            ? `${exercised.childLabel} became available with ${exercised.result.optionCount} option(s) after ${exercised.parentLabel} was selected.`
+            : `${qaCleanLabel(qaHumanLabel(childInfo.el), childInfo.el)} did not become ready after its parent selection was exercised.`,
+          evidence: exercised
+            ? {
+                parent: parentInfo.semantic,
+                child: childInfo.semantic,
+                waitMs: exercised.result.waitedMs || 0,
+                optionCount: exercised.result.optionCount || 0,
+                reacted: !!exercised.result.reacted
+              }
+            : { parent: parentInfo.semantic, child: childInfo.semantic }
         });
 
-        if (!ready) break;
+        if (!exercised) break;
+      }
 
-        const childOptions = qaRealSelectOptions(child);
-        const currentChild = String(child.value ?? '');
-        const childSelected = childOptions.find(option => String(option.value) === currentChild && currentChild.trim());
-        const childTarget = childSelected || childOptions[0];
-        if (childTarget) {
-          child.value = childTarget.value;
-          qaDispatchInteraction(child);
-          await sleep(250);
+      // Generic dependency discovery borrows the form-filling engine's principle:
+      // change a likely parent, wait for downstream controls to stabilize, then
+      // keep the temporary valid child choice only long enough to reveal the next link.
+      const dependencyLike = /state|province|district|city|town|course|program|programme|speciali[sz]ation|branch|campus|preference|stream|qualification|degree|subject|major|minor/;
+
+      for (let pass = 0; pass < 4 && !state.stopRequested; pass++) {
+        let progressed = false;
+
+        for (let childIndex = 0; childIndex < selects.length; childIndex++) {
+          const child = selects[childIndex];
+          const childKey = fieldKey(child);
+          if (testedChildren.has(childKey) || !dependencyLike.test(ownText(child))) continue;
+          if (!child?.isConnected) continue;
+
+          const hasOptions = qaRealSelectOptions(child).length > 0 && !child.disabled;
+          if (hasOptions) continue;
+
+          const parents = selects
+            .map((parent, parentIndex) => ({ parent, parentIndex, score: parentScore(parent, child, parentIndex, childIndex) }))
+            .filter(row => row.parentIndex < childIndex && row.parent !== child && row.score > 0 && !row.parent.disabled && qaRealSelectOptions(row.parent).length > 0)
+            .sort((a, b) => b.score - a.score)
+            .slice(0, 4);
+
+          let exercised = null;
+          let matchedParent = null;
+          for (const row of parents) {
+            exercised = await exercisePair(row.parent, child, 'generic');
+            if (exercised) {
+              matchedParent = row.parent;
+              break;
+            }
+          }
+
+          if (exercised && matchedParent) {
+            testedChildren.add(childKey);
+            progressed = true;
+            results.push({
+              el: child,
+              status: 'passed',
+              name: 'Dependent dropdown loaded',
+              actual: `${exercised.childLabel} loaded after ${exercised.parentLabel} was selected.`,
+              evidence: {
+                parentFieldKey: fieldKey(matchedParent),
+                childFieldKey: childKey,
+                parentLabel: exercised.parentLabel,
+                childLabel: exercised.childLabel,
+                waitMs: exercised.result.waitedMs || 0,
+                optionCount: exercised.result.optionCount || 0,
+                reacted: !!exercised.result.reacted,
+                discovered: true
+              }
+            });
+          }
         }
+
+        if (!progressed) break;
+      }
+
+      for (const child of selects) {
+        const key = fieldKey(child);
+        if (testedChildren.has(key) || !dependencyLike.test(ownText(child))) continue;
+        if (qaRealSelectOptions(child).length > 0 && !child.disabled) continue;
+
+        testedChildren.add(key);
+        results.push({
+          el: child,
+          status: 'review',
+          name: 'Dependent dropdown needs confirmation',
+          actual: `${qaCleanLabel(qaHumanLabel(child), child)} still had no selectable option after likely parent controls were exercised.`,
+          evidence: { childFieldKey: key, discovered: false }
+        });
       }
     } finally {
       for (const [el, snapshot] of [...snapshots].reverse()) {
         if (el?.isConnected) await qaRestoreFieldValue(el, snapshot);
-        await sleep(250);
+        await sleep(120);
       }
     }
 
@@ -16269,7 +16381,7 @@
       : {
           reportVersion: 7,
           product: 'Smart FormSense',
-          productVersion: '17.13.3',
+          productVersion: '17.13.4',
           generatedAt: new Date().toISOString(),
           auditType: 'Black-box Functional Form QA',
           page: {
@@ -16306,7 +16418,7 @@
     const cleanReason = String(reason || '').slice(0, 500);
     return {
       ...base,
-      productVersion: '17.13.3',
+      productVersion: '17.13.4',
       reportVersion: Math.max(5, Number(base.reportVersion || 0)),
       runState,
       incomplete: runState !== 'completed',
@@ -16453,7 +16565,7 @@
       return {
         reportVersion: 7,
         product: 'Smart FormSense',
-        productVersion: '17.13.3',
+        productVersion: '17.13.4',
         generatedAt,
         completedAt: ['completed', 'stopped', 'failed'].includes(runState) ? new Date().toISOString() : null,
         auditType: 'Black-box Functional Form QA',
