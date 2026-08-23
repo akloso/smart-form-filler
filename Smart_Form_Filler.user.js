@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Smart FormSense
 // @namespace    smart-form-filler
-// @version      17.11.1
+// @version      17.11.2
 // @description  Intelligent form filling and QA testing for authorized web-form validation, readiness checks, embedded forms, safe repair, and synthetic test data.
 // @author       Akash Singh
 // @match        *://*/*
@@ -187,7 +187,7 @@
     );
 
     console.error(
-      `Smart FormSense V17.11.1 [${stage}]`,
+      `Smart FormSense V17.11.2 [${stage}]`,
       error
     );
 
@@ -12460,7 +12460,7 @@
       return report;
     } catch (error) {
       console.error(
-        'Smart FormSense V17.11.1 debug export:',
+        'Smart FormSense V17.11.2 debug export:',
         error
       );
 
@@ -13547,7 +13547,7 @@
       product:
         'Smart FormSense',
       productVersion:
-        '17.11.1',
+        '17.11.2',
       generatedAt,
       auditType:
         'Non-destructive Form Readiness Audit',
@@ -13776,7 +13776,7 @@
   <div class="top">
     <div class="brand">✦ Smart FormSense QA</div>
     <h1>${esc(qa.page?.title || 'Form')}</h1>
-    <div class="meta">${esc(qa.page?.hostname || location.hostname || '')}<br>${esc(generated)} • v${esc(qa.productVersion || '17.11.1')}</div>
+    <div class="meta">${esc(qa.page?.hostname || location.hostname || '')}<br>${esc(generated)} • v${esc(qa.productVersion || '17.11.2')}</div>
     <div class="status">${esc(status)}</div>
     <div class="summary">
       <div class="metric"><b>${Number(qa.incomplete ? (qa.fieldsChecked || 0) : (qa.fieldsAudited || 0))}</b><span>FIELDS CHECKED</span></div>
@@ -14072,7 +14072,7 @@
       return report;
     } catch (error) {
       console.error(
-        'Smart FormSense V17.11.1 QA debug export:',
+        'Smart FormSense V17.11.2 QA debug export:',
         error
       );
 
@@ -15767,7 +15767,7 @@
       : {
           reportVersion: 5,
           product: 'Smart FormSense',
-          productVersion: '17.11.1',
+          productVersion: '17.11.2',
           generatedAt: new Date().toISOString(),
           auditType: 'Black-box Functional Form QA',
           page: {
@@ -15804,7 +15804,7 @@
     const cleanReason = String(reason || '').slice(0, 500);
     return {
       ...base,
-      productVersion: '17.11.1',
+      productVersion: '17.11.2',
       reportVersion: Math.max(5, Number(base.reportVersion || 0)),
       runState,
       incomplete: runState !== 'completed',
@@ -15909,7 +15909,7 @@
       return {
         reportVersion: 5,
         product: 'Smart FormSense',
-        productVersion: '17.11.1',
+        productVersion: '17.11.2',
         generatedAt,
         completedAt: runState === 'completed' || runState === 'stopped' || runState === 'failed'
           ? new Date().toISOString()
@@ -16863,13 +16863,6 @@
         );
       },
 
-      setQaProgress(percent, text) {
-        const value = clamp(Number(percent || 0), 0, 100);
-        state.qaProgressPercent = value;
-        if (refs.qaProgressBar) refs.qaProgressBar.style.width = `${value}%`;
-        if (refs.qaProgressPct) refs.qaProgressPct.textContent = `${Math.round(value)}%`;
-        if (refs.qaProgressText) refs.qaProgressText.textContent = text || 'Working…';
-      },
 
       setQaReport(report) {
         if (!report) return;
@@ -18025,6 +18018,14 @@
               : mode === 'qa'
                 ? 'QA AUDIT'
                 : 'READY';
+      },
+
+      setQaProgress(percent, text) {
+        const value = clamp(Number(percent || 0), 0, 100);
+        state.qaProgressPercent = value;
+        if (refs.qaProgressBar) refs.qaProgressBar.style.width = `${value}%`;
+        if (refs.qaProgressPct) refs.qaProgressPct.textContent = `${Math.round(value)}%`;
+        if (refs.qaProgressText) refs.qaProgressText.textContent = text || 'Working…';
       },
 
       setQaReport(report) {
