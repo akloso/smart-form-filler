@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Smart FormSense
 // @namespace    smart-form-filler
-// @version      17.10.0
+// @version      17.11.0
 // @description  Intelligent form filling and QA testing for authorized web-form validation, readiness checks, embedded forms, safe repair, and synthetic test data.
 // @author       Akash Singh
 // @match        *://*/*
@@ -185,7 +185,7 @@
     );
 
     console.error(
-      `Smart FormSense V17.10 [${stage}]`,
+      `Smart FormSense V17.11 [${stage}]`,
       error
     );
 
@@ -12320,7 +12320,7 @@
     const report = {
       reportVersion: 1,
       generatedBy:
-        'Smart FormSense V17.10',
+        'Smart FormSense V17.11',
       generatedAt:
         new Date().toISOString(),
       mode:
@@ -12440,7 +12440,7 @@
           .slice(0, 60);
 
       const filename =
-        `Smart_FormSense_V17_10_Debug_${host}_${stamp}.json`;
+        `Smart_FormSense_V17_11_Debug_${host}_${stamp}.json`;
 
       downloadTextFile(
         filename,
@@ -12458,7 +12458,7 @@
       return report;
     } catch (error) {
       console.error(
-        'Smart FormSense V17.10 debug export:',
+        'Smart FormSense V17.11 debug export:',
         error
       );
 
@@ -13681,216 +13681,81 @@
       );
 
   const qaGroupedFindings = report => {
-    const groups =
-      new Map();
+    const groups = new Map();
 
-    for (
-      const item
-      of report?.findings ||
-      []
-    ) {
+    for (const item of report?.findings || []) {
+      const rawTitle = String(item.title || 'QA finding');
+      const title = rawTitle.includes(' — ')
+        ? rawTitle.split(' — ').slice(-1)[0].trim()
+        : rawTitle;
       const key = [
-        item.severity ||
-          'observation',
-        item.category ||
-          'General',
-        item.title ||
-          'QA finding',
-        item.expected ||
-          '',
-        item.actual ||
-          '',
-        item.guidance ||
-          ''
+        item.severity || 'observation',
+        item.category || 'General',
+        title
       ].join('|');
 
-      const existing =
-        groups.get(key) || {
-          severity:
-            item.severity ||
-            'observation',
-          category:
-            item.category ||
-            'General',
-          title:
-            item.title ||
-            'QA finding',
-          message:
-            item.message ||
-            '',
-          expected:
-            item.expected ||
-            '',
-          actual:
-            item.actual ||
-            '',
-          guidance:
-            item.guidance ||
-            '',
-          fields: []
-        };
+      const existing = groups.get(key) || {
+        severity: item.severity || 'observation',
+        category: item.category || 'General',
+        title,
+        message: item.message || item.actual || '',
+        guidance: item.guidance || '',
+        fields: []
+      };
 
-      if (item.field) {
-        existing.fields.push(
-          item.field
-        );
-      }
-
-      groups.set(
-        key,
-        existing
-      );
+      if (item.field) existing.fields.push(qaCleanLabel(item.field));
+      groups.set(key, existing);
     }
 
-    return [
-      ...groups.values()
-    ];
+    return [...groups.values()].map(item => ({
+      ...item,
+      fields: [...new Set(item.fields)]
+    }));
   };
 
   const buildQaFriendlyHtml = report => {
-    const qa =
-      report ||
-      state.qaReport;
+    const qa = report || state.qaReport;
+    if (!qa) return '';
 
-    if (!qa) {
-      return '';
-    }
+    const counts = qa.counts || {};
+    const grouped = qaGroupedFindings(qa);
+    const blockers = grouped.filter(item => item.severity === 'critical');
+    const failed = grouped.filter(item => item.severity === 'warning');
+    const review = grouped.filter(item => item.severity === 'observation');
+    const esc = qaEscapeHtml;
 
-    const counts =
-      qa.counts || {};
+    const generated = (() => {
+      try { return new Date(qa.generatedAt).toLocaleString(); }
+      catch { return qa.generatedAt || ''; }
+    })();
 
-    const summary =
-      qa.summary ||
-      qaBuildSummary(
-        Number(qa.score || 0),
-        counts,
-        Number(
-          qa.fieldsAudited ||
-          0
-        ),
-        Number(
-          qa.checksRun ||
-          0
-        )
-      );
+    const status = blockers.length
+      ? 'Blockers Found'
+      : failed.length
+        ? 'Needs Attention'
+        : review.length
+          ? 'Needs Review'
+          : 'Looks Good';
 
-    const grouped =
-      qaGroupedFindings(qa);
+    const fieldsLine = fields => {
+      const list = [...new Set(fields || [])];
+      if (!list.length) return '';
+      const shown = list.slice(0, 12);
+      const more = list.length - shown.length;
+      return `<div class="fields"><b>Fields:</b> ${shown.map(esc).join(', ')}${more > 0 ? ` +${more} more` : ''}</div>`;
+    };
 
-    const sectionHtml =
-      severity => {
-        const items =
-          grouped.filter(
-            item =>
-              item.severity ===
-              severity
-          );
+    const itemHtml = (item, kind) => `
+      <article class="item ${kind}">
+        <div class="itemTitle">${kind === 'blocker' ? '🛑' : kind === 'failed' ? '❌' : '⚠'} ${esc(item.title)}</div>
+        ${fieldsLine(item.fields)}
+        ${item.message ? `<div class="what">${esc(item.message)}</div>` : ''}
+        ${item.guidance ? `<div class="action"><b>Action:</b> ${esc(item.guidance)}</div>` : ''}
+      </article>`;
 
-        if (!items.length) {
-          return '';
-        }
-
-        const label =
-          severity ===
-          'critical'
-            ? 'Functional failures'
-            : severity ===
-                'warning'
-              ? 'Warnings to review'
-              : 'Review / manual tests';
-
-        return `
-          <section class="section">
-            <h2>${qaEscapeHtml(label)} <span>${items.length} grouped item${items.length === 1 ? '' : 's'}</span></h2>
-            ${items
-              .map(item => {
-                const fields = [
-                  ...new Set(
-                    item.fields
-                  )
-                ];
-
-                const preview =
-                  fields.slice(
-                    0,
-                    8
-                  );
-
-                const more =
-                  Math.max(
-                    0,
-                    fields.length -
-                      preview.length
-                  );
-
-                return `
-                  <article class="finding ${qaEscapeHtml(severity)}">
-                    <div class="findingHead">
-                      <div>
-                        <span class="pill ${qaEscapeHtml(severity)}">${qaEscapeHtml(severity)}</span>
-                        <span class="category">${qaEscapeHtml(item.category)}</span>
-                      </div>
-                      ${fields.length ? `<strong>${fields.length} affected field${fields.length === 1 ? '' : 's'}</strong>` : ''}
-                    </div>
-
-                    <h3>${qaEscapeHtml(item.title)}</h3>
-                    ${item.message ? `<p>${qaEscapeHtml(item.message)}</p>` : ''}
-
-                    ${fields.length ? `
-                      <div class="fields">
-                        ${preview.map(field => `<span>${qaEscapeHtml(field)}</span>`).join('')}
-                        ${more ? `<span>+${more} more</span>` : ''}
-                      </div>
-                      ${more ? `
-                        <details>
-                          <summary>Show all affected fields</summary>
-                          <ul>${fields.map(field => `<li>${qaEscapeHtml(field)}</li>`).join('')}</ul>
-                        </details>
-                      ` : ''}
-                    ` : ''}
-
-                    ${item.guidance ? `
-                      <div class="action">
-                        <b>What to do:</b>
-                        ${qaEscapeHtml(item.guidance)}
-                      </div>
-                    ` : ''}
-
-                    ${(item.expected || item.actual) ? `
-                      <details class="technical">
-                        <summary>Expected vs detected</summary>
-                        ${item.expected ? `<div><b>Expected:</b> ${qaEscapeHtml(item.expected)}</div>` : ''}
-                        ${item.actual ? `<div><b>Detected:</b> ${qaEscapeHtml(item.actual)}</div>` : ''}
-                      </details>
-                    ` : ''}
-                  </article>
-                `;
-              })
-              .join('')}
-          </section>
-        `;
-      };
-
-    const safeTitle =
-      qa.page?.title ||
-      'Form';
-
-    const safeHost =
-      qa.page?.hostname ||
-      location.hostname ||
-      '';
-
-    const generated =
-      (() => {
-        try {
-          return new Date(
-            qa.generatedAt
-          ).toLocaleString();
-        } catch {
-          return qa.generatedAt ||
-            '';
-        }
-      })();
+    const section = (title, items, kind) => !items.length
+      ? ''
+      : `<section><h2>${esc(title)} <span>${items.length}</span></h2>${items.map(item => itemHtml(item, kind)).join('')}</section>`;
 
     return `<!doctype html>
 <html lang="en">
@@ -13899,96 +13764,31 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Smart FormSense QA Report</title>
 <style>
-  :root{color-scheme:light;font-family:Inter,Segoe UI,Arial,sans-serif}
-  *{box-sizing:border-box}
-  body{margin:0;background:#f6f7fb;color:#202334}
-  .wrap{max-width:1040px;margin:0 auto;padding:28px 18px 48px}
-  .hero{background:linear-gradient(135deg,#5145ff,#9b5cff,#ec4899);color:#fff;border-radius:22px;padding:26px;box-shadow:0 18px 48px rgba(70,50,150,.18)}
-  .brand{font-size:13px;font-weight:800;opacity:.95}
-  h1{margin:7px 0 6px;font-size:28px;line-height:1.15}
-  .meta{font-size:13px;opacity:.9;line-height:1.55}
-  .scoreRow{display:grid;grid-template-columns:180px 1fr;gap:18px;margin-top:22px;align-items:stretch}
-  .score{background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.28);border-radius:18px;padding:18px;text-align:center}
-  .score strong{display:block;font-size:48px;line-height:1}
-  .score span{display:block;font-size:13px;margin-top:7px;font-weight:700}
-  .summary{background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.24);border-radius:18px;padding:18px}
-  .summary h2{margin:0 0 7px;font-size:18px}
-  .summary p{margin:6px 0;font-size:13px;line-height:1.55}
-  .cards{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:18px 0}
-  .card{background:#fff;border:1px solid #e7e8ef;border-radius:14px;padding:15px;box-shadow:0 5px 18px rgba(20,25,50,.04)}
-  .card strong{display:block;font-size:24px}
-  .card span{font-size:11px;color:#6f7484;font-weight:700}
-  .critical strong{color:#dc2626}.warning strong{color:#d97706}.observation strong{color:#2563eb}.passed strong{color:#15803d}
-  .section{margin-top:22px}
-  .section>h2{font-size:18px;margin:0 0 10px}
-  .section>h2 span{font-size:11px;color:#777;font-weight:600;margin-left:6px}
-  .finding{background:#fff;border:1px solid #e6e7ee;border-left:5px solid #cbd5e1;border-radius:14px;padding:16px;margin:10px 0;box-shadow:0 5px 18px rgba(20,25,50,.035)}
-  .finding.critical{border-left-color:#dc2626}.finding.warning{border-left-color:#d97706}.finding.observation{border-left-color:#2563eb}
-  .findingHead{display:flex;justify-content:space-between;gap:12px;align-items:center;font-size:11px;color:#717687}
-  .pill{display:inline-block;border-radius:999px;padding:4px 8px;font-size:10px;font-weight:900;text-transform:uppercase;margin-right:6px}
-  .pill.critical{background:#fff1f2;color:#dc2626}.pill.warning{background:#fff7ed;color:#b45309}.pill.observation{background:#eff6ff;color:#2563eb}
-  .category{font-weight:700}.finding h3{margin:10px 0 5px;font-size:16px}.finding p{margin:0;color:#5d6272;line-height:1.55;font-size:13px}
-  .fields{display:flex;flex-wrap:wrap;gap:6px;margin-top:11px}.fields span{background:#f4f4f8;border:1px solid #e5e7eb;border-radius:999px;padding:5px 8px;font-size:11px}
-  .action{margin-top:12px;background:#f7f7ff;border-radius:10px;padding:10px 12px;font-size:12px;line-height:1.5}
-  details{margin-top:10px;font-size:12px;color:#5d6272}summary{cursor:pointer;font-weight:700;color:#4e5363}
-  details ul{columns:2;padding-left:20px}.technical div{margin-top:6px}
-  .scope{background:#fff;border:1px solid #e6e7ee;border-radius:14px;padding:16px;margin-top:24px;font-size:12px;color:#656a79;line-height:1.6}
-  .scope h2{color:#252839;font-size:16px;margin:0 0 7px}
-  .footer{text-align:center;color:#8a8e9b;font-size:11px;margin-top:24px}
-  @media(max-width:700px){.scoreRow{grid-template-columns:1fr}.cards{grid-template-columns:repeat(2,1fr)}details ul{columns:1}}
-  @media print{body{background:#fff}.wrap{max-width:none;padding:0}.hero,.card,.finding,.scope{box-shadow:none}}
+*{box-sizing:border-box}body{margin:0;background:#f7f7fa;color:#242633;font-family:Inter,Segoe UI,Arial,sans-serif}.wrap{max-width:850px;margin:auto;padding:28px 18px 44px}.top{background:#fff;border:1px solid #e7e7ee;border-radius:16px;padding:20px}.brand{font-size:13px;font-weight:850;color:#5b4bff}.top h1{font-size:22px;margin:5px 0}.meta{font-size:12px;color:#747887;line-height:1.5}.status{display:inline-block;margin-top:13px;padding:6px 10px;border-radius:999px;background:#f2efff;color:#5b4bff;font-size:12px;font-weight:850}.summary{display:grid;grid-template-columns:repeat(5,1fr);gap:7px;margin-top:15px}.metric{border:1px solid #e8e8ef;border-radius:10px;padding:10px 7px;text-align:center}.metric b{display:block;font-size:19px}.metric span{font-size:9px;color:#777b88;font-weight:750}.blockerText{color:#b91c1c}.failedText{color:#c2410c}.reviewText{color:#a16207}section{margin-top:24px}h2{font-size:16px;margin:0 0 9px}h2 span{font-size:10px;background:#ececf2;border-radius:999px;padding:3px 6px;color:#666}.item{background:#fff;border:1px solid #e7e7ee;border-left:4px solid #cbd5e1;border-radius:11px;padding:13px;margin:8px 0}.item.blocker{border-left-color:#b91c1c}.item.failed{border-left-color:#ea580c}.item.review{border-left-color:#d97706}.itemTitle{font-size:14px;font-weight:850}.fields,.what,.action{margin-top:6px;font-size:11px;line-height:1.5;color:#606473}.action{background:#f7f7fb;border-radius:8px;padding:8px 9px}.passed{margin-top:24px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:11px;padding:12px;font-size:12px;color:#166534}.note{margin-top:18px;font-size:10px;line-height:1.55;color:#858895}.footer{text-align:center;margin-top:24px;font-size:10px;color:#9295a1}@media(max-width:650px){.summary{grid-template-columns:repeat(2,1fr)}}@media print{body{background:#fff}.wrap{padding:0}}
 </style>
 </head>
 <body>
 <div class="wrap">
-  <header class="hero">
-    <div class="brand">✦ Smart FormSense • Functional QA Report</div>
-    <h1>${qaEscapeHtml(safeTitle)}</h1>
-    <div class="meta">${qaEscapeHtml(safeHost)}<br>Generated ${qaEscapeHtml(generated)} • Smart FormSense ${qaEscapeHtml(qa.productVersion || '17.10.0')}</div>
-
-    <div class="scoreRow">
-      <div class="score">
-        <strong>${Number(qa.score || 0)}</strong>
-        <span>${qaEscapeHtml(qa.rating || 'Review')} • out of 100</span>
-      </div>
-
-      <div class="summary">
-        <h2>${qaEscapeHtml(summary.headline || '')}</h2>
-        <p><b>Risk level:</b> ${qaEscapeHtml(summary.riskLevel || 'Review')}</p>
-        <p>${qaEscapeHtml(summary.recommendation || '')}</p>
-        <p>${Number(qa.fieldsAudited || 0)} fields analysed • ${Number(qa.checksRun || 0)} functional test cases executed</p>
-      </div>
+  <div class="top">
+    <div class="brand">✦ Smart FormSense QA</div>
+    <h1>${esc(qa.page?.title || 'Form')}</h1>
+    <div class="meta">${esc(qa.page?.hostname || location.hostname || '')}<br>${esc(generated)} • v${esc(qa.productVersion || '17.11.0')}</div>
+    <div class="status">${esc(status)}</div>
+    <div class="summary">
+      <div class="metric"><b>${Number(qa.fieldsAudited || 0)}</b><span>FIELDS CHECKED</span></div>
+      <div class="metric"><b class="blockerText">${blockers.length}</b><span>BLOCKER TYPES</span></div>
+      <div class="metric"><b class="failedText">${failed.length}</b><span>ISSUE TYPES</span></div>
+      <div class="metric"><b class="reviewText">${review.length}</b><span>REVIEW AREAS</span></div>
+      <div class="metric"><b>${Number(qa.coverage ?? qa.summary?.coverage ?? 0)}%</b><span>AUTO COVERAGE</span></div>
     </div>
-  </header>
-
-  <div class="cards">
-    <div class="card critical"><strong>${Number(counts.critical || 0)}</strong><span>Functional failures</span></div>
-    <div class="card warning"><strong>${Number(counts.warning || 0)}</strong><span>Warnings</span></div>
-    <div class="card observation"><strong>${Number(counts.observation || 0)}</strong><span>Review</span></div>
-    <div class="card passed"><strong>${Number(counts.passed || 0)}</strong><span>Checks passed</span></div>
   </div>
 
-  ${sectionHtml('critical')}
-  ${sectionHtml('warning')}
-  ${sectionHtml('observation')}
+  ${section('Blockers', blockers, 'blocker')}
+  ${section('Issues to Fix', failed, 'failed')}
+  ${section('Needs Review', review, 'review')}
 
-  ${!grouped.length ? `
-    <section class="section">
-      <article class="finding">
-        <h3>No functional failures were reproduced</h3>
-        <p>The safe black-box test run did not reproduce a user-facing failure. Complete the remaining manual journey checks before go-live.</p>
-      </article>
-    </section>
-  ` : ''}
-
-  <section class="scope">
-    <h2>How to read this report</h2>
-    <b>Failed:</b> a user-facing test case that Smart FormSense reproduced as failing.<br>
-    <b>Warning:</b> behaviour or configuration that needs review.<br>
-    <b>Review:</b> a journey/widget behaviour that needs human confirmation because it cannot be proven safely at field level.<br><br>
-    This is black-box functional QA of the finished form. Smart FormSense temporarily tests valid, invalid and boundary values, restores the original field state after each case, and never submits the final form automatically. Final go-live approval remains with the QA tester.
-  </section>
-
+  <div class="passed">✓ ${Number(counts.passed || 0)} automated checks passed.</div>
+  <div class="note">Smart FormSense tests the finished form from the applicant's point of view. Similar findings are grouped into one issue with affected fields listed. Safe Next/Continue/Save & Next actions may be tested; final submit, payment and application-generation actions are never executed automatically. Manual sign-off remains with the form QC team.</div>
   <div class="footer">Created with love ❤️ Akash Singh • Smart FormSense</div>
 </div>
 </body>
@@ -14041,7 +13841,7 @@
     );
 
     state.panel?.setStatus(
-      `Functional QA report exported • Score ${qa.score}/100 • ${qa.findings.length} finding(s)`
+      `QA report exported • ${qaGroupedFindings(qa).length} grouped item(s)`
     );
 
     return qa;
@@ -14259,7 +14059,7 @@
       return report;
     } catch (error) {
       console.error(
-        'Smart FormSense V17.10 QA debug export:',
+        'Smart FormSense V17.11 QA debug export:',
         error
       );
 
@@ -15195,12 +14995,8 @@
   };
 
   const qaSemanticFor = el => {
-    const snapshot = debugFieldSnapshot(el);
-    if (snapshot?.semantic && snapshot.confidence !== 'low') {
-      return normalize(snapshot.semantic);
-    }
-
-    const context = normalize([
+    const type = normalize(el?.type);
+    const ownContext = normalize([
       qaHumanLabel(el),
       el?.name,
       el?.id,
@@ -15209,19 +15005,407 @@
       tableRowLabelContext(el)
     ].filter(Boolean).join(' '));
 
-    if (/email|e mail/.test(context)) return 'email';
-    if (/mobile|phone|contact number|telephone/.test(context)) return 'mobile';
-    if (/pin code|pincode|postal|zip/.test(context)) return 'pincode';
-    if (/percentage|percent/.test(context)) return 'percentage';
-    if (/cgpa/.test(context)) return 'cgpa';
-    if (/date of birth|birth date|\bdob\b/.test(context)) return 'dob';
-    if (/year of passing|passing year|pass year|completion year/.test(context)) return 'passing_year';
-    if (/first name|last name|father.*name|mother.*name|guardian.*name|applicant name|parent name/.test(context)) return 'name';
-    if (/country/.test(context)) return 'country';
-    if (/state|province/.test(context)) return 'state';
-    if (/district/.test(context)) return 'district';
-    if (/city|town/.test(context)) return 'city';
+    if (type === 'file') return 'file';
+    if (/percentage.*cgpa|cgpa.*percentage/.test(ownContext)) return 'marks_metric';
+    if (/email|e mail/.test(ownContext)) return 'email';
+    if (/mobile|phone|contact number|telephone/.test(ownContext)) return 'mobile';
+    if (/pin code|pincode|postal|zip/.test(ownContext)) return 'pincode';
+    if (/percentage|percent/.test(ownContext)) return 'percentage';
+    if (/cgpa/.test(ownContext)) return 'cgpa';
+    if (/date of birth|birth date|\bdob\b/.test(ownContext)) return 'dob';
+    if (/year of passing|passing year|pass year|completion year/.test(ownContext)) return 'passing_year';
+    if (/first name|last name|father.*name|mother.*name|guardian.*name|applicant name|parent name/.test(ownContext)) return 'name';
+    if (/country/.test(ownContext)) return 'country';
+    if (/state|province/.test(ownContext)) return 'state';
+    if (/district/.test(ownContext)) return 'district';
+    if (/city|town/.test(ownContext)) return 'city';
+
+    if (['radio', 'checkbox'].includes(type)) return '';
+
+    const snapshot = debugFieldSnapshot(el);
+    if (snapshot?.semantic && snapshot.confidence !== 'low') {
+      return normalize(snapshot.semantic);
+    }
+
     return snapshot?.semantic ? normalize(snapshot.semantic) : '';
+  };
+
+  const qaCleanLabel = (label, el = null) => {
+    let text = String(label || 'Unnamed field').replace(/\s+/g, ' ').trim();
+    if (normalize(el?.type) === 'radio') text = text.replace(/^(?:yes|no)\s+/i, '');
+    text = text.replace(/\s*\*+\s*$/, '').trim();
+    if (/i hereby declare|declaration|i agree/i.test(text) && text.length > 70) return 'Declaration Agreement';
+    if (/permanent address same as address for correspondence/i.test(text)) return 'Permanent Address Same as Correspondence?';
+    return text.length > 92 ? `${text.slice(0, 89).trim()}…` : text;
+  };
+
+  const qaAttemptUserEntry = async (el, value) => {
+    const attemptedValue = String(value ?? '');
+    const type = normalize(el?.type);
+
+    if (!el || ['radio', 'checkbox'].includes(type) || el.tagName === 'SELECT') {
+      qaSetNativeLikeValue(el, value);
+      await sleep(70);
+      return {
+        method: 'control-interaction',
+        attemptedValue,
+        acceptedValue: String(el?.value ?? '')
+      };
+    }
+
+    try { el.focus({ preventScroll: true }); } catch {}
+    qaSetNativeLikeValue(el, '');
+
+    const win = el.ownerDocument?.defaultView || window;
+    const maxLength = Number(el.maxLength);
+    const enforceMax = Number.isFinite(maxLength) && maxLength >= 0;
+
+    for (const char of attemptedValue) {
+      let allowed = true;
+      try {
+        const keydown = new win.KeyboardEvent('keydown', {
+          key: char,
+          bubbles: true,
+          cancelable: true
+        });
+        allowed = el.dispatchEvent(keydown);
+      } catch {}
+      if (!allowed) continue;
+
+      try {
+        const beforeInput = new win.InputEvent('beforeinput', {
+          data: char,
+          inputType: 'insertText',
+          bubbles: true,
+          cancelable: true
+        });
+        allowed = el.dispatchEvent(beforeInput);
+      } catch {}
+      if (!allowed) continue;
+
+      if (enforceMax && String(el.value ?? '').length >= maxLength) continue;
+      qaSetNativeLikeValue(el, `${String(el.value ?? '')}${char}`);
+
+      try {
+        el.dispatchEvent(new win.KeyboardEvent('keyup', { key: char, bubbles: true }));
+      } catch {}
+    }
+
+    try { el.dispatchEvent(new win.Event('blur', { bubbles: true })); } catch {}
+    await sleep(90);
+
+    return {
+      method: 'user-like-entry',
+      attemptedValue,
+      acceptedValue: String(el.value ?? ''),
+      normalizedOrBlocked: String(el.value ?? '') !== attemptedValue
+    };
+  };
+
+  const qaButtonText = el => normalize(
+    el?.innerText ||
+    el?.textContent ||
+    el?.value ||
+    el?.getAttribute?.('aria-label') ||
+    el?.title ||
+    ''
+  );
+
+  const qaFindJourneyButtons = () => {
+    const safe = [];
+    const protectedFinal = [];
+    const nodes = [...document.querySelector(
+      'button,input[type="button"],input[type="submit"],a,[role="button"]'
+    )];
+
+    for (const el of nodes) {
+      if (!isVisible(el) || el.disabled) continue;
+      const text = qaButtonText(el);
+      if (!text) continue;
+
+      if (/\bsubmit\b|pay|payment|generate application|confirm admission|finali[sz]e|place order/.test(text)) {
+        protectedFinal.push(el);
+        continue;
+      }
+
+      if (/^(?:next|continue|proceed)$|save\s*(?:&|and)\s*next|continue to|proceed to|next step/.test(text)) {
+        safe.push(el);
+      }
+    }
+
+    return { safe, protectedFinal };
+  };
+
+  const qaJourneyState = () => ({
+    url: location.href,
+    keys: visibleFillableFields()
+      .filter(el => !isLikelyInternalField(el))
+      .map(fieldKey)
+      .sort()
+      .join('|')
+  });
+
+  const qaClickJourneyButton = async button => {
+    const before = qaJourneyState();
+    const form = button?.form || button?.closest?.('form') || null;
+    let submitAttempted = false;
+
+    const guard = event => {
+      submitAttempted = true;
+      try { event.preventDefault(); } catch {}
+    };
+
+    try { form?.addEventListener('submit', guard, true); } catch {}
+    try { button.click(); } catch {}
+    await sleep(500);
+    try { form?.removeEventListener('submit', guard, true); } catch {}
+
+    const after = qaJourneyState();
+    return {
+      before,
+      after,
+      submitAttempted,
+      progressed: before.url !== after.url || before.keys !== after.keys
+    };
+  };
+
+  const qaFeedbackQuality = text => {
+    const clean = String(text || '').replace(/\s+/g, ' ').trim();
+    if (!clean) return 'missing';
+    if (clean.length < 8 || /^(?:required|invalid|error|mandatory|please enter)$/i.test(clean)) return 'generic';
+    return 'clear';
+  };
+
+  const qaRunDependencyChain = async fields => {
+    const map = new Map();
+    for (const el of fields) {
+      if (el.tagName !== 'SELECT') continue;
+      const semantic = qaSemanticFor(el);
+      if (semantic && !map.has(semantic)) map.set(semantic, el);
+    }
+
+    const chain = ['country', 'state', 'district', 'city']
+      .map(key => map.get(key))
+      .filter(Boolean);
+
+    if (chain.length < 2) return [];
+
+    const snapshots = chain.map(el => [el, qaSnapshotFieldValue(el)]);
+    const results = [];
+
+    try {
+      for (let i = 0; i < chain.length - 1; i++) {
+        const parent = chain[i];
+        const child = chain[i + 1];
+        const options = validOptions(parent);
+
+        if (!options.length) {
+          results.push({
+            el: child,
+            status: 'review',
+            name: 'Dependent dropdown could not be exercised',
+            actual: `${qaCleanLabel(qaHumanLabel(parent), parent)} has no selectable option in the current state.`
+          });
+          break;
+        }
+
+        const current = String(parent.value ?? '');
+        const target = options.find(option => String(option.value) !== current) || options[0];
+        const before = `${String(child.value ?? '')}|${validOptions(child).length}|${!!child.disabled}`;
+
+        parent.value = target.value;
+        qaDispatchInteraction(parent);
+
+        let reacted = false;
+        const started = Date.now();
+        while (Date.now() - started < 1800) {
+          await sleep(120);
+          const now = `${String(child.value ?? '')}|${validOptions(child).length}|${!!child.disabled}`;
+          if (now !== before) {
+            reacted = true;
+            break;
+          }
+        }
+
+        results.push({
+          el: child,
+          status: reacted ? 'passed' : 'review',
+          name: 'Dependent dropdown response',
+          actual: reacted
+            ? `${qaCleanLabel(qaHumanLabel(child), child)} reacted after ${qaCleanLabel(qaHumanLabel(parent), parent)} changed.`
+            : `${qaCleanLabel(qaHumanLabel(child), child)} did not visibly react after its parent changed.`
+        });
+
+        const childOptions = validOptions(child);
+        if (childOptions.length && !String(child.value ?? '')) {
+          child.value = childOptions[0].value;
+          qaDispatchInteraction(child);
+          await sleep(180);
+        }
+      }
+    } finally {
+      for (const [el, snapshot] of [...snapshots].reverse()) {
+        if (el?.isConnected) await qaRestoreFieldValue(el, snapshot);
+        await sleep(160);
+      }
+    }
+
+    return results;
+  };
+
+  const qaRunJourneyChecks = async (fields, candidates) => {
+    const rows = [];
+    const buttons = qaFindJourneyButtons();
+
+    if (buttons.protectedFinal.length) {
+      rows.push({
+        status: 'review',
+        name: 'Final submission protection',
+        actual: `${buttons.protectedFinal.length} final/transaction action(s) were detected and intentionally not clicked automatically. Confirm final-submit validation manually.`
+      });
+    }
+
+    const button = buttons.safe[0];
+    if (!button) {
+      rows.push({
+        status: 'review',
+        name: 'Next / Continue validation',
+        actual: 'No safe Next, Continue or Save & Next action was available on this step.'
+      });
+      return rows;
+    }
+
+    const required = fields.filter(el => {
+      if (!el?.isConnected || normalize(el.type) === 'file' || el.readOnly) return false;
+      const signals = qaRequiredSignals(el);
+      return signals.visible || signals.configured || isRequired(el);
+    }).slice(0, 8);
+
+    if (required.length) {
+      const snapshots = required.map(el => [el, qaSnapshotFieldValue(el)]);
+
+      for (const el of required) {
+        if (el.tagName === 'SELECT') {
+          const placeholder = [...el.options].find(option =>
+            !option.disabled &&
+            (!String(option.value || '').trim() || /^(?:select|choose|please select|--)/i.test(String(option.textContent || '').trim()))
+          );
+          if (placeholder) el.value = placeholder.value;
+          else el.selectedIndex = -1;
+        } else if (normalize(el.type) === 'checkbox') {
+          el.checked = false;
+        } else if (normalize(el.type) === 'radio') {
+          radioGroupMembers(el).forEach(item => { item.checked = false; });
+        } else {
+          qaSetNativeLikeValue(el, '');
+        }
+        qaDispatchInteraction(el);
+      }
+
+      const click = await qaClickJourneyButton(button);
+      const messages = required
+        .map(el => [el, qaVisibleFeedback(el)])
+        .filter(([, feedback]) => feedback.invalid);
+
+      if (messages.length) {
+        rows.push({
+          status: 'passed',
+          name: 'Required fields on Next / Continue',
+          actual: `Progression was blocked and validation appeared for ${messages.length} required field(s).`
+        });
+      } else if (click.progressed || click.submitAttempted) {
+        rows.push({
+          status: 'failed',
+          name: 'Required fields on Next / Continue',
+          actual: 'The form attempted to progress while required test fields were blank and no clear validation message was captured.'
+        });
+      } else {
+        rows.push({
+          status: 'review',
+          name: 'Required fields on Next / Continue',
+          actual: 'Progression did not occur, but Smart FormSense could not confirm clear field-level validation messages.'
+        });
+      }
+
+      for (const [el, feedback] of messages) {
+        if (qaFeedbackQuality(feedback.text) !== 'clear') {
+          rows.push({
+            el,
+            status: 'review',
+            name: 'Validation message could be clearer',
+            actual: feedback.text || 'Validation was triggered, but the message was missing or too generic.'
+          });
+        }
+      }
+
+      for (const [el, snapshot] of snapshots) {
+        if (el?.isConnected) await qaRestoreFieldValue(el, snapshot);
+      }
+
+      if (click.progressed) return rows;
+    }
+
+    for (const candidate of candidates.slice(0, 3)) {
+      const el = candidate.el;
+      if (!el?.isConnected || !button?.isConnected) continue;
+
+      const snapshot = qaSnapshotFieldValue(el);
+      const entry = await qaAttemptUserEntry(el, candidate.testCase.value);
+      const click = await qaClickJourneyButton(button);
+      const feedback = qaVisibleFeedback(el);
+
+      if (feedback.invalid) {
+        rows.push({
+          el,
+          status: 'passed',
+          name: candidate.testCase.label,
+          actual: `Next/Continue triggered validation: ${feedback.text}`,
+          evidence: {
+            method: 'journey-probe',
+            attemptedValue: entry.attemptedValue,
+            acceptedValue: entry.acceptedValue,
+            feedback: feedback.text || '',
+            progressed: click.progressed,
+            submitAttempted: click.submitAttempted
+          }
+        });
+      } else if (click.progressed || click.submitAttempted) {
+        rows.push({
+          el,
+          status: 'failed',
+          name: candidate.testCase.label,
+          actual: `The invalid value ${JSON.stringify(entry.acceptedValue)} was allowed through the Next/Continue action without clear validation.`,
+          evidence: {
+            method: 'journey-probe',
+            attemptedValue: entry.attemptedValue,
+            acceptedValue: entry.acceptedValue,
+            feedback: '',
+            progressed: click.progressed,
+            submitAttempted: click.submitAttempted
+          }
+        });
+      } else {
+        rows.push({
+          el,
+          status: 'review',
+          name: candidate.testCase.label,
+          actual: 'Next/Continue did not progress, but no clear validation message was captured.',
+          evidence: {
+            method: 'journey-probe',
+            attemptedValue: entry.attemptedValue,
+            acceptedValue: entry.acceptedValue,
+            feedback: '',
+            progressed: click.progressed,
+            submitAttempted: click.submitAttempted
+          }
+        });
+      }
+
+      if (el?.isConnected) await qaRestoreFieldValue(el, snapshot);
+      if (click.progressed) break;
+    }
+
+    return rows;
   };
 
   const qaFunctionalCasesFor = el => {
@@ -15313,43 +15497,33 @@
   const qaRunOneFieldCase = async (el, testCase) => {
     const before = qaVisibleFeedback(el);
     const snapshot = qaSnapshotFieldValue(el);
-
-    qaSetNativeLikeValue(el, testCase.value);
-    await sleep(110);
-
+    const entry = await qaAttemptUserEntry(el, testCase.value);
     const after = qaVisibleFeedback(el);
-    const retained = qaValueLooksRetained(el, testCase.value);
-    const newFeedback =
-      after.invalid &&
-      (
-        !before.invalid ||
-        after.signature !== before.signature
-      );
+    const exact = entry.acceptedValue === entry.attemptedValue;
+    const newFeedback = after.invalid && (!before.invalid || after.signature !== before.signature);
 
     let status = 'passed';
     let actual = '';
 
     if (testCase.expectation === 'reject') {
-      if (!retained) {
+      if (!exact) {
         status = 'passed';
-        actual = 'Invalid test value was rejected or normalized by the field.';
+        actual = `The control prevented or normalized the invalid entry. Accepted value: ${JSON.stringify(entry.acceptedValue)}.`;
       } else if (newFeedback || after.invalid) {
         status = 'passed';
-        actual = `Invalid value produced validation feedback${after.text ? `: ${after.text}` : '.'}`;
+        actual = `The invalid value produced validation feedback${after.text ? `: ${after.text}` : '.'}`;
       } else {
-        status = 'failed';
-        actual = 'Invalid test value remained accepted with no immediate user-facing validation feedback.';
+        status = 'review';
+        actual = 'The invalid value could be entered without immediate feedback. Smart FormSense will confirm it against Next/Continue before calling it a defect.';
       }
+    } else if (exact && !after.invalid) {
+      status = 'passed';
+      actual = 'The valid value was accepted without a validation error.';
     } else {
-      if (retained && !after.invalid) {
-        status = 'passed';
-        actual = 'Valid test value was accepted and no validation error remained.';
-      } else {
-        status = 'failed';
-        actual = retained
-          ? `Valid value remained in the field but validation feedback was still present${after.text ? `: ${after.text}` : '.'}`
-          : 'Valid test value was not retained by the field.';
-      }
+      status = 'failed';
+      actual = exact
+        ? `The valid value remained but validation feedback was still present${after.text ? `: ${after.text}` : '.'}`
+        : `The valid value could not be entered as expected. Accepted value: ${JSON.stringify(entry.acceptedValue)}.`;
     }
 
     await qaRestoreFieldValue(el, snapshot);
@@ -15357,8 +15531,14 @@
     return {
       status,
       actual,
-      feedback: after.text || '',
-      attemptedValue: String(testCase.value)
+      attemptedValue: entry.attemptedValue,
+      evidence: {
+        method: entry.method,
+        attemptedValue: entry.attemptedValue,
+        acceptedValue: entry.acceptedValue,
+        feedback: after.text || '',
+        restored: true
+      }
     };
   };
 
@@ -15422,8 +15602,8 @@
     const options = validOptions(el);
     if (!options.length) {
       return {
-        status: 'failed',
-        actual: 'No selectable option was available.'
+        status: 'review',
+        actual: 'No option is currently available. A parent selection may need to load this dropdown.'
       };
     }
 
@@ -15567,6 +15747,7 @@
     const generatedAt = new Date().toISOString();
     const findings = [];
     const testCases = [];
+    const journeyCandidates = [];
     const seenRadioGroups = new Set();
     let fields = [];
 
@@ -15586,9 +15767,10 @@
       expected = '',
       actual = '',
       attemptedValue = '',
+      evidence = null,
       guidance = ''
     }) => {
-      const field = el ? qaHumanLabel(el) : '';
+      const field = el ? qaCleanLabel(qaHumanLabel(el), el) : '';
       const fieldKeyValue = el ? fieldKey(el) : null;
       const row = {
         id: `tc_${testCases.length + 1}`,
@@ -15599,17 +15781,17 @@
         fieldKey: fieldKeyValue,
         expected,
         actual,
-        attemptedValue
+        attemptedValue,
+        evidence
       };
 
       testCases.push(row);
-
       if (status === 'passed') return;
 
       const severity =
-        status === 'failed'
+        status === 'blocker'
           ? 'critical'
-          : status === 'warning'
+          : status === 'failed'
             ? 'warning'
             : 'observation';
 
@@ -15625,11 +15807,12 @@
         actual,
         guidance: guidance || (
           status === 'failed'
-            ? 'Review the user-facing validation or control behaviour and rerun this test.'
-            : 'Confirm this behaviour manually during the end-to-end form journey.'
+            ? 'Review this user-facing field or validation setting in the form builder and rerun QA.'
+            : 'Confirm this behaviour manually during the form journey.'
         ),
         testCaseId: row.id,
-        attemptedValue
+        attemptedValue,
+        evidence
       });
     };
 
@@ -15637,7 +15820,7 @@
       addCase({
         category: 'Form Detection',
         name: 'Detect active form',
-        status: 'failed',
+        status: 'review',
         expected: 'At least one active user-facing form field',
         actual: 'No active user-facing form fields were detected.',
         guidance: 'Confirm the form is fully loaded and the correct page/frame is active.'
@@ -15651,7 +15834,7 @@
 
       const el = fields[index];
       const type = normalize(el.type);
-      const label = qaHumanLabel(el);
+      const label = qaCleanLabel(qaHumanLabel(el), el);
 
       if (type === 'radio') {
         const key = `${el.ownerDocument?.URL || ''}|${el.name || fieldKey(el)}`;
@@ -15661,9 +15844,10 @@
 
       state.panel?.setStatus?.(`Functional QA • ${index + 1}/${fields.length} • ${label}`);
 
+      const requiredSignals = qaRequiredSignals(el);
       const required = !!(
-        qaRequiredSignals(el).visible ||
-        qaRequiredSignals(el).configured ||
+        requiredSignals.visible ||
+        requiredSignals.configured ||
         isRequired(el)
       );
 
@@ -15671,14 +15855,51 @@
         addCase({
           el,
           category: 'File Upload',
-          name: `${label} — manual upload test`,
+          name: 'File upload behaviour',
           status: 'review',
           expected: required
-            ? 'Valid file uploads successfully; invalid type/size is rejected; required upload blocks progression when missing'
-            : 'Valid file uploads successfully; invalid type/size is rejected',
+            ? 'Valid file uploads; invalid type/size is rejected; missing required file blocks progression.'
+            : 'Valid file uploads; invalid type/size is rejected.',
           actual: 'Browser security requires a real file selection for this test.',
-          guidance: 'Test one valid file, wrong file type, oversized file, removal/re-upload, and required behaviour manually.'
+          guidance: 'Check one valid file, wrong type, oversized file, remove/re-upload, and required behaviour.'
         });
+        continue;
+      }
+
+      const adapter = debugFieldSnapshot(el)?.adapter || '';
+      const isDateWidget = /datepicker/i.test(String(adapter)) || /datepicker/i.test(String(el.className || ''));
+
+      if (el.readOnly) {
+        if (isDateWidget) {
+          addCase({
+            el,
+            category: 'Date Picker',
+            name: 'Date-picker interaction',
+            status: 'review',
+            expected: 'The user can open the date picker, choose an allowed date, and keep the selected value.',
+            actual: 'This field is controlled by a date-picker widget.',
+            guidance: 'Verify calendar opening, allowed/disabled dates, selection, close behaviour and persistence.'
+          });
+        } else if (fieldHasValue(el)) {
+          addCase({
+            el,
+            category: 'Prefilled Fields',
+            name: 'Prefilled locked field',
+            status: 'passed',
+            expected: 'The prefilled value remains present and cannot be accidentally edited.',
+            actual: 'The field is prefilled, read-only, and retained its value.'
+          });
+        } else if (required) {
+          addCase({
+            el,
+            category: 'Prefilled Fields',
+            name: 'Required locked field is empty',
+            status: 'review',
+            expected: 'A required read-only field should be populated before it can block the applicant.',
+            actual: 'The field is required, read-only and currently empty.',
+            guidance: 'Confirm whether an earlier selection or step is expected to populate this field.'
+          });
+        }
         continue;
       }
 
@@ -15687,30 +15908,18 @@
         addCase({
           el,
           category: 'Mandatory Validation',
-          name: `${label} — required-field behaviour`,
+          name: 'Required-field behaviour',
           status: result.status,
-          expected: 'Leaving a mandatory field empty should create clear user-facing validation before the user can complete the journey.',
+          expected: 'A mandatory field should block progression when empty and show useful validation at the appropriate time.',
           actual: result.actual,
+          evidence: {
+            method: 'field-blank-probe',
+            feedback: result.feedback || ''
+          },
           guidance: result.status === 'review'
-            ? 'Confirm this field blocks progression at the appropriate journey step; absence of blur validation alone is not treated as a defect.'
+            ? 'Smart FormSense will also check this through Next/Continue.'
             : ''
         });
-      }
-
-      if (el.readOnly) {
-        const adapter = debugFieldSnapshot(el)?.adapter || '';
-        if (/datepicker/i.test(String(adapter)) || /datepicker/i.test(String(el.className || ''))) {
-          addCase({
-            el,
-            category: 'Date Picker',
-            name: `${label} — date-picker interaction`,
-            status: 'review',
-            expected: 'The user can open the date picker, select an allowed date, and see the selected value populated correctly.',
-            actual: 'The textbox is intentionally read-only and appears to be controlled by a date-picker widget.',
-            guidance: 'Manually verify calendar opening, date selection, disabled dates, keyboard/close behaviour, and value persistence.'
-          });
-        }
-        continue;
       }
 
       if (el.tagName === 'SELECT') {
@@ -15718,9 +15927,9 @@
         addCase({
           el,
           category: 'Dropdown Behaviour',
-          name: `${label} — option selection`,
+          name: 'Option selection',
           status: result.status,
-          expected: 'A real selectable option can be chosen, retained, and does not leave a validation error.',
+          expected: 'A selectable option can be chosen and retained without an error.',
           actual: result.actual
         });
       } else if (['checkbox', 'radio'].includes(type)) {
@@ -15728,99 +15937,137 @@
         addCase({
           el,
           category: 'Choice Controls',
-          name: `${label} — selection behaviour`,
+          name: 'Selection behaviour',
           status: result.status,
           expected: 'The user can change the selection and the control responds correctly.',
           actual: result.actual
         });
       }
 
-      const functionalCases = qaFunctionalCasesFor(el);
+      const semantic = qaSemanticFor(el);
+      if (semantic === 'marks_metric') {
+        addCase({
+          el,
+          category: 'Input Validation',
+          name: 'Marks range follows marking scheme',
+          status: 'review',
+          expected: 'Percentage/CGPA range should match the selected marking scheme.',
+          actual: 'This field supports both Percentage and CGPA, so a single fixed range cannot be safely inferred.',
+          guidance: 'Switch the Marking Scheme and confirm the accepted range/message changes appropriately.'
+        });
+      }
 
+      const functionalCases = qaFunctionalCasesFor(el);
       for (const testCase of functionalCases) {
         if (state.stopRequested) break;
+
         const result = await qaRunOneFieldCase(el, testCase);
         addCase({
           el,
           category: 'Input Validation',
-          name: `${label} — ${testCase.label}`,
+          name: testCase.label,
           status: result.status,
           expected: testCase.expectation === 'reject'
-            ? 'Invalid value should be rejected, normalized, or produce clear validation feedback.'
+            ? 'Invalid value should be blocked, normalized, or clearly rejected during the applicant journey.'
             : 'Valid value should be accepted without a validation error.',
           actual: result.actual,
           attemptedValue: result.attemptedValue,
+          evidence: result.evidence,
           guidance: result.status === 'failed'
-            ? `Reproduce with the tested value ${JSON.stringify(result.attemptedValue)} and correct the user-facing validation behaviour.`
+            ? `Review this validation in the form builder. Tested value: ${JSON.stringify(result.attemptedValue)}.`
             : ''
         });
+
+        if (result.status === 'review' && testCase.expectation === 'reject') {
+          journeyCandidates.push({ el, testCase });
+        }
       }
 
       await yieldToUI();
     }
 
-    for (const pair of qaDependencyCandidates(fields)) {
-      if (state.stopRequested) break;
-      state.panel?.setStatus?.(`Functional QA • testing ${pair.parentSemantic} → ${pair.childSemantic} dependency...`);
-      const result = await qaRunDependencyCase(pair);
+    for (const row of await qaRunDependencyChain(fields)) {
       addCase({
-        el: pair.child,
+        el: row.el || null,
         category: 'Dependencies',
-        name: `${qaHumanLabel(pair.parent)} → ${qaHumanLabel(pair.child)} dependency`,
-        status: result.status,
-        expected: `${qaHumanLabel(pair.child)} should react appropriately when ${qaHumanLabel(pair.parent)} changes.`,
-        actual: result.actual,
-        guidance: result.status === 'review'
-          ? 'Change the parent selection manually and verify child options/value reset or reload as expected.'
+        name: row.name,
+        status: row.status,
+        expected: 'Dependent dropdowns should load/reset in parent-to-child order.',
+        actual: row.actual,
+        guidance: row.status === 'review'
+          ? 'Verify the parent-to-child dependency once manually if this chain is expected.'
           : ''
       });
     }
 
+    for (const row of await qaRunJourneyChecks(fields, journeyCandidates)) {
+      addCase({
+        el: row.el || null,
+        category: 'Journey Validation',
+        name: row.name,
+        status: row.status,
+        expected: 'Next/Continue should enforce validation without executing protected final actions.',
+        actual: row.actual,
+        evidence: row.evidence || null,
+        guidance: row.status === 'failed'
+          ? 'Review the affected validation in the form builder and rerun this journey check.'
+          : row.status === 'review'
+            ? 'Complete this remaining journey check manually.'
+            : ''
+      });
+    }
+
+    const blockers = testCases.filter(item => item.status === 'blocker').length;
+    const failed = testCases.filter(item => item.status === 'failed').length;
+    const review = testCases.filter(item => ['review', 'manual', 'warning'].includes(item.status)).length;
+    const passed = testCases.filter(item => item.status === 'passed').length;
     const counts = {
-      critical: testCases.filter(item => item.status === 'failed').length,
-      warning: testCases.filter(item => item.status === 'warning').length,
-      observation: testCases.filter(item => ['review', 'manual'].includes(item.status)).length,
-      passed: testCases.filter(item => item.status === 'passed').length
+      critical: blockers,
+      warning: failed,
+      observation: review,
+      passed
     };
 
     const checksRun = testCases.length;
-    const weightedTotal =
-      counts.passed +
-      counts.critical +
-      counts.warning * 0.65 +
-      counts.observation * 0.18;
-
-    let score = checksRun
-      ? Math.round(clamp((counts.passed / Math.max(1, weightedTotal)) * 100, 0, 100))
+    const completed = blockers + failed + passed;
+    const score = completed
+      ? Math.round(clamp((passed / completed) * 100, 0, 100))
       : 0;
-
-    if (counts.critical > 0) {
-      score = Math.min(score, counts.critical >= 3 ? 59 : 79);
-    }
-
-    const rating =
-      score >= 92
-        ? 'Strong'
-        : score >= 82
-          ? 'Good'
-          : score >= 70
-            ? 'Needs Review'
-            : 'Needs Attention';
+    const coverage = checksRun
+      ? Math.round(clamp((completed / checksRun) * 100, 0, 100))
+      : 0;
+    const rating = blockers > 0
+      ? 'Blocked'
+      : failed > 0
+        ? 'Needs Attention'
+        : review > 0
+          ? 'Needs Review'
+          : 'Strong';
 
     const summary = {
-      riskLevel: counts.critical > 0 ? 'High' : counts.warning > 0 ? 'Moderate' : counts.observation > 0 ? 'Low' : 'Low',
-      headline: counts.critical > 0
-        ? `${counts.critical} functional failure${counts.critical === 1 ? '' : 's'} were reproduced and should be reviewed before go-live.`
-        : counts.warning > 0
-          ? `${counts.warning} warning${counts.warning === 1 ? '' : 's'} need review; no functional blocker was reproduced.`
-          : `No functional blocker was reproduced in ${checksRun} safe test case${checksRun === 1 ? '' : 's'}.`,
-      recommendation: counts.critical > 0
-        ? 'Fix the reproduced user-facing failures first, rerun Functional QA, then complete the remaining manual journey checks.'
-        : counts.observation > 0
-          ? 'Complete the review/manual test cases, especially date pickers, file uploads, and journey-only validation.'
-          : 'Complete a final human journey check before go-live.',
+      riskLevel: blockers > 0
+        ? 'High'
+        : failed > 0
+          ? 'Moderate'
+          : review > 0
+            ? 'Review'
+            : 'Low',
+      headline: blockers > 0
+        ? `${blockers} blocker${blockers === 1 ? '' : 's'} need attention before go-live.`
+        : failed > 0
+          ? `${failed} confirmed issue${failed === 1 ? '' : 's'} should be fixed before go-live.`
+          : review > 0
+            ? `No confirmed failure was reproduced. ${review} check${review === 1 ? '' : 's'} still need review.`
+            : 'No applicant-facing issue was reproduced in the completed automated checks.',
+      recommendation: blockers > 0 || failed > 0
+        ? 'Fix the confirmed applicant-facing issues, rerun QA, then complete the remaining manual checks.'
+        : review > 0
+          ? 'Complete only the listed manual/review checks before final sign-off.'
+          : 'Complete a brief final human journey check before sign-off.',
       fieldsAudited: fields.length,
       checksRun,
+      completed,
+      coverage,
       score
     };
 
@@ -15830,9 +16077,9 @@
     }
 
     return {
-      reportVersion: 3,
+      reportVersion: 4,
       product: 'Smart FormSense',
-      productVersion: '17.10.0',
+      productVersion: '17.11.0',
       generatedAt,
       auditType: 'Black-box Functional Form QA',
       page: {
@@ -15846,6 +16093,7 @@
       checksRun,
       score,
       rating,
+      coverage,
       summary,
       counts,
       categoryCounts,
@@ -15854,9 +16102,9 @@
       notes: [
         'Smart FormSense tests the finished form from the applicant/user point of view; it does not audit backend implementation choices.',
         'Field values are temporarily changed for safe black-box tests and restored after each test case.',
-        'The final form is never submitted automatically.',
-        'Journey-only behaviours that cannot be proven safely without progression/submission are marked for review instead of being guessed as failures.',
-        'File uploads and some widget-specific behaviours remain manual QA steps because browsers restrict synthetic user actions.'
+        'Safe Next/Continue/Save & Next actions may be tested after field checks; final submit/payment/generate-application actions are always protected.',
+        'A field-level negative test is not called a defect unless stronger applicant-journey evidence confirms it.',
+        'File uploads, final submission, and some widget-specific behaviours remain manual QA steps.'
       ]
     };
   };
@@ -17297,8 +17545,8 @@
             <button class="primary" id="qaRunBtn">Run Functional QA</button>
 
             <div class="qaStats">
-              <div class="qaStat qaCritical"><b id="qaCritical">0</b><span>Failed</span></div>
-              <div class="qaStat qaWarning"><b id="qaWarning">0</b><span>Warnings</span></div>
+              <div class="qaStat qaCritical"><b id="qaCritical">0</b><span>Blockers</span></div>
+              <div class="qaStat qaWarning"><b id="qaWarning">0</b><span>Failed</span></div>
               <div class="qaStat qaObservation"><b id="qaObservation">0</b><span>Review</span></div>
               <div class="qaStat qaPassed"><b id="qaPassed">0</b><span>Checks Passed</span></div>
             </div>
@@ -17313,7 +17561,7 @@
               <button class="secondary" id="qaRefreshBtn">Run Again</button>
             </div>
 
-            <div class="qaHint">Safe audit mode: no final submission and no deliberate invalid-value injection.</div>
+            <div class="qaHint">Applicant-side QA: safe field + Next/Continue tests; final submit/payment stays protected.</div>
           </div>
 
           <div class="status" id="status">
@@ -17559,7 +17807,7 @@
         }
 
         if (refs.qaRating) {
-          refs.qaRating.textContent = `${report.rating || 'Review'} • ${Number(report.fieldsAudited || 0)} field(s) • ${Number(report.checksRun || 0)} check(s)`;
+          refs.qaRating.textContent = `${report.rating || 'Review'} • ${Number(report.fieldsAudited || 0)} fields • ${Number(report.coverage ?? report.summary?.coverage ?? 0)}% auto coverage`;
         }
 
         const counts = report.counts || {};
@@ -17596,15 +17844,15 @@
             ? item.severity
             : 'observation';
 
-          const key = [
-            severity,
-            item.category || 'General',
-            item.title || 'QA finding'
-          ].join('|');
+          const rawTitle = String(item.title || 'QA finding');
+          const cleanTitle = rawTitle.includes(' — ')
+            ? rawTitle.split(' — ').slice(-1)[0].trim()
+            : rawTitle;
+          const key = [severity, item.category || 'General', cleanTitle].join('|');
 
           const group = displayGroups.get(key) || {
             severity,
-            title: item.title || 'QA finding',
+            title: cleanTitle,
             message: item.message || '',
             guidance: item.guidance || '',
             firstFieldKey: item.fieldKey || '',
@@ -17628,7 +17876,7 @@
             return `
               <button class="qaIssue" ${clickable ? `data-qa-field="${escape(group.firstFieldKey)}"` : 'disabled'}>
                 <div class="qaIssueTop">
-                  <span class="qaPill ${group.severity}">${escape(group.severity)}</span>
+                  <span class="qaPill ${group.severity}">${escape(group.severity === 'critical' ? 'blocker' : group.severity === 'warning' ? 'failed' : 'review')}</span>
                   <span class="qaIssueTitle">${escape(group.title)}</span>
                   ${fields.length > 1 ? `<span class="qaIssueCount">×${fields.length}</span>` : ''}
                 </div>
