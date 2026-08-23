@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Smart FormSense
 // @namespace    smart-form-filler
-// @version      17.13.1
+// @version      17.13.2
 // @description  Intelligent form filling and QA testing for authorized web-form validation, readiness checks, embedded forms, safe repair, and synthetic test data.
 // @author       Akash Singh
 // @match        *://*/*
@@ -10,6 +10,7 @@
 // @grant        GM_setValue
 // @grant        GM_registerMenuCommand
 // @grant        GM_openInTab
+// @grant        GM_download
 // ==/UserScript==
 
 (() => {
@@ -102,6 +103,8 @@
     activeRemoteAction: null,
     workspace: 'fill',
     qaReport: null,
+    qaReportAgentId: null,
+    qaDebugAwaiting: false,
     qaNavIndex: 0,
     qaProgressPercent: 0
   };
@@ -188,7 +191,7 @@
     );
 
     console.error(
-      `Smart FormSense V17.13.1 [${stage}]`,
+      `Smart FormSense V17.13.2 [${stage}]`,
       error
     );
 
@@ -12323,7 +12326,7 @@
     const report = {
       reportVersion: 1,
       generatedBy:
-        'Smart FormSense V17.13.0',
+        'Smart FormSense V17.13.2',
       generatedAt:
         new Date().toISOString(),
       mode:
@@ -12385,36 +12388,63 @@
   const downloadTextFile = (
     filename,
     text,
-    mime =
-      'application/json;charset=utf-8'
+    mime = 'application/json;charset=utf-8'
   ) => {
-    const blob =
-      new Blob(
-        [text],
-        {
-          type: mime
-        }
-      );
+    const content = String(text ?? '');
+    const blob = new Blob([content], { type: mime });
+    const blobUrl = URL.createObjectURL(blob);
+    let settled = false;
 
-    const url =
-      URL.createObjectURL(blob);
+    const cleanup = () => {
+      setTimeout(() => {
+        try { URL.revokeObjectURL(blobUrl); } catch {}
+      }, 1800);
+    };
 
-    const link =
-      document.createElement('a');
+    const anchorFallback = () => {
+      try {
+        const link = document.createElement('a');
+        link.href = blobUrl;
+        link.download = filename;
+        link.style.display = 'none';
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        cleanup();
+        return true;
+      } catch {
+        cleanup();
+        return false;
+      }
+    };
 
-    link.href = url;
-    link.download = filename;
-    link.style.display = 'none';
+    try {
+      if (typeof GM_download === 'function') {
+        GM_download({
+          url: blobUrl,
+          name: filename,
+          saveAs: false,
+          onload: () => {
+            settled = true;
+            cleanup();
+          },
+          onerror: () => {
+            if (settled) return;
+            settled = true;
+            anchorFallback();
+          },
+          ontimeout: () => {
+            if (settled) return;
+            settled = true;
+            anchorFallback();
+          }
+        });
+        return true;
+      }
+    } catch {}
 
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-
-    setTimeout(
-      () =>
-        URL.revokeObjectURL(url),
-      1500
-    );
+    settled = true;
+    return anchorFallback();
   };
 
   const exportDebugReport = () => {
@@ -12461,7 +12491,7 @@
       return report;
     } catch (error) {
       console.error(
-        'Smart FormSense V17.13.1 debug export:',
+        'Smart FormSense V17.13.2 debug export:',
         error
       );
 
@@ -13548,7 +13578,7 @@
       product:
         'Smart FormSense',
       productVersion:
-        '17.13.0',
+        '17.13.2',
       generatedAt,
       auditType:
         'Non-destructive Form Readiness Audit',
@@ -13842,11 +13872,11 @@
 </head>
 <body>
 <div class="wrap">
-  <div class="reportActions"><button class="pdfBtn" onclick="window.print()">Download PDF</button></div>
+  <div class="reportActions"><button class="pdfBtn" id="qaDownloadPdf" type="button">Download PDF</button></div>
   <div class="hero">
     <div class="brand">✦ SMART FORMSENSE QA</div>
     <h1>${esc(qa.page?.title || 'Form')}</h1>
-    <div class="meta">${esc(qa.page?.hostname || location.hostname || '')}<br>${esc(generated)} • v${esc(qa.productVersion || '17.13.1')}</div>
+    <div class="meta">${esc(qa.page?.hostname || location.hostname || '')}<br>${esc(generated)} • v${esc(qa.productVersion || '17.13.2')}</div>
     <div class="status ${statusClass}">${esc(status)}</div>
     <div class="overview">${esc(overview)}</div>
 
@@ -13874,6 +13904,7 @@
   <div class="note">Only confirmed issues are explained in detail. Fields that were not fully confirmed or missed are listed by name only. Exact test values and technical evidence remain in <b>Export Debug</b>.</div>
   <div class="footer">Created with love ❤️ Akash Singh • Smart FormSense</div>
 </div>
+<script>try{document.getElementById("qaDownloadPdf")?.addEventListener("click",function(e){e.preventDefault();window.print();});}catch(e){}</script>
 </body>
 </html>`;
   };
@@ -13886,57 +13917,60 @@
       return null;
     }
 
+    state.panel?.setStatus('Opening QA report...');
     const html = buildQaFriendlyHtml(qa);
-    const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    let opened = false;
 
     try {
-      if (typeof GM_openInTab === 'function') {
-        GM_openInTab(url, {
+      const tab = window.open('about:blank', '_blank');
+      if (tab && !tab.closed && tab.document) {
+        tab.document.open();
+        tab.document.write(html);
+        tab.document.close();
+
+        try {
+          const pdfButton = tab.document.getElementById('qaDownloadPdf');
+          if (pdfButton) {
+            pdfButton.addEventListener('click', event => {
+              event.preventDefault();
+              tab.print();
+            });
+          }
+        } catch {}
+
+        try { tab.focus(); } catch {}
+        state.panel?.setStatus('QA report opened in a new tab. Use Download PDF at the top.');
+        return qa;
+      }
+    } catch {}
+
+    // Popup fallback: use a data URL only when it is reasonably small. This is
+    // independent of page-created blob URL permissions.
+    try {
+      const dataUrl = `data:text/html;charset=utf-8,${encodeURIComponent(html)}`;
+      if (dataUrl.length < 1800000 && typeof GM_openInTab === 'function') {
+        const handle = GM_openInTab(dataUrl, {
           active: true,
           insert: true,
           setParent: true
         });
-        opened = true;
+        if (handle) {
+          state.panel?.setStatus('QA report opened in a new tab. Use Download PDF at the top.');
+          return qa;
+        }
       }
     } catch {}
 
-    if (!opened) {
-      try {
-        const link = document.createElement('a');
-        link.href = url;
-        link.target = '_blank';
-        link.rel = 'noopener noreferrer';
-        link.style.display = 'none';
-        document.body.appendChild(link);
-        link.click();
-        link.remove();
-        opened = true;
-      } catch {}
-    }
-
-    if (opened) {
-      setTimeout(() => {
-        try { URL.revokeObjectURL(url); } catch {}
-      }, 120000);
-      state.panel?.setStatus('QA report opened in a new tab. Use Download PDF at the top.');
-      return qa;
-    }
-
-    try { URL.revokeObjectURL(url); } catch {}
-
-    // Last-resort fallback: save the readable HTML locally rather than doing nothing.
     const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
     const host = String(qa.page?.hostname || location.hostname || 'form')
       .replace(/[^a-z0-9.-]+/gi, '_')
       .slice(0, 60);
+
     downloadTextFile(
       `Smart_FormSense_QA_Report_${host}_${stamp}.html`,
       html,
       'text/html;charset=utf-8'
     );
-    state.panel?.setStatus('Browser blocked the report tab, so the HTML report was downloaded instead.');
+    state.panel?.setStatus('The browser blocked a new tab, so the QA report was downloaded instead.');
     return qa;
   };
 
@@ -14069,7 +14103,7 @@
       product:
         'Smart FormSense',
       productVersion:
-        '17.13.0',
+        '17.13.2',
       generatedAt:
         new Date().toISOString(),
       purpose:
@@ -14159,7 +14193,7 @@
       return report;
     } catch (error) {
       console.error(
-        'Smart FormSense V17.13.1 QA debug export:',
+        'Smart FormSense V17.13.2 QA debug export:',
         error
       );
 
@@ -16235,7 +16269,7 @@
       : {
           reportVersion: 7,
           product: 'Smart FormSense',
-          productVersion: '17.13.1',
+          productVersion: '17.13.2',
           generatedAt: new Date().toISOString(),
           auditType: 'Black-box Functional Form QA',
           page: {
@@ -16272,7 +16306,7 @@
     const cleanReason = String(reason || '').slice(0, 500);
     return {
       ...base,
-      productVersion: '17.13.1',
+      productVersion: '17.13.2',
       reportVersion: Math.max(5, Number(base.reportVersion || 0)),
       runState,
       incomplete: runState !== 'completed',
@@ -16419,7 +16453,7 @@
       return {
         reportVersion: 7,
         product: 'Smart FormSense',
-        productVersion: '17.13.1',
+        productVersion: '17.13.2',
         generatedAt,
         completedAt: ['completed', 'stopped', 'failed'].includes(runState) ? new Date().toISOString() : null,
         auditType: 'Black-box Functional Form QA',
@@ -16895,6 +16929,7 @@
 
         if (result?.qaReport) {
           state.qaReport = result.qaReport;
+          state.qaReportAgentId = context.agent?.id || null;
           state.panel?.setQaReport?.(result.qaReport);
         }
 
@@ -16904,6 +16939,7 @@
       if (context.kind === 'none') {
         const report = await buildQaFunctionalReport();
         state.qaReport = report;
+        state.qaReportAgentId = null;
         state.panel?.setQaReport?.(report);
         state.panel?.setStatus(
           'QA Audit completed, but no meaningful active form was detected.'
@@ -16912,6 +16948,7 @@
       }
 
       state.lastRemoteAgentId = null;
+      state.qaReportAgentId = null;
 
       const report = await buildQaFunctionalReport();
       state.qaReport = report;
@@ -17113,10 +17150,13 @@
   };
 
   const smartQaDebugExport = () => {
-    const agent = remoteAgentById(state.lastRemoteAgentId);
+    state.panel?.setStatus('Preparing QA debug download...');
+
+    const agent = remoteAgentById(state.qaReportAgentId);
 
     if (agent?.source) {
       try {
+        state.qaDebugAwaiting = true;
         agent.source.postMessage(
           bridgePayload(
             'QA_DEBUG_DATA',
@@ -17127,11 +17167,18 @@
           ),
           '*'
         );
-        state.panel?.setStatus('Preparing QA debug export from the active form...');
+
+        setTimeout(() => {
+          if (!state.qaDebugAwaiting) return;
+          state.qaDebugAwaiting = false;
+          state.panel?.setStatus('Embedded debug response was unavailable. Downloading the saved QA data instead...');
+          exportQaDebugReport();
+        }, 1800);
         return;
       } catch {}
     }
 
+    state.qaDebugAwaiting = false;
     exportQaDebugReport();
   };
 
@@ -17210,6 +17257,7 @@
         }
 
         if (data.type === 'REMOTE_QA_DEBUG_DATA') {
+          state.qaDebugAwaiting = false;
           const report = data.debugReport;
           if (!report || typeof report !== 'object') {
             state.panel?.setStatus('QA debug export could not be prepared.');
@@ -17375,6 +17423,7 @@
 
             if (data.qaReport) {
               state.qaReport = data.qaReport;
+              state.qaReportAgentId = data.agentId || null;
               state.panel?.setQaReport?.(
                 data.qaReport
               );
@@ -18425,7 +18474,7 @@
               <div class="qaRating" id="qaRating">Run QA to inspect this form</div>
             </div>
 
-            <button class="primary" id="qaRunBtn">Run Functional QA</button>
+            <button type="button" class="primary" id="qaRunBtn">Run Functional QA</button>
 
             <div class="qaProgressBox">
               <div class="qaProgressMeta">
@@ -18449,8 +18498,8 @@
             </div>
 
             <div class="qaActions">
-              <button class="secondary qaOpenReport" id="qaExportBtn" disabled title="Open the readable QA report in a new tab">Open Report</button>
-              <button class="secondary" id="qaDebugBtn" title="Download technical QA diagnostics">Export Debug</button>
+              <button type="button" class="secondary qaOpenReport" id="qaExportBtn" disabled title="Open the readable QA report in a new tab">Open Report</button>
+              <button type="button" class="secondary" id="qaDebugBtn" title="Download technical QA diagnostics">Export Debug</button>
             </div>
           </div>
 
@@ -18923,11 +18972,31 @@
     refs.qaRefreshBtn.onclick =
       runSmartQaAudit;
 
-    refs.qaExportBtn.onclick = () =>
-      exportQaReport(state.qaReport);
+    const bindQaAction = (button, handler) => {
+      if (!button) return;
+      let lastRunAt = 0;
+      const invoke = event => {
+        try { event?.preventDefault?.(); } catch {}
+        try { event?.stopPropagation?.(); } catch {}
+        const now = Date.now();
+        if (now - lastRunAt < 450) return;
+        lastRunAt = now;
+        handler();
+      };
+      button.addEventListener('click', invoke, true);
+      button.addEventListener('pointerup', event => {
+        if (event?.button !== undefined && event.button !== 0) return;
+        invoke(event);
+      }, true);
+    };
 
-    refs.qaDebugBtn.onclick =
-      smartQaDebugExport;
+    bindQaAction(refs.qaExportBtn, () =>
+      exportQaReport(state.qaReport)
+    );
+
+    bindQaAction(refs.qaDebugBtn,
+      smartQaDebugExport
+    );
 
     refs.qaIssues.addEventListener('click', event => {
       const button = event.target?.closest?.('[data-qa-field]');
