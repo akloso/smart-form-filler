@@ -83,11 +83,12 @@ jobs:
           test "$(grep -o 'akash.singh@meritto.com' Smart_Form_Filler.user.js | wc -l)" -eq 1
           grep -q "SETTINGS_KEY = 'STFF_V17_14_SETTINGS'" Smart_Form_Filler.user.js
           grep -q 'activeAction:' Smart_Form_Filler.user.js
-          grep -q 'beginActionAuthorization' Smart_Form_Filler.user.js
-          grep -q 'assertMutationAuthorized' Smart_Form_Filler.user.js
-          grep -q 'showSettings' Smart_Form_Filler.user.js
-          grep -q 'installTopShortcutRuntime' Smart_Form_Filler.user.js
+          grep -q 'beginAuthorizedAction' Smart_Form_Filler.user.js
+          grep -q 'requireActionPermission' Smart_Form_Filler.user.js
+          grep -q 'openSettings' Smart_Form_Filler.user.js
+          grep -q 'installTopShortcutEngine' Smart_Form_Filler.user.js
           grep -q 'maybeResumeAfterReload' Smart_Form_Filler.user.js
+          grep -q 'Created with love ❤️' Smart_Form_Filler.user.js
 
       - name: Commit production userscript only
         shell: bash
