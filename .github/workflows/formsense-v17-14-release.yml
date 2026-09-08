@@ -1,0 +1,96 @@
+name: Smart FormSense v17.14.0 release
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/formsense-v17-14-release.yml'
+      - '.github/formsense-v17-14-final/**'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Verify current production source
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git hash-object Smart_Form_Filler.user.js)" = "427dce4f4991c91397044aabcb489347caa5e66c"
+          grep -q '^// @version      17.13.4$' Smart_Form_Filler.user.js
+
+      - name: Reconstruct validated patch bundle
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat .github/formsense-v17-14-final/bundle_part*.b64 > /tmp/formsense-patches.b64
+          echo '67cd03cca2ca04d66a82299e47d97a57aea75bf1944ba460845696977c4a0e3b  /tmp/formsense-patches.b64' | sha256sum -c -
+          base64 -d /tmp/formsense-patches.b64 > /tmp/formsense-patches.tar.gz
+          echo '2954c5b65e4dba73285828c555250df9bc750868bd2095104e470358831ae7f2  /tmp/formsense-patches.tar.gz' | sha256sum -c -
+          rm -rf /tmp/formsense-release
+          mkdir -p /tmp/formsense-release
+          tar -xzf /tmp/formsense-patches.tar.gz -C /tmp/formsense-release
+
+      - name: Build v17.14.0 from exact v17.13.4 source
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo mkdir -p /mnt/data
+          sudo chown "$(id -u):$(id -g)" /mnt/data
+          cp Smart_Form_Filler.user.js '/mnt/data/Smart_Form_Filler.user(1).js'
+          python3 /tmp/formsense-release/scripts/patch_formsense_v17_14.py
+          python3 /tmp/formsense-release/scripts/patch_stage2.py
+          python3 /tmp/formsense-release/scripts/patch_stage3.py
+          python3 /tmp/formsense-release/scripts/patch_stage4.py
+          python3 /tmp/formsense-release/scripts/patch_stage5.py
+          python3 /tmp/formsense-release/scripts/patch_stage6.py
+          python3 /tmp/formsense-release/scripts/patch_stage7_ui.py
+          python3 /tmp/formsense-release/scripts/patch_stage8_settings_logic.py
+          python3 /tmp/formsense-release/scripts/patch_stage9_shortcuts.py
+          python3 /tmp/formsense-release/scripts/patch_stage10_resume_init.py
+          python3 /tmp/formsense-release/scripts/patch_stage11_audit.py
+          python3 /tmp/formsense-release/scripts/patch_stage12_cleanup.py
+          python3 /tmp/formsense-release/scripts/patch_stage13_hardening.py
+          python3 /tmp/formsense-release/scripts/patch_stage14_cleanup_unused.py
+          echo '879f3fc9dc60092372cddd4ff0829ea9494df9462561c5f68810f1c9e3f93176  /mnt/data/Smart_Form_Filler_v17.14.0.user.js' | sha256sum -c -
+          cp /mnt/data/Smart_Form_Filler_v17.14.0.user.js Smart_Form_Filler.user.js
+
+      - name: Release safety checks
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --check Smart_Form_Filler.user.js
+          grep -q '^// @version      17.14.0$' Smart_Form_Filler.user.js
+          grep -q '^// @match        \*://\*/\*$' Smart_Form_Filler.user.js
+          ! grep -q '^// @noframes' Smart_Form_Filler.user.js
+          test "$(grep -o 'commitSelectedRadioGroups(' Smart_Form_Filler.user.js | wc -l)" -eq 0
+          test "$(grep -o 'meritto' Smart_Form_Filler.user.js | wc -l)" -eq 1
+          test "$(grep -o 'akash.singh@meritto.com' Smart_Form_Filler.user.js | wc -l)" -eq 1
+          grep -q "SETTINGS_KEY = 'STFF_V17_14_SETTINGS'" Smart_Form_Filler.user.js
+          grep -q 'activeAction:' Smart_Form_Filler.user.js
+          grep -q 'beginActionAuthorization' Smart_Form_Filler.user.js
+          grep -q 'assertMutationAuthorized' Smart_Form_Filler.user.js
+          grep -q 'showSettings' Smart_Form_Filler.user.js
+          grep -q 'installTopShortcutRuntime' Smart_Form_Filler.user.js
+          grep -q 'maybeResumeAfterReload' Smart_Form_Filler.user.js
+
+      - name: Commit production userscript only
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --exit-code -- .github || true
+          git config user.name 'Smart FormSense Release'
+          git config user.email 'actions@users.noreply.github.com'
+          git add Smart_Form_Filler.user.js
+          test "$(git diff --cached --name-only | wc -l)" -eq 1
+          test "$(git diff --cached --name-only)" = 'Smart_Form_Filler.user.js'
+          git commit -m 'Release Smart FormSense v17.14.0'
+          git push origin HEAD:main
