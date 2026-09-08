@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Smart FormSense
 // @namespace    smart-form-filler
-// @version      17.13.4
+// @version      17.14.0
 // @description  Intelligent form filling and QA testing for authorized web-form validation, readiness checks, embedded forms, safe repair, and synthetic test data.
 // @author       Akash Singh
 // @match        *://*/*
@@ -30,7 +30,6 @@
   const MANUAL_ATTR = 'data-stff-manual';
   const FILLED_ATTR = 'data-stff-filled';
   const PRESERVED_ATTR = 'data-stff-preserved';
-  const FIELD_KEY_ATTR = 'data-stff-field-key';
   const TECH_CACHE_KEY = 'STFF_V17_7_TECH_CACHE';
   const RUN_SESSION_KEY = 'STFF_V17_7_RUN_SESSION';
   const MAX_FILL_BUDGET_MS = 15000;
@@ -44,6 +43,11 @@
   const MAX_DYNAMIC_PASSES = 3;
   const DYNAMIC_TIMEOUT_MS = 2800;
   const STABLE_QUIET_MS = 280;
+
+  const SETTINGS_KEY = 'STFF_V17_14_SETTINGS';
+  const PANEL_POSITION_KEY_PREFIX = 'STFF_V17_14_PANEL_POSITION:';
+  const SETTINGS_VERSION = 1;
+  const ACTION_DEFAULT_TTL_MS = 5 * 60 * 1000;
 
   const BRIDGE_MARKER = '__STFF_V17_7_BRIDGE__';
   const FRAME_DISCOVERY_SOFT_MS = 500;
@@ -69,11 +73,13 @@
     },
     navIndex: { filled: 0, preserved: 0, review: 0, errors: 0, manual: 0 },
     formModel: new Map(),
+    fieldKeys: new WeakMap(),
     runtimeConstraints: new Map(),
     usedMobiles: new Set(),
     usedEmails: new Set(),
     repairAttempts: new Map(),
     generatedValues: new Map(),
+    sourceProfile: {},
     accepted: new Set(),
     rejected: new Set(),
     pending: new Set(),
@@ -94,13 +100,16 @@
     liveObserver: null,
     debugEvents: [],
     lastProgressText: '',
-    committedRadioGroups: new Set(),
     lastRuntimeError: null,
     panel: null,
     activeRemoteAgentId: null,
     lastRemoteAgentId: null,
     activeRemoteRequestId: null,
     activeRemoteAction: null,
+    activeAction: null,
+    settings: null,
+    shortcutCaptureAction: null,
+    pendingFillContext: null,
     workspace: 'fill',
     qaReport: null,
     qaReportAgentId: null,
@@ -191,7 +200,7 @@
     );
 
     console.error(
-      `Smart FormSense V17.13.4 [${stage}]`,
+      `Smart FormSense V17.14.0 [${stage}]`,
       error
     );
 
@@ -240,6 +249,310 @@
     return /^test\b/i.test(clean) ? clean : `Test ${clean}`;
   };
 
+  const DEFAULT_SHORTCUTS = Object.freeze({
+    toggle: 'PRIMARY+ALT+M',
+    settings: 'PRIMARY+ALT+S',
+    fill: 'PRIMARY+ALT+F',
+    validate: 'PRIMARY+ALT+V',
+    recheck: 'PRIMARY+ALT+C',
+    stop: 'PRIMARY+ALT+X',
+    undo: 'PRIMARY+ALT+Z',
+    newApplicant: 'PRIMARY+ALT+N',
+    qa: 'PRIMARY+ALT+Q',
+    report: 'PRIMARY+ALT+R',
+    debug: 'PRIMARY+ALT+D'
+  });
+
+  const DEFAULT_SETTINGS = Object.freeze({
+    version: SETTINGS_VERSION,
+    general: {
+      autoShow: false,
+      startMinimized: false,
+      rememberPosition: true,
+      rememberWorkspace: true,
+      showShortcutHints: true,
+      lastWorkspace: 'fill'
+    },
+    fill: {
+      behavior: 'ask',
+      autoDependencies: true
+    },
+    qa: {
+      progression: 'auto-safe',
+      autoOpenReport: true
+    },
+    reports: {
+      autoDebugExport: false
+    },
+    shortcuts: { ...DEFAULT_SHORTCUTS }
+  });
+
+  const cloneDefaultSettings = () => ({
+    version: SETTINGS_VERSION,
+    general: { ...DEFAULT_SETTINGS.general },
+    fill: { ...DEFAULT_SETTINGS.fill },
+    qa: { ...DEFAULT_SETTINGS.qa },
+    reports: { ...DEFAULT_SETTINGS.reports },
+    shortcuts: { ...DEFAULT_SHORTCUTS }
+  });
+
+  const mergeSettings = stored => {
+    const next = cloneDefaultSettings();
+    if (!stored || typeof stored !== 'object') return next;
+
+    for (const group of ['general', 'fill', 'qa', 'reports']) {
+      if (stored[group] && typeof stored[group] === 'object') {
+        Object.assign(next[group], stored[group]);
+      }
+    }
+
+    if (stored.shortcuts && typeof stored.shortcuts === 'object') {
+      for (const key of Object.keys(DEFAULT_SHORTCUTS)) {
+        const value = stored.shortcuts[key];
+        if (typeof value === 'string') next.shortcuts[key] = value;
+      }
+    }
+
+    next.version = SETTINGS_VERSION;
+    return next;
+  };
+
+  const loadSettings = () => {
+    try {
+      return mergeSettings(GM_getValue(SETTINGS_KEY, null));
+    } catch {
+      return cloneDefaultSettings();
+    }
+  };
+
+  const saveSettings = next => {
+    state.settings = mergeSettings(next || state.settings);
+    try { GM_setValue(SETTINGS_KEY, state.settings); } catch {}
+    return state.settings;
+  };
+
+  state.settings = loadSettings();
+
+  const updateSetting = (group, key, value) => {
+    const next = mergeSettings(state.settings);
+    if (!next[group] || typeof next[group] !== 'object') return state.settings;
+    next[group][key] = value;
+    return saveSettings(next);
+  };
+
+  const resetAllSettings = () => saveSettings(cloneDefaultSettings());
+
+  const resetShortcutSettings = () => {
+    const next = mergeSettings(state.settings);
+    next.shortcuts = { ...DEFAULT_SHORTCUTS };
+    return saveSettings(next);
+  };
+
+  const isMacPlatform = () => {
+    const platform = String(navigator.userAgentData?.platform || navigator.platform || '');
+    return /mac/i.test(platform);
+  };
+
+  const displayShortcut = shortcut => {
+    if (!shortcut) return 'Disabled';
+    const mac = isMacPlatform();
+    return String(shortcut)
+      .split('+')
+      .map(part => {
+        if (part === 'PRIMARY') return mac ? '⌘' : 'Ctrl';
+        if (part === 'ALT') return mac ? 'Option' : 'Alt';
+        if (part === 'SHIFT') return 'Shift';
+        return part.length === 1 ? part : part.replace(/^KEY/, '');
+      })
+      .join(' + ');
+  };
+
+  const normalizeShortcutEvent = event => {
+    if (!event || event.isComposing || event.repeat) return '';
+    const parts = [];
+    const mac = isMacPlatform();
+    const primary = mac ? event.metaKey : event.ctrlKey;
+    if (primary) parts.push('PRIMARY');
+    if (event.altKey) parts.push('ALT');
+    if (event.shiftKey) parts.push('SHIFT');
+
+    let key = String(event.key || '').toUpperCase();
+    if (!key || ['CONTROL', 'ALT', 'SHIFT', 'META'].includes(key)) return '';
+    if (key === ' ') key = 'SPACE';
+    if (key.length === 1 && /[A-Z0-9]/.test(key)) parts.push(key);
+    else if (/^F\d{1,2}$/.test(key)) parts.push(key);
+    else if (['ENTER', 'ESCAPE', 'SPACE'].includes(key)) parts.push(key);
+    else return '';
+
+    return parts.join('+');
+  };
+
+  const RESERVED_SHORTCUTS = new Set([
+    'PRIMARY+R', 'PRIMARY+W', 'PRIMARY+L', 'PRIMARY+T', 'PRIMARY+P', 'PRIMARY+F',
+    'PRIMARY+SHIFT+R', 'PRIMARY+SHIFT+T', 'PRIMARY+SHIFT+W'
+  ]);
+
+  const validateShortcut = (shortcut, actionName = '') => {
+    if (!shortcut) return { ok: true };
+    const parts = shortcut.split('+');
+    const modifiers = parts.slice(0, -1);
+    if (!modifiers.length || (modifiers.length === 1 && modifiers[0] === 'SHIFT')) {
+      return { ok: false, message: 'Use Ctrl/⌘, Alt/Option, or another modifier with the key.' };
+    }
+    if (RESERVED_SHORTCUTS.has(shortcut)) {
+      return { ok: false, message: 'That shortcut is reserved by the browser.' };
+    }
+    for (const [otherAction, value] of Object.entries(state.settings?.shortcuts || {})) {
+      if (otherAction !== actionName && value && value === shortcut) {
+        return { ok: false, message: `Already assigned to ${shortcutActionLabel(otherAction)}.` };
+      }
+    }
+    return { ok: true };
+  };
+
+  const shortcutActionLabel = action => ({
+    toggle: 'Open / Minimize',
+    settings: 'Settings',
+    fill: 'Fill Form',
+    validate: 'Validate',
+    recheck: 'Recheck & Correct',
+    stop: 'Stop Current Action',
+    undo: 'Undo',
+    newApplicant: 'New Applicant',
+    qa: 'Run Functional QA',
+    report: 'Open QA Report',
+    debug: 'Export Debug'
+  }[action] || action);
+
+  const canonicalActionKind = kind => {
+    if (kind === 'qa-audit' || kind === 'qa') return 'qa';
+    if (kind === 'recheck') return 'recheck';
+    if (kind === 'validate') return 'validate';
+    if (kind === 'undo') return 'undo';
+    return 'fill';
+  };
+
+  const ACTION_PERMISSIONS = Object.freeze({
+    fill: ['form-write', 'form-events', 'control-click', 'page-repair'],
+    validate: ['form-write', 'form-events', 'control-click', 'page-repair'],
+    recheck: ['form-write', 'form-events', 'control-click', 'page-repair'],
+    qa: ['form-write', 'form-events', 'control-click', 'safe-progression', 'page-repair'],
+    undo: ['form-write', 'form-events']
+  });
+
+  const actionId = prefix =>
+    `${prefix}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`;
+
+  const beginAuthorizedAction = (
+    kind,
+    {
+      source = 'ui',
+      id = null,
+      expiresAt = null,
+      continuation = false
+    } = {}
+  ) => {
+    const canonical = canonicalActionKind(kind);
+    const existing = state.activeAction;
+
+    if (existing && !continuation) return null;
+
+    const action = {
+      id: id || actionId('action'),
+      kind: canonical,
+      source,
+      permissions: [...(ACTION_PERMISSIONS[canonical] || [])],
+      startedAt: Date.now(),
+      expiresAt: Number(expiresAt || (Date.now() + ACTION_DEFAULT_TTL_MS)),
+      continuation: !!continuation
+    };
+
+    state.activeAction = action;
+    debugEvent('action-authorized', {
+      actionId: action.id,
+      kind: action.kind,
+      source: action.source,
+      continuation: action.continuation
+    });
+    return action;
+  };
+
+  const revokeAuthorizedAction = (id = null, reason = 'completed') => {
+    const current = state.activeAction;
+    if (!current) return;
+    if (id && current.id !== id) return;
+    debugEvent('action-revoked', {
+      actionId: current.id,
+      kind: current.kind,
+      reason
+    });
+    state.activeAction = null;
+  };
+
+  const activeActionValid = () => {
+    const action = state.activeAction;
+    if (!action) return false;
+    if (Date.now() > Number(action.expiresAt || 0)) {
+      revokeAuthorizedAction(action.id, 'expired');
+      return false;
+    }
+    return true;
+  };
+
+  const hasActionPermission = permission =>
+    activeActionValid() &&
+    state.activeAction.permissions.includes(permission);
+
+  const activeActionIs = kind =>
+    activeActionValid() &&
+    state.activeAction.kind === canonicalActionKind(kind);
+
+  const requireActionPermission = (permission, el = null, operation = '') => {
+    if (hasActionPermission(permission)) return true;
+    debugEvent('blocked-write-no-active-action', {
+      permission,
+      operation: operation || 'form-mutation',
+      tag: el?.tagName || '',
+      type: el?.type || ''
+    });
+    return false;
+  };
+
+  const serializedActiveAuthorization = () => {
+    if (!activeActionValid()) return null;
+    const action = state.activeAction;
+    return {
+      id: action.id,
+      kind: action.kind,
+      permissions: [...action.permissions],
+      startedAt: action.startedAt,
+      expiresAt: action.expiresAt
+    };
+  };
+
+  const adoptRemoteAuthorization = (authorization, expectedKind) => {
+    if (!authorization || typeof authorization !== 'object') return null;
+    const kind = canonicalActionKind(expectedKind);
+    if (!authorization.id || authorization.kind !== kind) return null;
+    if (Date.now() > Number(authorization.expiresAt || 0)) return null;
+
+    const allowed = ACTION_PERMISSIONS[kind] || [];
+    const supplied = Array.isArray(authorization.permissions)
+      ? authorization.permissions.filter(permission => allowed.includes(permission))
+      : [];
+
+    if (!supplied.includes('form-write') && kind !== 'undo') return null;
+
+    const action = beginAuthorizedAction(kind, {
+      source: 'remote-command',
+      id: String(authorization.id),
+      expiresAt: Number(authorization.expiresAt),
+      continuation: true
+    });
+    if (!action) return null;
+    action.permissions = supplied;
+    return action;
+  };
 
 
   const loadTechCache = () => {
@@ -299,17 +612,26 @@
   };
 
   const startRunSession = (mode, resumed = false) => {
-    if (!IS_TOP) return;
+    if (!IS_TOP || !activeActionIs('fill')) return null;
+
+    const authorization = serializedActiveAuthorization();
+    if (!authorization) return null;
 
     const current = getRunSession();
 
     if (
       resumed &&
-      current?.active
+      current?.active &&
+      current?.resumeAllowed === true &&
+      current?.actionId === authorization.id
     ) {
       return writeRunSession({
         mode,
         active: true,
+        resumeAllowed: true,
+        actionId: authorization.id,
+        actionKind: 'fill',
+        actionExpiresAt: authorization.expiresAt,
         hostname: location.hostname,
         pathname: location.pathname,
         profileId: profile.id
@@ -318,6 +640,10 @@
 
     return writeRunSession({
       active: true,
+      resumeAllowed: true,
+      actionId: authorization.id,
+      actionKind: 'fill',
+      actionExpiresAt: authorization.expiresAt,
       mode,
       hostname: location.hostname,
       pathname: location.pathname,
@@ -328,17 +654,25 @@
   };
 
   const touchRunSession = () => {
-    if (!IS_TOP) return;
+    if (!IS_TOP || !activeActionIs('fill')) return;
 
     const current = getRunSession();
+    const authorization = serializedActiveAuthorization();
 
-    if (!current?.active) {
+    if (
+      !current?.active ||
+      current?.resumeAllowed !== true ||
+      !authorization ||
+      current?.actionId !== authorization.id
+    ) {
       return;
     }
 
     writeRunSession({
       hostname: location.hostname,
-      pathname: location.pathname
+      pathname: location.pathname,
+      actionExpiresAt: authorization.expiresAt,
+      resumeAllowed: true
     });
   };
 
@@ -348,6 +682,9 @@
     try {
       GM_setValue(RUN_SESSION_KEY, {
         active: false,
+        resumeAllowed: false,
+        actionId: null,
+        actionKind: null,
         updatedAt: Date.now()
       });
     } catch {}
@@ -691,66 +1028,37 @@
   };
 
   const syncProfileFromExistingApplicant = () => {
-    let changed = false;
-    let first = '';
-    let last = '';
-    let full = '';
+    const source = {};
 
     for (const doc of collectDocuments()) {
       allFields(doc).forEach(el => {
         if (!isVisible(el) || !fieldHasValue(el)) return;
 
         const key = directContext(el);
-
         if (/father|mother|guardian|parent/.test(key)) return;
 
         const value = String(el.value || el.textContent || '').trim();
         if (!value) return;
 
         if (/first name|firstname|given name/.test(key)) {
-          first = prefixTestName(value);
+          source.firstName = value;
         } else if (/last name|lastname|surname|family name/.test(key)) {
-          last = prefixTestName(value);
+          source.lastName = value;
         } else if (/applicant name|candidate name|student name|full name/.test(key)) {
-          full = prefixTestName(value);
+          source.fullName = value;
         } else if (/email/.test(key) || normalize(el.type) === 'email') {
-          profile.email = value;
-          changed = true;
+          source.email = value;
         } else if (/mobile|phone|contact number|contact no/.test(key) || normalize(el.type) === 'tel') {
-          profile.mobile = value;
-          changed = true;
+          source.mobile = value;
         } else if (/date of birth|birth date|\bdob\b/.test(key)) {
           const iso = parseFlexibleDateToISO(value);
-          if (iso) {
-            profile.dobISO = iso;
-            changed = true;
-          }
+          if (iso) source.dobISO = iso;
         }
       });
     }
 
-    if (first) {
-      profile.firstName = first;
-      changed = true;
-    }
-
-    if (last) {
-      profile.lastName = last;
-      changed = true;
-    }
-
-    if (full) {
-      profile.fullName = full;
-      changed = true;
-    } else if (first || last) {
-      profile.fullName = `${profile.firstName} ${profile.lastName}`.trim();
-      changed = true;
-    }
-
-    if (changed) {
-      saveProfile();
-      state.panel?.refreshProfile();
-    }
+    state.sourceProfile = source;
+    return source;
   };
 
   const cssEscape = (doc, value) => {
@@ -1869,22 +2177,6 @@
   };
 
 
-  const isPersonNameField = el => {
-    const key = fieldContext(el);
-
-    if (!/\bname\b|firstname|lastname|surname|given name|family name/.test(key)) {
-      return false;
-    }
-
-    if (
-      /school|college|university|institute|institution|organization|organisation|company|employer|board|course|program|programme|branch name|bank name|username|user name/.test(key)
-    ) {
-      return false;
-    }
-
-    return true;
-  };
-
   const isSensitive = key => /\b(passport number|passport no|ssn|social security|bank account|account number|credit card|debit card|card number|cvv|ifsc|upi|voter id|tax id|password|otp|captcha)\b/i.test(key);
 
   const isManualRequiredField = el => {
@@ -2008,9 +2300,10 @@
   };
 
   const fieldKey = el => {
-    if (el.getAttribute(FIELD_KEY_ATTR)) {
-      return el.getAttribute(FIELD_KEY_ATTR);
-    }
+    if (!el) return '';
+
+    const cached = state.fieldKeys.get(el);
+    if (cached) return cached;
 
     const type = normalize(el.type);
     const stable =
@@ -2030,11 +2323,7 @@
     }
 
     const key = `f${(hash >>> 0).toString(36)}`;
-
-    try {
-      el.setAttribute(FIELD_KEY_ATTR, key);
-    } catch {}
-
+    state.fieldKeys.set(el, key);
     return key;
   };
 
@@ -2194,9 +2483,11 @@
   };
 
   const eventBurst = el => {
+    if (!requireActionPermission('form-events', el, 'eventBurst')) return false;
     ['input','change','keyup','blur'].forEach(type => {
       try { el.dispatchEvent(new Event(type, { bubbles: true })); } catch {}
     });
+    return true;
   };
 
   const currentState = el => {
@@ -2227,6 +2518,7 @@
   };
 
   const setNativeValue = (el, value) => {
+    if (!requireActionPermission('form-write', el, 'setNativeValue')) return false;
     snapshotBeforeChange(el);
     const wasReadonly = el.readOnly;
     try { el.readOnly = false; el.removeAttribute('readonly'); } catch {}
@@ -2242,44 +2534,39 @@
       try { el.readOnly = true; el.setAttribute('readonly','readonly'); } catch {}
     }
     rememberAfterChange(el);
+    return true;
   };
 
   const setContentEditable = (el, value) => {
+    if (!requireActionPermission('form-write', el, 'setContentEditable')) return false;
     snapshotBeforeChange(el);
     el.textContent = String(value);
     eventBurst(el);
     rememberAfterChange(el);
+    return true;
   };
 
   const triggerSelect = select => {
+    if (!requireActionPermission('form-events', select, 'triggerSelect')) return false;
     const win = select.ownerDocument.defaultView;
     const adapter = detectControlAdapter(select);
 
     try {
-      select.dispatchEvent(
-        new Event('change', {
-          bubbles: true
-        })
-      );
+      select.dispatchEvent(new Event('change', { bubbles: true }));
     } catch {}
 
     try {
       const jq = win.jQuery || win.$;
-
-      if (typeof jq !== 'function') {
-        return;
-      }
-
+      if (typeof jq !== 'function') return true;
       const $select = jq(select);
-
       if (adapter === 'chosen') {
-        // Update Chosen's visual layer once, without firing unrelated plugin events.
         $select.trigger('chosen:updated');
       } else if (adapter === 'select2') {
-        // Scoped Select2 UI update; native change above already notified the form.
         $select.trigger('change.select2');
       }
     } catch {}
+
+    return true;
   };
 
   const setSelect = (
@@ -2287,6 +2574,7 @@
     option,
     lowConfidence = false
   ) => {
+    if (!requireActionPermission('form-write', select, 'setSelect')) return false;
     snapshotBeforeChange(select);
     select.disabled = false;
 
@@ -2294,7 +2582,6 @@
       [...select.options].forEach(item => {
         item.selected = false;
       });
-
       option.selected = true;
     } else {
       select.value = option.value;
@@ -2304,47 +2591,32 @@
     rememberAfterChange(select);
 
     if (lowConfidence) {
-      mark(
-        select,
-        'review',
-        'Dropdown filled with low confidence'
-      );
+      mark(select, 'review', 'Dropdown filled with low confidence');
     } else {
       clearMark(select, REVIEW_ATTR);
     }
+    return true;
   };
 
   const setChecked = (el, checked, lowConfidence = false) => {
+    if (!requireActionPermission('form-write', el, 'setChecked')) return false;
     snapshotBeforeChange(el);
     el.disabled = false;
 
-    const desired =
-      !!checked;
+    const desired = !!checked;
+    let committed = false;
 
-    let committed =
-      false;
-
-    // Prefer a real browser click. Many admission forms attach business
-    // logic specifically to click handlers rather than only change/input.
     try {
-      if (
-        el.type === 'radio' &&
-        desired
-      ) {
+      if (el.type === 'radio' && desired && hasActionPermission('control-click')) {
         el.click();
         committed = true;
-      } else if (
-        el.type === 'checkbox' &&
-        el.checked !== desired
-      ) {
+      } else if (el.type === 'checkbox' && el.checked !== desired && hasActionPermission('control-click')) {
         el.click();
         committed = true;
       }
     } catch {}
 
-    if (
-      el.checked !== desired
-    ) {
+    if (el.checked !== desired) {
       el.checked = desired;
       eventBurst(el);
     } else if (!committed) {
@@ -2354,120 +2626,12 @@
     rememberAfterChange(el);
 
     if (lowConfidence) {
-      mark(
-        el,
-        'review',
-        'Selection filled with low confidence'
-      );
+      mark(el, 'review', 'Selection filled with low confidence');
     } else {
-      clearMark(
-        el,
-        REVIEW_ATTR
-      );
+      clearMark(el, REVIEW_ATTR);
     }
+    return true;
   };
-
-  const radioGroupCommitKey = el =>
-    `${location.hostname}|${state.currentFormSignature || ''}|${el.name || fieldKey(el)}`;
-
-  const commitSelectedRadioGroups =
-    async ({
-      force = false,
-      maxGroups = 24
-    } = {}) => {
-      let committed = 0;
-      const seen =
-        new Set();
-
-      for (const doc of collectDocuments()) {
-        const radios =
-          [
-            ...doc.querySelectorAll(
-              'input[type="radio"]:checked'
-            )
-          ];
-
-        for (const radio of radios) {
-          if (
-            committed >= maxGroups ||
-            !isFieldOperationallyVisible(
-              radio
-            ) ||
-            radio.disabled ||
-            isLikelyInternalField(
-              radio
-            )
-          ) {
-            continue;
-          }
-
-          const groupKey =
-            radioGroupCommitKey(
-              radio
-            );
-
-          if (
-            seen.has(groupKey)
-          ) {
-            continue;
-          }
-
-          seen.add(groupKey);
-
-          if (
-            !force &&
-            state.committedRadioGroups.has(
-              groupKey
-            )
-          ) {
-            continue;
-          }
-
-          snapshotBeforeChange(
-            radio
-          );
-
-          try {
-            // Clicking an already-selected radio does not toggle it off,
-            // but does execute site click handlers and dependent-state logic.
-            radio.click();
-          } catch {
-            eventBurst(radio);
-          }
-
-          rememberAfterChange(
-            radio
-          );
-
-          state.committedRadioGroups.add(
-            groupKey
-          );
-
-          debugEvent(
-            'radio-commit',
-            {
-              name:
-                radio.name || '',
-              value:
-                String(
-                  radio.value || ''
-                ),
-              forced:
-                !!force
-            }
-          );
-
-          committed++;
-
-          // Small cooperative pause lets synchronous/short async handlers
-          // materialize dependent controls without making the run slow.
-          await sleep(25);
-        }
-      }
-
-      return committed;
-    };
-
 
   const dateParts = iso => {
     const [y,m,d] = iso.split('-');
@@ -2510,6 +2674,7 @@
     el,
     iso
   ) => {
+    if (!requireActionPermission('form-write', el, 'syncExistingDateWidget')) return;
     const win = el.ownerDocument.defaultView;
     const { y } = dateParts(iso);
     const dateObj =
@@ -2625,7 +2790,7 @@
   };
 
   const closeDateWidgets = el => {
-    if (!el) return;
+    if (!el || !requireActionPermission('form-events', el, 'closeDateWidgets')) return;
 
     const doc = el.ownerDocument;
     const win = doc.defaultView;
@@ -2694,6 +2859,7 @@
   };
 
   const closeAllDateWidgets = () => {
+    if (!requireActionPermission('form-events', null, 'closeAllDateWidgets')) return;
     for (const doc of collectDocuments()) {
       for (const el of allFields(doc)) {
         if (
@@ -2727,6 +2893,7 @@
 
   const cleanupLegacyDateWidgetDamage =
     () => {
+      if (!requireActionPermission('page-repair', null, 'cleanupLegacyDateWidgetDamage')) return;
       for (const doc of collectDocuments()) {
         let nodes = [];
 
@@ -2789,7 +2956,7 @@
     el,
     iso
   ) => {
-    if (!el || !iso) return;
+    if (!el || !iso || !requireActionPermission('form-write', el, 'setSmartDate')) return false;
 
     const formatted =
       isYearOnlyField(el)
@@ -5199,20 +5366,6 @@
     if (el.disabled || !isFieldOperationallyVisible(el)) return false;
 
     if (fieldHasValue(el)) {
-      if (isPersonNameField(el) && el.type !== 'file') {
-        const current = el.isContentEditable
-          ? String(el.textContent || '').trim()
-          : String(el.value || '').trim();
-
-        const corrected = prefixTestName(current);
-
-        if (corrected !== current) {
-          if (el.isContentEditable) setContentEditable(el, corrected);
-          else setNativeValue(el, adaptToConstraints(el, corrected));
-          return true;
-        }
-      }
-
       countPreserved(el);
       return false;
     }
@@ -5961,6 +6114,8 @@
     if (!el || el.getAttribute?.('role') !== 'combobox') {
       return false;
     }
+
+    if (!requireActionPermission('control-click', el, 'fillAriaCombobox')) return false;
 
     if (fieldHasValue(el)) {
       countPreserved(el);
@@ -6741,7 +6896,8 @@
 
   const quickMissedFieldSweep =
     async ({
-      maxMs = 2300
+      maxMs = 2300,
+      handleDependencies = true
     } = {}) => {
       const started =
         Date.now();
@@ -6762,23 +6918,21 @@
 
       // Give asynchronously loaded controls a short chance,
       // but stop as soon as their state stops changing.
-      const dependencyResult =
-        await resolveAsyncDependencies({
-          maxMs: Math.min(
-            maxMs,
-            Math.max(
-              300,
-              remainingFillBudget() -
-                450
-            )
-          ),
-          aggressive: false,
-          noProgressMs:
-            NORMAL_NO_PROGRESS_MS
-        });
+      const dependencyResult = handleDependencies
+        ? await resolveAsyncDependencies({
+            maxMs: Math.min(
+              maxMs,
+              Math.max(
+                300,
+                remainingFillBudget() - 450
+              )
+            ),
+            aggressive: false,
+            noProgressMs: NORMAL_NO_PROGRESS_MS
+          })
+        : { resolved: 0 };
 
-      progress +=
-        dependencyResult.resolved;
+      progress += dependencyResult.resolved;
 
       // Only process newly revealed controls once.
       const fresh =
@@ -10766,7 +10920,8 @@
 
   const deepValidateAndAssist =
     async () => {
-      if (state.running) return;
+      if (state.running || !activeActionIs('validate')) return;
+      cleanupLegacyDateWidgetDamage();
 
       state.running = true;
       state.stopRequested = false;
@@ -10906,7 +11061,8 @@
     };
 
   const recheckAndCorrect = async () => {
-    if (state.running) return;
+    if (state.running || !activeActionIs('recheck')) return;
+    cleanupLegacyDateWidgetDamage();
 
     state.running = true;
     state.stopRequested = false;
@@ -11087,8 +11243,9 @@
     mode,
     options = {}
   ) => {
-    if (state.running) return;
+    if (state.running || !activeActionIs('fill')) return;
 
+    cleanupLegacyDateWidgetDamage();
     const resumed = !!options.resumed;
 
     state.running = true;
@@ -11105,7 +11262,6 @@
       state.debugEvents = [];
       state.lastProgressText = '';
       state.lastRuntimeError = null;
-      state.committedRadioGroups.clear();
       debugEvent('fill-start', { mode });
 
       state.snapshots.clear();
@@ -11288,7 +11444,8 @@
 
       const sweep =
         await quickMissedFieldSweep({
-          maxMs: 2600
+          maxMs: 2600,
+          handleDependencies: state.settings?.fill?.autoDependencies !== false
         });
 
       if (
@@ -11458,6 +11615,7 @@
   };
 
   const undo = () => {
+    if (!activeActionIs('undo') || !requireActionPermission('form-write', null, 'undo')) return 0;
     let restored = 0;
     for (const [key, snap] of state.snapshots.entries()) {
       let el = snap.element;
@@ -11509,7 +11667,6 @@
     state.stats.errors.clear();
     state.stats.manual.clear();
     state.formModel.clear();
-    resetMarks();
     state.panel?.refreshProfile();
     state.panel?.setStatus(`New applicant created: ${profile.fullName}`);
     updateCounters();
@@ -11723,145 +11880,34 @@
     );
   };
 
-  const scheduleLiveValidation = () => {
-    if (state.running) return;
-
-    clearTimeout(state.liveTimer);
-
-    state.liveTimer = setTimeout(() => {
-      if (state.running) return;
-      validateForm({
-        deepText: false
-      });
-      updateCounters();
-    }, 700);
-  };
-
   const installLiveValidation = () => {
     if (state.liveWatchInstalled) return;
     state.liveWatchInstalled = true;
 
-    const getEditedField = event =>
-      event.target?.closest?.(
+    const observeTrustedEdit = event => {
+      if (state.running || !event.isTrusted) return;
+
+      const el = event.target?.closest?.(
         'input,select,textarea,[contenteditable="true"]'
       ) || null;
 
-    const lightweightUserEdit = event => {
-      if (
-        state.running ||
-        !event.isTrusted
-      ) {
-        return;
-      }
-
-      const el =
-        getEditedField(event);
-
       if (!el) return;
 
-      const key =
-        fieldKey(el);
+      const key = fieldKey(el);
+      const expected = state.lastScriptValues.get(key);
 
-      // Local-only update while typing. Do not rescan the whole form.
-      if (fieldHasValue(el)) {
-        clearMark(
-          el,
-          REVIEW_ATTR
-        );
-
-        state.stats.review.delete(
-          key
-        );
-
-        try {
-          if (
-            typeof el.checkValidity === 'function' &&
-            el.checkValidity() &&
-            el.getAttribute('aria-invalid') !== 'true'
-          ) {
-            clearMark(
-              el,
-              ERROR_ATTR
-            );
-
-            state.stats.errors.delete(
-              key
-            );
-          }
-        } catch {}
-
-        updateCounters();
+      if (expected && !sameState(currentState(el), expected)) {
+        state.lastScriptValues.delete(key);
+        state.snapshots.delete(key);
+        state.stats.filled.delete(key);
       }
+
+      updateCounters();
     };
 
-    const committedUserEdit = event => {
-      if (
-        state.running ||
-        !event.isTrusted
-      ) {
-        return;
-      }
-
-      const el =
-        getEditedField(event);
-
-      if (el) {
-        lightweightUserEdit(event);
-
-        if (
-          isPersonNameField(el) &&
-          fieldHasValue(el)
-        ) {
-          const current =
-            el.isContentEditable
-              ? String(el.textContent || '').trim()
-              : String(el.value || '').trim();
-
-          const corrected =
-            prefixTestName(current);
-
-          if (corrected !== current) {
-            if (el.isContentEditable) {
-              setContentEditable(
-                el,
-                corrected
-              );
-            } else {
-              setNativeValue(
-                el,
-                adaptToConstraints(
-                  el,
-                  corrected
-                )
-              );
-            }
-          }
-        }
-      }
-
-      // One debounced full check only after change/blur.
-      scheduleLiveValidation();
-    };
-
-    document.addEventListener(
-      'input',
-      lightweightUserEdit,
-      true
-    );
-
-    document.addEventListener(
-      'change',
-      committedUserEdit,
-      true
-    );
-
-    document.addEventListener(
-      'blur',
-      committedUserEdit,
-      true
-    );
-
-    // No always-running MutationObserver.
+    document.addEventListener('input', observeTrustedEdit, true);
+    document.addEventListener('change', observeTrustedEdit, true);
+    document.addEventListener('blur', observeTrustedEdit, true);
     state.liveObserver = null;
   };
 
@@ -11878,7 +11924,20 @@
     state.timerId = null;
   };
 
-  const showModeDialog = () => state.panel?.showModeDialog();
+  const showModeDialog = (context = {}) => state.panel?.showModeDialog(context);
+
+  const requestFillAction = (context = {}) => {
+    const behavior = state.settings?.fill?.behavior || 'ask';
+    if (behavior === 'minimum' || behavior === 'all') {
+      return runSmartAction('fill', {
+        mode: behavior,
+        preferredAgentId: context.preferredAgentId || null,
+        source: context.source || 'button'
+      });
+    }
+
+    showModeDialog(context);
+  };
 
 
   const safeDebugValue = el => {
@@ -12326,7 +12385,7 @@
     const report = {
       reportVersion: 1,
       generatedBy:
-        'Smart FormSense V17.13.4',
+        'Smart FormSense V17.14.0',
       generatedAt:
         new Date().toISOString(),
       mode:
@@ -12491,7 +12550,7 @@
       return report;
     } catch (error) {
       console.error(
-        'Smart FormSense V17.13.4 debug export:',
+        'Smart FormSense V17.14.0 debug export:',
         error
       );
 
@@ -13578,7 +13637,7 @@
       product:
         'Smart FormSense',
       productVersion:
-        '17.13.4',
+        '17.14.0',
       generatedAt,
       auditType:
         'Non-destructive Form Readiness Audit',
@@ -13875,7 +13934,7 @@
   <div class="hero">
     <div class="brand">✦ SMART FORMSENSE QA</div>
     <h1>${esc(qa.page?.title || 'Form')}</h1>
-    <div class="meta">${esc(qa.page?.hostname || location.hostname || '')}<br>${esc(generated)} • v${esc(qa.productVersion || '17.13.4')}</div>
+    <div class="meta">${esc(qa.page?.hostname || location.hostname || '')}<br>${esc(generated)} • v${esc(qa.productVersion || '17.14.0')}</div>
     <div class="status ${statusClass}">${esc(status)}</div>
     <div class="overview">${esc(overview)}</div>
 
@@ -14093,7 +14152,7 @@
       product:
         'Smart FormSense',
       productVersion:
-        '17.13.4',
+        '17.14.0',
       generatedAt:
         new Date().toISOString(),
       purpose:
@@ -14183,7 +14242,7 @@
       return report;
     } catch (error) {
       console.error(
-        'Smart FormSense V17.13.4 QA debug export:',
+        'Smart FormSense V17.14.0 QA debug export:',
         error
       );
 
@@ -14682,6 +14741,12 @@
         );
       }
 
+      const authorization = serializedActiveAuthorization();
+
+      if (!authorization || authorization.kind !== canonicalActionKind(action)) {
+        return Promise.reject(new Error('No authorized Smart FormSense action is active'));
+      }
+
       const requestId =
         makeBridgeId(
           'request'
@@ -14780,6 +14845,7 @@
                     agent.id,
                   requestId,
                   action,
+                  authorization,
                   ...extra
                 }
               ),
@@ -14809,95 +14875,80 @@
     ) => {
       if (
         !IS_TOP ||
-        state.running
+        state.running ||
+        state.activeAction
       ) {
         return;
       }
+
+      const authorization = beginAuthorizedAction(
+        action,
+        { source: extra.source || 'button' }
+      );
+
+      if (!authorization) return;
 
       state.panel?.setStatus(
         'Locating the active form...'
       );
 
       try {
-        const context =
-          await chooseExecutionContext();
+        let context = null;
+        const preferred = extra.preferredAgentId
+          ? remoteAgentById(extra.preferredAgentId)
+          : null;
 
-        if (
-          context.kind ===
-          'remote'
-        ) {
+        if (preferred?.source) {
+          context = { kind: 'remote', local: localFormMetrics(), agent: preferred };
+        } else {
+          context = await chooseExecutionContext();
+        }
+
+        if (context.kind === 'remote') {
           await sendRemoteCommand(
             context.agent,
             action,
             extra
           );
-
           return;
         }
 
-        if (
-          context.kind ===
-          'none'
-        ) {
-          state.panel?.setProgress(
-            0,
-            'No fillable form detected'
-          );
-
+        if (context.kind === 'none') {
+          state.panel?.setProgress(0, 'No fillable form detected');
           state.panel?.setStatus(
             hasEmbeddedFormHints()
               ? 'An embedded widget/frame exists, but no active form fields became accessible. Reload once and try again if the widget is still loading.'
               : 'No meaningful fillable form was found on this page.'
           );
-
           return;
         }
 
-        // Local/direct form path preserves the established V17 engine.
-        state.lastRemoteAgentId =
-          null;
+        state.lastRemoteAgentId = null;
 
-        if (
-          action === 'fill'
-        ) {
-          await fillForm(
-            extra.mode ||
-            'all'
-          );
-        } else if (
-          action === 'validate'
-        ) {
+        if (action === 'fill') {
+          await fillForm(extra.mode || 'all');
+        } else if (action === 'validate') {
           await deepValidateAndAssist();
-        } else if (
-          action === 'recheck'
-        ) {
+        } else if (action === 'recheck') {
           await recheckAndCorrect();
         }
       } catch (error) {
-        state.running =
-          false;
-
-        state.activeRemoteAgentId =
-          null;
-
-        state.activeRemoteRequestId =
-          null;
-
-        state.activeRemoteAction =
-          null;
-
-        state.panel?.setBusy(
-          false
-        );
-
+        state.running = false;
+        state.activeRemoteAgentId = null;
+        state.activeRemoteRequestId = null;
+        state.activeRemoteAction = null;
+        state.panel?.setBusy(false);
         state.panel?.setStatus(
-          `Embedded-form action failed safely: ${error?.message || 'unknown error'}`
+          `Smart FormSense action failed safely: ${error?.message || 'unknown error'}`
         );
-
         setProgress(
           100,
-          `Embedded-form action stopped: ${error?.message || 'unknown error'}`
+          `Action stopped safely: ${error?.message || 'unknown error'}`
         );
+      } finally {
+        if (!state.pageUnloading) {
+          revokeAuthorizedAction(authorization.id, state.stopRequested ? 'stopped' : 'completed');
+        }
       }
     };
 
@@ -14907,7 +14958,7 @@
   // Smart FormSense Functional QA engine (black-box, reversible)
   // ==========================================================
   const qaDispatchInteraction = (el, includeBlur = true) => {
-    if (!el) return;
+    if (!el || !requireActionPermission('form-events', el, 'qaDispatchInteraction')) return false;
 
     try {
       el.dispatchEvent(new Event('input', { bubbles: true }));
@@ -14926,6 +14977,7 @@
         } catch {}
       }
     }
+    return true;
   };
 
   const qaSnapshotFieldValue = el => {
@@ -14966,7 +15018,7 @@
   };
 
   const qaSetNativeLikeValue = (el, value) => {
-    if (!el) return false;
+    if (!el || !requireActionPermission('form-write', el, 'qaSetNativeLikeValue')) return false;
 
     const type = normalize(el.type);
 
@@ -15019,7 +15071,7 @@
   };
 
   const qaRestoreFieldValue = async (el, snapshot) => {
-    if (!el || !snapshot) return;
+    if (!el || !snapshot || !requireActionPermission('form-write', el, 'qaRestoreFieldValue')) return;
 
     try {
       if (snapshot.kind === 'radio-group') {
@@ -15176,6 +15228,9 @@
   };
 
   const qaAttemptUserEntry = async (el, value) => {
+    if (!activeActionIs('qa') || !requireActionPermission('form-events', el, 'qaAttemptUserEntry') || !hasActionPermission('form-write')) {
+      return { method: 'blocked', attemptedValue: String(value ?? ''), acceptedValue: String(el?.value ?? '') };
+    }
     const attemptedValue = String(value ?? '');
     const type = normalize(el?.type);
 
@@ -15286,6 +15341,13 @@
   });
 
   const qaClickJourneyButton = async (button, fields = []) => {
+    const protectedText = qaButtonText(button);
+    if (/\bsubmit\b|\bpay\b|payment|generate application|confirm admission|finali[sz]e|place order|complete application|finish application/.test(protectedText)) {
+      return { progressed: false, submitAttempted: false, buttonText: protectedText, validationAfter: { entries: [], count: 0 }, newValidationEntries: [], protectedFinal: true };
+    }
+    if (!activeActionIs('qa') || !requireActionPermission('safe-progression', button, 'qaJourneyClick')) {
+      return { progressed: false, submitAttempted: false, buttonText: qaButtonText(button), validationAfter: { entries: [], count: 0 }, newValidationEntries: [], blockedByAuthorization: true };
+    }
     const before = qaJourneyState();
     const beforeValidation = qaValidationDigest(fields);
     const form = button?.form || button?.closest?.('form') || null;
@@ -15579,6 +15641,7 @@
   };
 
   const qaRunDependencyChain = async fields => {
+    if (!activeActionIs('qa') || !hasActionPermission('form-write')) return [];
     const selects = (fields || []).filter(
       el => el?.isConnected && el.tagName === 'SELECT' && !isLikelyInternalField(el)
     );
@@ -15791,11 +15854,37 @@
 
   const qaRunJourneyChecks = async (fields, candidates) => {
     const rows = [];
+    if (!activeActionIs('qa') || !hasActionPermission('form-write')) return rows;
     if (state.stopRequested) return rows;
 
     const liveFields = (fields || []).filter(el => el?.isConnected && !isLikelyInternalField(el));
     const buttons = qaFindJourneyButtons();
     const button = buttons.safe[0];
+    const progression = state.settings?.qa?.progression || 'auto-safe';
+
+    if (button && progression === 'never') {
+      rows.push({
+        status: 'review',
+        name: 'Safe progression disabled in Settings',
+        actual: `A safe ${qaButtonText(button) || 'Next / Continue'} action was detected, but Smart FormSense is configured not to progress automatically.`
+      });
+      return rows;
+    }
+
+    if (button && progression === 'ask') {
+      let approved = false;
+      try {
+        approved = window.confirm(`Smart FormSense QA found a safe “${qaButtonText(button) || 'Next / Continue'}” action. Run this progression check now?`);
+      } catch {}
+      if (!approved) {
+        rows.push({
+          status: 'review',
+          name: 'Progression check skipped by user',
+          actual: 'The safe Next / Continue progression check was not run.'
+        });
+        return rows;
+      }
+    }
 
     if (!button) {
       if (buttons.protectedFinal.length || buttons.other.length) {
@@ -16162,6 +16251,7 @@
   };
 
   const qaRunRequiredBlankCase = async el => {
+    if (!activeActionIs('qa') || !requireActionPermission('form-write', el, 'qaRequiredBlank')) return { status: 'review', actual: 'QA mutation authorization was unavailable.' };
     const snapshot = qaSnapshotFieldValue(el);
     const before = qaVisibleFeedback(el);
     const type = normalize(el.type);
@@ -16231,6 +16321,7 @@
   };
 
   const qaRunSelectInteractionCase = async el => {
+    if (!activeActionIs('qa') || !requireActionPermission('form-write', el, 'qaSelectInteraction')) return { status: 'review', actual: 'QA mutation authorization was unavailable.' };
     const options = qaRealSelectOptions(el);
     if (!options.length) {
       return {
@@ -16261,6 +16352,7 @@
   };
 
   const qaRunToggleCase = async el => {
+    if (!activeActionIs('qa') || !requireActionPermission('form-write', el, 'qaToggle')) return { status: 'review', actual: 'QA mutation authorization was unavailable.' };
     const snapshot = qaSnapshotFieldValue(el);
     const type = normalize(el.type);
 
@@ -16317,6 +16409,7 @@
   };
 
   const qaRunDependencyCase = async pair => {
+    if (!activeActionIs('qa') || !hasActionPermission('form-write')) return { status: 'review', actual: 'QA mutation authorization was unavailable.' };
     const parent = pair.parent;
     const child = pair.child;
     const parentOptions = validOptions(parent);
@@ -16381,7 +16474,7 @@
       : {
           reportVersion: 7,
           product: 'Smart FormSense',
-          productVersion: '17.13.4',
+          productVersion: '17.14.0',
           generatedAt: new Date().toISOString(),
           auditType: 'Black-box Functional Form QA',
           page: {
@@ -16418,7 +16511,7 @@
     const cleanReason = String(reason || '').slice(0, 500);
     return {
       ...base,
-      productVersion: '17.13.4',
+      productVersion: '17.14.0',
       reportVersion: Math.max(5, Number(base.reportVersion || 0)),
       runState,
       incomplete: runState !== 'completed',
@@ -16439,6 +16532,10 @@
     qaMarkReportIncomplete(null, runState, reason);
 
   const buildQaFunctionalReport = async () => {
+    if (!activeActionIs('qa')) {
+      return qaFallbackPartialReport('failed', 'QA authorization was unavailable');
+    }
+    cleanupLegacyDateWidgetDamage();
     const generatedAt = new Date().toISOString();
     const findings = [];
     const testCases = [];
@@ -16565,7 +16662,7 @@
       return {
         reportVersion: 7,
         product: 'Smart FormSense',
-        productVersion: '17.13.4',
+        productVersion: '17.14.0',
         generatedAt,
         completedAt: ['completed', 'stopped', 'failed'].includes(runState) ? new Date().toISOString() : null,
         auditType: 'Black-box Functional Form QA',
@@ -17019,8 +17116,13 @@
     return report;
   };
 
-  const runSmartQaAudit = async () => {
-    if (!IS_TOP || state.running) return;
+  const runSmartQaAudit = async (options = {}) => {
+    if (!IS_TOP || state.running || state.activeAction) return;
+
+    const authorization = beginAuthorizedAction('qa', {
+      source: options.source || 'button'
+    });
+    if (!authorization) return;
 
     state.workspace = 'qa';
     state.running = true;
@@ -17030,19 +17132,40 @@
     state.panel?.setStatus('Locating the active form for QA Audit...');
     state.panel?.setMode('qa');
 
+    const finishReportPreferences = report => {
+      if (!report || !IS_TOP) return;
+      if (state.settings?.qa?.autoOpenReport) {
+        try { exportQaReport(report); } catch {}
+      }
+      if (state.settings?.reports?.autoDebugExport) {
+        try { smartQaDebugExport(); } catch {}
+      }
+    };
+
     try {
-      const context = await chooseExecutionContext();
+      let context = null;
+      const preferred = options.preferredAgentId
+        ? remoteAgentById(options.preferredAgentId)
+        : null;
+
+      if (preferred?.source) {
+        context = { kind: 'remote', local: localFormMetrics(), agent: preferred };
+      } else {
+        context = await chooseExecutionContext();
+      }
 
       if (context.kind === 'remote') {
         const result = await sendRemoteCommand(
           context.agent,
-          'qa-audit'
+          'qa-audit',
+          { source: options.source || 'button' }
         );
 
         if (result?.qaReport) {
           state.qaReport = result.qaReport;
           state.qaReportAgentId = context.agent?.id || null;
           state.panel?.setQaReport?.(result.qaReport);
+          finishReportPreferences(result.qaReport);
         }
 
         return state.qaReport;
@@ -17056,6 +17179,7 @@
         state.panel?.setStatus(
           'QA Audit completed, but no meaningful active form was detected.'
         );
+        finishReportPreferences(report);
         return report;
       }
 
@@ -17070,7 +17194,7 @@
           ? `Functional QA stopped • Partial report • ${report.fieldsChecked}/${report.fieldsAudited} fields with results`
           : `Functional QA completed • ${report.fieldsChecked}/${report.fieldsAudited} fields covered • ${report.counts.critical} blocker(s) • ${report.counts.warning} failed`
       );
-
+      finishReportPreferences(report);
       return report;
     } catch (error) {
       const reason = error?.message || 'unknown error';
@@ -17085,7 +17209,7 @@
         Number(partial.summary?.fieldsAudited || partial.fieldsAudited || 0)
           ? Math.max(1, Math.round((Number(partial.fieldsChecked || 0) / Math.max(1, Number(partial.fieldsAudited || 0))) * 80))
           : 1,
-        `Interrupted • partial report available`
+        'Interrupted • partial report available'
       );
       state.panel?.setStatus(
         `QA interrupted safely: ${reason} • Partial report is available.`
@@ -17097,6 +17221,7 @@
       state.activeRemoteRequestId = null;
       state.activeRemoteAction = null;
       state.panel?.setBusy(false);
+      revokeAuthorizedAction(authorization.id, state.stopRequested ? 'stopped' : 'completed');
     }
   };
 
@@ -17193,44 +17318,38 @@
       );
     };
 
-  const smartUndo = () => {
-    const agent =
-      remoteAgentById(
-        state.lastRemoteAgentId
+  const smartUndo = async (preferredAgentId = null, source = 'button') => {
+    if (state.running || state.activeAction) return;
+
+    const authorization = beginAuthorizedAction('undo', { source });
+    if (!authorization) return;
+
+    try {
+      const agent = remoteAgentById(
+        typeof preferredAgentId === 'string' ? preferredAgentId : state.lastRemoteAgentId
       );
 
-    if (
-      agent?.source
-    ) {
-      try {
-        agent.source.postMessage(
-          bridgePayload(
-            'UNDO',
-            {
-              sessionId:
-                bridge.sessionId,
-              agentId:
-                  agent.id
-            }
-          ),
-          '*'
-        );
-
-        state.panel?.setStatus(
-          'Undo requested inside embedded form.'
-        );
-
+      if (agent?.source) {
+        await sendRemoteCommand(agent, 'undo', { source });
         return;
-      } catch {}
-    }
+      }
 
-    undo();
+      state.running = true;
+      state.panel?.setBusy(true);
+      undo();
+    } catch (error) {
+      state.panel?.setStatus(`Undo stopped safely: ${error?.message || 'unknown error'}`);
+    } finally {
+      state.running = false;
+      state.panel?.setBusy(false);
+      revokeAuthorizedAction(authorization.id, 'undo-completed');
+    }
   };
 
-  const smartDebugExport = () => {
+  const smartDebugExport = (preferredAgentId = null) => {
     const agent =
       remoteAgentById(
-        state.lastRemoteAgentId
+        preferredAgentId || state.lastRemoteAgentId
       );
 
     if (
@@ -17292,6 +17411,138 @@
 
     state.qaDebugAwaiting = false;
     exportQaDebugReport();
+  };
+
+  const matchedShortcutAction = event => {
+    state.settings = loadSettings();
+    const shortcut = normalizeShortcutEvent(event);
+    if (!shortcut) return null;
+    const entry = Object.entries(state.settings?.shortcuts || {})
+      .find(([, value]) => value && value === shortcut);
+    return entry ? { action: entry[0], shortcut } : null;
+  };
+
+  const handleShortcutCapture = event => {
+    const action = state.shortcutCaptureAction;
+    if (!action || !IS_TOP) return false;
+
+    if (event.key === 'Escape' && !event.ctrlKey && !event.metaKey && !event.altKey && !event.shiftKey) {
+      event.preventDefault();
+      event.stopPropagation();
+      state.shortcutCaptureAction = null;
+      state.panel?.setShortcutMessage?.('Shortcut change cancelled.');
+      state.panel?.refreshSettings?.();
+      return true;
+    }
+
+    const shortcut = normalizeShortcutEvent(event);
+    if (!shortcut) return false;
+
+    event.preventDefault();
+    event.stopPropagation();
+
+    const validation = validateShortcut(shortcut, action);
+    if (!validation.ok) {
+      state.panel?.setShortcutMessage?.(validation.message, 'error');
+      return true;
+    }
+
+    const next = mergeSettings(state.settings);
+    next.shortcuts[action] = shortcut;
+    saveSettings(next);
+    state.shortcutCaptureAction = null;
+    state.panel?.setShortcutMessage?.(`${shortcutActionLabel(action)} set to ${displayShortcut(shortcut)}.`, 'ok');
+    state.panel?.refreshSettings?.();
+    state.panel?.applyShortcutHints?.();
+    return true;
+  };
+
+  const executeShortcutAction = (action, preferredAgentId = null) => {
+    if (!action) return;
+
+    if ((state.running || state.activeAction) && action !== 'stop') {
+      return;
+    }
+
+    if (action === 'stop') {
+      requestSmartStop();
+      return;
+    }
+
+    if (action === 'toggle') {
+      const existing = document.getElementById(PANEL_ID);
+      if (!existing) mountPanel();
+      else state.panel?.toggle?.();
+      return;
+    }
+
+    if (action === 'settings') {
+      mountPanel();
+      state.panel?.openSettings?.();
+      return;
+    }
+
+    if (action === 'fill') {
+      mountPanel();
+      requestFillAction({ preferredAgentId, source: 'shortcut' });
+      return;
+    }
+
+    if (action === 'validate') {
+      mountPanel();
+      runSmartAction('validate', { preferredAgentId, source: 'shortcut' });
+      return;
+    }
+
+    if (action === 'recheck') {
+      mountPanel();
+      runSmartAction('recheck', { preferredAgentId, source: 'shortcut' });
+      return;
+    }
+
+    if (action === 'undo') {
+      mountPanel();
+      smartUndo(preferredAgentId);
+      return;
+    }
+
+    if (action === 'newApplicant') {
+      mountPanel();
+      newApplicant();
+      return;
+    }
+
+    if (action === 'qa') {
+      mountPanel();
+      state.panel?.showWorkspace?.('qa');
+      runSmartQaAudit({ preferredAgentId, source: 'shortcut' });
+      return;
+    }
+
+    if (action === 'report') {
+      mountPanel();
+      if (state.qaReport) exportQaReport(state.qaReport);
+      else state.panel?.setStatus('No QA report is available yet. Run Functional QA first.');
+      return;
+    }
+
+    if (action === 'debug') {
+      mountPanel();
+      smartDebugExport(preferredAgentId);
+    }
+  };
+
+  const installTopShortcutEngine = () => {
+    if (!IS_TOP) return;
+    window.addEventListener('keydown', event => {
+      if (handleShortcutCapture(event)) return;
+      const matched = matchedShortcutAction(event);
+      if (!matched) return;
+      if ((state.running || state.activeAction) && matched.action !== 'stop') return;
+      event.preventDefault();
+      event.stopPropagation();
+      executeShortcutAction(matched.action, null);
+    }, true);
   };
 
   const installTopBridge = () => {
@@ -17365,6 +17616,14 @@
             }
           );
 
+          return;
+        }
+
+        if (data.type === 'SHORTCUT_REQUEST') {
+          const agent = bridge.agents.get(data.agentId);
+          if (!agent || agent.source !== event.source) return;
+          if (typeof data.shortcutAction !== 'string') return;
+          executeShortcutAction(data.shortcutAction, agent.id);
           return;
         }
 
@@ -17822,23 +18081,19 @@
           data.type ===
           'UNDO'
         ) {
-          undo();
+          const undoAuthorization = adoptRemoteAuthorization(data.authorization, 'undo');
+          if (!undoAuthorization) {
+            send('REMOTE_STATUS', { text: 'Undo was blocked because authorization was unavailable.' });
+            return;
+          }
 
-          send(
-            'REMOTE_STATUS',
-            {
-              text:
-                'Embedded form changes undone.'
-            }
-          );
-
-          send(
-            'REMOTE_COUNTERS',
-            {
-              counters:
-                counters()
-            }
-          );
+          try {
+            undo();
+            send('REMOTE_STATUS', { text: 'Embedded form changes undone.' });
+            send('REMOTE_COUNTERS', { counters: counters() });
+          } finally {
+            revokeAuthorizedAction(undoAuthorization.id, 'remote-undo-completed');
+          }
 
           return;
         }
@@ -17900,8 +18155,30 @@
           data.action ||
           '';
 
+        const remoteAuthorization =
+          adoptRemoteAuthorization(
+            data.authorization,
+            agent.action
+          );
+
+        if (!remoteAuthorization) {
+          send(
+            'REMOTE_RESULT',
+            {
+              ok: false,
+              action: agent.action,
+              counters: counters(),
+              status: 'Embedded action blocked: authorization was missing, stale, or did not match the requested action.'
+            }
+          );
+          agent.requestId = null;
+          agent.action = null;
+          return;
+        }
+
         profile =
           loadProfile();
+        state.settings = loadSettings();
 
         try {
           let qaReport = null;
@@ -17930,6 +18207,11 @@
           ) {
             qaReport = await buildQaFunctionalReport();
             state.qaReport = qaReport;
+          } else if (
+            agent.action ===
+            'undo'
+          ) {
+            undo();
           }
 
           send(
@@ -17974,6 +18256,11 @@
             }
           );
         } finally {
+          revokeAuthorizedAction(
+            remoteAuthorization.id,
+            state.stopRequested ? 'remote-stopped' : 'remote-completed'
+          );
+
           agent.requestId =
             null;
 
@@ -17986,10 +18273,24 @@
       true
     );
 
-    // Lightweight listeners are useful after a remote fill because the user
-    // can manually correct a field inside the iframe and keep counters fresh.
+    window.addEventListener('keydown', event => {
+      const matched = matchedShortcutAction(event);
+      if (!matched) return;
+      if ((state.running || state.activeAction) && matched.action !== 'stop') return;
+
+      event.preventDefault();
+      event.stopPropagation();
+
+      send('SHORTCUT_REQUEST', {
+        sessionId: agent.sessionId,
+        shortcutAction: matched.action,
+        shortcut: matched.shortcut
+      });
+    }, true);
+
+    // Idle frame agents may observe trusted user edits, but never repair or
+    // mutate the embedded form without an authorized top-owned action.
     try {
-      cleanupLegacyDateWidgetDamage();
       installLiveValidation();
     } catch {}
 
@@ -18012,7 +18313,7 @@
     );
   };
 
-  const mountPanel = () => {
+  const mountPanel = (options = {}) => {
     if (!IS_TOP) {
       return;
     }
@@ -18033,6 +18334,18 @@
       bottom: '8px',
       zIndex: '2147483647'
     });
+
+    if (state.settings?.general?.rememberPosition) {
+      try {
+        const saved = GM_getValue(`${PANEL_POSITION_KEY_PREFIX}${location.hostname}`, null);
+        if (saved && Number.isFinite(Number(saved.left)) && Number.isFinite(Number(saved.top))) {
+          host.style.right = 'auto';
+          host.style.bottom = 'auto';
+          host.style.left = `${clamp(Number(saved.left), 6, Math.max(6, window.innerWidth - 190))}px`;
+          host.style.top = `${clamp(Number(saved.top), 6, Math.max(6, window.innerHeight - 50))}px`;
+        }
+      } catch {}
+    }
 
     const shadow = host.attachShadow({ mode: 'open' });
 
@@ -18498,6 +18811,25 @@
           font-size:10px;
           font-weight:850
         }
+
+        .settingsBack{display:none;position:fixed;inset:0;width:100vw;height:100vh;background:rgba(19,15,40,.48);backdrop-filter:blur(5px);align-items:center;justify-content:center;padding:18px;z-index:30}
+        .settingsModal{width:min(700px,calc(100vw - 24px));max-height:min(760px,calc(100vh - 24px));overflow:hidden;background:#fff;border:1px solid #e7e2f6;border-radius:20px;box-shadow:0 30px 90px rgba(17,12,45,.32);display:flex;flex-direction:column;color:#26213a}
+        .settingsHead{display:flex;align-items:center;justify-content:space-between;padding:15px 17px;border-bottom:1px solid #eeeaf7;background:linear-gradient(135deg,#faf9ff,#fff)}
+        .settingsHead h2{margin:0;font-size:16px}.settingsHead p{margin:3px 0 0;font-size:9px;color:#817a91}.settingsClose{border:0;background:#f3f0fb;color:#655d78;width:30px;height:30px;border-radius:9px;cursor:pointer;font-size:17px}
+        .settingsLayout{display:grid;grid-template-columns:160px minmax(0,1fr);min-height:470px;overflow:hidden}
+        .settingsNav{padding:11px;border-right:1px solid #eeeaf7;background:#faf9fd;display:flex;flex-direction:column;gap:5px}
+        .settingsNavBtn{border:0;background:transparent;text-align:left;padding:9px 10px;border-radius:9px;color:#696279;font-size:10px;font-weight:800;cursor:pointer}.settingsNavBtn.active{background:#eeeaff;color:#5b4bff}
+        .settingsContent{padding:16px 18px;overflow:auto}.settingsSection{display:none}.settingsSection.active{display:block}.settingsSection h3{margin:0 0 4px;font-size:14px}.settingsIntro{font-size:9px;color:#817a91;line-height:1.45;margin-bottom:12px}
+        .settingCard{border:1px solid #e9e5f2;border-radius:12px;padding:10px 11px;margin:8px 0;background:#fff}.settingRow{display:flex;align-items:flex-start;justify-content:space-between;gap:14px}.settingText b{display:block;font-size:10px;color:#342e48}.settingText span{display:block;font-size:8.5px;color:#858092;line-height:1.4;margin-top:2px}
+        .lockCard{background:#f8fafc;border-color:#e2e8f0}.lockBadge{font-size:8px;font-weight:900;color:#15803d;background:#dcfce7;border-radius:999px;padding:4px 7px;white-space:nowrap}
+        .switch{position:relative;width:36px;height:21px;flex:0 0 auto}.switch input{opacity:0;width:0;height:0}.slider{position:absolute;inset:0;background:#d9d5e5;border-radius:999px;cursor:pointer;transition:.18s}.slider:before{content:"";position:absolute;width:15px;height:15px;left:3px;top:3px;background:#fff;border-radius:50%;box-shadow:0 2px 6px rgba(0,0,0,.18);transition:.18s}.switch input:checked + .slider{background:#6d4aff}.switch input:checked + .slider:before{transform:translateX(15px)}
+        .radioGroup{display:grid;gap:7px;margin-top:8px}.radioChoice{display:flex;align-items:flex-start;gap:8px;border:1px solid #e8e4f1;border-radius:10px;padding:9px;cursor:pointer}.radioChoice input{margin-top:1px}.radioChoice strong{display:block;font-size:9.5px}.radioChoice span{display:block;font-size:8px;color:#837d90;margin-top:2px;line-height:1.35}
+        .settingsAction{border:1px solid #ddd6fe;background:#f7f5ff;color:#5b4bff;border-radius:9px;padding:7px 9px;font-size:9px;font-weight:850;cursor:pointer}.settingsAction.dangerLite{border-color:#fecdd3;background:#fff1f2;color:#be123c}
+        .shortcutTable{display:grid;gap:6px}.shortcutRow{display:grid;grid-template-columns:minmax(120px,1fr) auto auto auto;align-items:center;gap:6px;border:1px solid #e9e5f2;border-radius:10px;padding:8px}.shortcutName{font-size:9px;font-weight:800}.shortcutChip{font-size:8px;font-weight:850;background:#f3f0ff;color:#5b4bff;border-radius:7px;padding:5px 7px;white-space:nowrap}.shortcutBtn{border:1px solid #e4dfed;background:#fff;border-radius:7px;padding:5px 7px;font-size:8px;cursor:pointer;color:#635d70}.shortcutBtn.capture{background:#fff7ed;color:#c2410c;border-color:#fed7aa}
+        .settingsMessage{min-height:18px;margin-top:9px;font-size:8.5px;color:#6b7280}.settingsMessage.error{color:#dc2626}.settingsMessage.ok{color:#15803d}
+        .shortcutHint{font-size:7.5px;opacity:.78;margin-left:4px;font-weight:700}
+        .shortcutEnabled[data-shortcut]::after{content:'  ' attr(data-shortcut);font-size:7px;font-weight:700;opacity:.72;margin-left:4px}
+        @media(max-width:620px){.settingsBack{padding:0}.settingsModal{width:100vw;height:100vh;max-height:none;border-radius:0}.settingsLayout{grid-template-columns:1fr;display:flex;flex-direction:column}.settingsNav{border-right:0;border-bottom:1px solid #eeeaf7;flex-direction:row;overflow:auto;padding:8px}.settingsNavBtn{white-space:nowrap}.settingsContent{padding:13px}.shortcutRow{grid-template-columns:1fr auto}.shortcutRow .shortcutBtn{grid-row:2}.shortcutChip{justify-self:end}}
         button:disabled{opacity:.55;cursor:wait}
       </style>
 
@@ -18506,6 +18838,7 @@
           <div class="top">
             <div><div class="title">✦ Smart FormSense</div><div class="tagline">Intelligent Form Filling & QA Testing</div></div>
             <div class="windowBtns">
+              <button class="windowBtn" id="settingsBtn" title="Settings">⚙</button>
               <button class="windowBtn" id="minimize" title="Minimize">−</button>
               <button class="windowBtn" id="close" title="Close">×</button>
             </div>
@@ -18663,6 +18996,77 @@
           <button class="cancel" id="cancelChoice">Cancel</button>
         </div>
       </div>
+
+      <div class="settingsBack" id="settingsBack">
+        <div class="settingsModal" role="dialog" aria-modal="true" aria-label="Smart FormSense Settings">
+          <div class="settingsHead">
+            <div><h2>⚙ Smart FormSense Settings</h2><p>Personalize behavior without weakening the built-in safety rules.</p></div>
+            <button class="settingsClose" id="settingsClose" title="Close Settings">×</button>
+          </div>
+          <div class="settingsLayout">
+            <nav class="settingsNav" id="settingsNav">
+              <button class="settingsNavBtn active" data-settings-target="safety">🔒 Safety</button>
+              <button class="settingsNavBtn" data-settings-target="general">⚙ General</button>
+              <button class="settingsNavBtn" data-settings-target="fill">⚡ Form Filling</button>
+              <button class="settingsNavBtn" data-settings-target="qa">🧪 Functional QA</button>
+              <button class="settingsNavBtn" data-settings-target="reports">📄 Reports</button>
+              <button class="settingsNavBtn" data-settings-target="shortcuts">⌨ Shortcuts</button>
+            </nav>
+            <main class="settingsContent">
+              <section class="settingsSection active" data-settings-section="safety">
+                <h3>Safety — Always On</h3><div class="settingsIntro">These protections are permanent and cannot be disabled.</div>
+                <div class="settingCard lockCard"><div class="settingRow"><div class="settingText"><b>No background form changes</b><span>Opening a page or typing manually never authorizes Smart FormSense to modify the form.</span></div><span class="lockBadge">LOCKED ON</span></div></div>
+                <div class="settingCard lockCard"><div class="settingRow"><div class="settingText"><b>Existing values protected during Fill</b><span>Manual and website-prefilled values are preserved exactly.</span></div><span class="lockBadge">LOCKED ON</span></div></div>
+                <div class="settingCard lockCard"><div class="settingRow"><div class="settingText"><b>Final submission protected</b><span>Submit, payment and finalize actions are never triggered automatically.</span></div><span class="lockBadge">LOCKED ON</span></div></div>
+                <div class="settingCard lockCard"><div class="settingRow"><div class="settingText"><b>Undo only Smart FormSense changes</b><span>Later manual edits are never overwritten by Undo.</span></div><span class="lockBadge">LOCKED ON</span></div></div>
+              </section>
+
+              <section class="settingsSection" data-settings-section="general">
+                <h3>General</h3><div class="settingsIntro">Control how the Smart FormSense panel behaves.</div>
+                <div class="settingCard"><div class="settingRow"><div class="settingText"><b>Show panel automatically on page load</b><span>Default is off.</span></div><label class="switch"><input id="settingAutoShow" type="checkbox"><span class="slider"></span></label></div></div>
+                <div class="settingCard"><div class="settingRow"><div class="settingText"><b>Start panel minimized</b><span>Used only when automatic panel display is enabled.</span></div><label class="switch"><input id="settingStartMinimized" type="checkbox"><span class="slider"></span></label></div></div>
+                <div class="settingCard"><div class="settingRow"><div class="settingText"><b>Remember panel position</b><span>Stored separately for each website.</span></div><label class="switch"><input id="settingRememberPosition" type="checkbox"><span class="slider"></span></label></div></div>
+                <div class="settingCard"><div class="settingRow"><div class="settingText"><b>Remember last Fill / QA workspace</b></div><label class="switch"><input id="settingRememberWorkspace" type="checkbox"><span class="slider"></span></label></div></div>
+                <div class="settingCard"><div class="settingRow"><div class="settingText"><b>Show shortcut hints on buttons</b></div><label class="switch"><input id="settingShortcutHints" type="checkbox"><span class="slider"></span></label></div></div>
+                <button class="settingsAction dangerLite" id="resetAllSettings">Reset all settings</button>
+              </section>
+
+              <section class="settingsSection" data-settings-section="fill">
+                <h3>Form Filling</h3><div class="settingsIntro">Choose what happens when you explicitly select Fill Form.</div>
+                <div class="settingCard"><div class="settingText"><b>When I choose Fill Form</b></div><div class="radioGroup">
+                  <label class="radioChoice"><input type="radio" name="settingFillBehavior" value="ask"><span><strong>Ask every time</strong><span>Safest default. Choose Minimum or Fill All for each run.</span></span></label>
+                  <label class="radioChoice"><input type="radio" name="settingFillBehavior" value="minimum"><span><strong>Minimum Required Fields</strong><span>Start the required-fields mode immediately after your Fill action.</span></span></label>
+                  <label class="radioChoice"><input type="radio" name="settingFillBehavior" value="all"><span><strong>Fill All Fields</strong><span>Start full Fill immediately after your Fill action.</span></span></label>
+                </div></div>
+                <div class="settingCard"><div class="settingRow"><div class="settingText"><b>Automatically handle dependent fields</b><span>Wait for and fill State/District and other dynamically loaded dependencies during Fill.</span></div><label class="switch"><input id="settingAutoDependencies" type="checkbox"><span class="slider"></span></label></div></div>
+              </section>
+
+              <section class="settingsSection" data-settings-section="qa">
+                <h3>Functional QA</h3><div class="settingsIntro">Control safe Next / Continue journey checks. Final actions remain protected.</div>
+                <div class="settingCard"><div class="settingText"><b>Journey progression</b></div><div class="radioGroup">
+                  <label class="radioChoice"><input type="radio" name="settingQaProgression" value="auto-safe"><span><strong>Automatically use safe Next / Continue</strong><span>Recommended. Never includes final Submit/Payment/Finalize.</span></span></label>
+                  <label class="radioChoice"><input type="radio" name="settingQaProgression" value="ask"><span><strong>Ask before every progression</strong></span></label>
+                  <label class="radioChoice"><input type="radio" name="settingQaProgression" value="never"><span><strong>Never progress automatically</strong></span></label>
+                </div></div>
+                <div class="settingCard lockCard"><div class="settingRow"><div class="settingText"><b>Final submission protection</b></div><span class="lockBadge">LOCKED ON</span></div></div>
+              </section>
+
+              <section class="settingsSection" data-settings-section="reports">
+                <h3>Reports</h3><div class="settingsIntro">Choose what happens after Functional QA finishes.</div>
+                <div class="settingCard"><div class="settingRow"><div class="settingText"><b>Open report automatically after QA</b></div><label class="switch"><input id="settingAutoOpenReport" type="checkbox"><span class="slider"></span></label></div></div>
+                <div class="settingCard"><div class="settingRow"><div class="settingText"><b>Automatic Debug export</b><span>Off by default.</span></div><label class="switch"><input id="settingAutoDebugExport" type="checkbox"><span class="slider"></span></label></div></div>
+              </section>
+
+              <section class="settingsSection" data-settings-section="shortcuts">
+                <h3>Keyboard Shortcuts</h3><div class="settingsIntro">Click Change, then press the new combination. Browser-reserved and duplicate shortcuts are rejected.</div>
+                <div class="shortcutTable" id="shortcutList"></div>
+                <div class="settingsMessage" id="shortcutMessage"></div>
+                <button class="settingsAction" id="resetShortcuts">Reset shortcuts to defaults</button>
+              </section>
+            </main>
+          </div>
+        </div>
+      </div>
     `;
 
     document.body.appendChild(host);
@@ -18706,7 +19110,13 @@
       bar: $('bar'),
       stage: $('stage'),
       status: $('status'),
-      modal: $('modalBack')
+      modal: $('modalBack'),
+      settingsBtn: $('settingsBtn'),
+      settingsBack: $('settingsBack'),
+      settingsClose: $('settingsClose'),
+      settingsNav: $('settingsNav'),
+      shortcutList: $('shortcutList'),
+      shortcutMessage: $('shortcutMessage')
     };
 
     if (
@@ -18715,6 +19125,182 @@
       refs.creatorEmail.textContent =
         'akash.singh@meritto.com';
     }
+
+    const setShortcutMessage = (text = '', type = '') => {
+      if (!refs.shortcutMessage) return;
+      refs.shortcutMessage.textContent = text;
+      refs.shortcutMessage.className = `settingsMessage${type ? ` ${type}` : ''}`;
+    };
+
+    const applyShortcutHints = () => {
+      const mapping = [
+        [refs.fillBtn, 'fill'],
+        [refs.correctBtn, 'recheck'],
+        [refs.validateBtn, 'validate'],
+        [refs.undoBtn, 'undo'],
+        [refs.newBtn, 'newApplicant'],
+        [refs.debugBtn, 'debug'],
+        [refs.qaRunBtn, 'qa'],
+        [refs.qaExportBtn, 'report']
+      ];
+
+      for (const [button, action] of mapping) {
+        if (!button) continue;
+        const shortcut = state.settings?.shortcuts?.[action] || '';
+        if (state.settings?.general?.showShortcutHints && shortcut) {
+          button.dataset.shortcut = displayShortcut(shortcut);
+          button.classList.add('shortcutEnabled');
+        } else {
+          delete button.dataset.shortcut;
+          button.classList.remove('shortcutEnabled');
+        }
+      }
+    };
+
+    const renderShortcutRows = () => {
+      if (!refs.shortcutList) return;
+      const actions = Object.keys(DEFAULT_SHORTCUTS);
+      refs.shortcutList.innerHTML = actions.map(action => {
+        const shortcut = state.settings?.shortcuts?.[action] || '';
+        const capturing = state.shortcutCaptureAction === action;
+        return `
+          <div class="shortcutRow">
+            <div class="shortcutName">${shortcutActionLabel(action)}</div>
+            <div class="shortcutChip">${capturing ? 'Press shortcut…' : displayShortcut(shortcut)}</div>
+            <button class="shortcutBtn${capturing ? ' capture' : ''}" data-shortcut-change="${action}">${capturing ? 'Listening…' : 'Change'}</button>
+            <button class="shortcutBtn" data-shortcut-disable="${action}" ${shortcut ? '' : 'disabled'}>Disable</button>
+          </div>
+        `;
+      }).join('');
+    };
+
+    const renderSettings = () => {
+      const s = state.settings = loadSettings();
+      const setChecked = (id, value) => { const el = $(id); if (el) el.checked = !!value; };
+      setChecked('settingAutoShow', s.general.autoShow);
+      setChecked('settingStartMinimized', s.general.startMinimized);
+      setChecked('settingRememberPosition', s.general.rememberPosition);
+      setChecked('settingRememberWorkspace', s.general.rememberWorkspace);
+      setChecked('settingShortcutHints', s.general.showShortcutHints);
+      setChecked('settingAutoDependencies', s.fill.autoDependencies);
+      setChecked('settingAutoOpenReport', s.qa.autoOpenReport);
+      setChecked('settingAutoDebugExport', s.reports.autoDebugExport);
+
+      shadow.querySelectorAll('input[name="settingFillBehavior"]').forEach(input => {
+        input.checked = input.value === s.fill.behavior;
+      });
+      shadow.querySelectorAll('input[name="settingQaProgression"]').forEach(input => {
+        input.checked = input.value === s.qa.progression;
+      });
+
+      renderShortcutRows();
+      applyShortcutHints();
+      if (refs.settingsBtn) {
+        const shortcut = state.settings?.shortcuts?.settings || '';
+        refs.settingsBtn.title = shortcut ? `Settings • ${displayShortcut(shortcut)}` : 'Settings';
+      }
+    };
+
+    const openSettings = () => {
+      state.shortcutCaptureAction = null;
+      renderSettings();
+      setShortcutMessage('');
+      refs.settingsBack.style.display = 'flex';
+    };
+
+    const closeSettings = () => {
+      state.shortcutCaptureAction = null;
+      refs.settingsBack.style.display = 'none';
+      renderShortcutRows();
+    };
+
+    const bindSettingToggle = (id, group, key) => {
+      const input = $(id);
+      if (!input) return;
+      input.addEventListener('change', () => {
+        updateSetting(group, key, !!input.checked);
+        if (id === 'settingShortcutHints') applyShortcutHints();
+      });
+    };
+
+    bindSettingToggle('settingAutoShow', 'general', 'autoShow');
+    bindSettingToggle('settingStartMinimized', 'general', 'startMinimized');
+    bindSettingToggle('settingRememberPosition', 'general', 'rememberPosition');
+    bindSettingToggle('settingRememberWorkspace', 'general', 'rememberWorkspace');
+    bindSettingToggle('settingShortcutHints', 'general', 'showShortcutHints');
+    bindSettingToggle('settingAutoDependencies', 'fill', 'autoDependencies');
+    bindSettingToggle('settingAutoOpenReport', 'qa', 'autoOpenReport');
+    bindSettingToggle('settingAutoDebugExport', 'reports', 'autoDebugExport');
+
+    shadow.querySelectorAll('input[name="settingFillBehavior"]').forEach(input => {
+      input.addEventListener('change', () => {
+        if (input.checked) updateSetting('fill', 'behavior', input.value);
+      });
+    });
+
+    shadow.querySelectorAll('input[name="settingQaProgression"]').forEach(input => {
+      input.addEventListener('change', () => {
+        if (input.checked) updateSetting('qa', 'progression', input.value);
+      });
+    });
+
+    refs.settingsNav?.addEventListener('click', event => {
+      const button = event.target?.closest?.('[data-settings-target]');
+      if (!button) return;
+      const target = button.getAttribute('data-settings-target');
+      refs.settingsNav.querySelectorAll('.settingsNavBtn').forEach(item => item.classList.toggle('active', item === button));
+      shadow.querySelectorAll('[data-settings-section]').forEach(section => section.classList.toggle('active', section.getAttribute('data-settings-section') === target));
+    });
+
+    refs.shortcutList?.addEventListener('click', event => {
+      const change = event.target?.closest?.('[data-shortcut-change]');
+      const disable = event.target?.closest?.('[data-shortcut-disable]');
+      if (change) {
+        state.shortcutCaptureAction = change.getAttribute('data-shortcut-change');
+        setShortcutMessage('Press the new shortcut now. Esc cancels capture.');
+        renderShortcutRows();
+        return;
+      }
+      if (disable) {
+        const action = disable.getAttribute('data-shortcut-disable');
+        const next = mergeSettings(state.settings);
+        next.shortcuts[action] = '';
+        saveSettings(next);
+        state.shortcutCaptureAction = null;
+        setShortcutMessage(`${shortcutActionLabel(action)} shortcut disabled.`, 'ok');
+        renderShortcutRows();
+        applyShortcutHints();
+      }
+    });
+
+    $('resetShortcuts')?.addEventListener('click', () => {
+      resetShortcutSettings();
+      state.shortcutCaptureAction = null;
+      setShortcutMessage('Shortcuts reset to defaults.', 'ok');
+      renderShortcutRows();
+      applyShortcutHints();
+    });
+
+    $('resetAllSettings')?.addEventListener('click', () => {
+      resetAllSettings();
+      try { GM_setValue(`${PANEL_POSITION_KEY_PREFIX}${location.hostname}`, null); } catch {}
+      host.style.left = 'auto';
+      host.style.top = 'auto';
+      host.style.right = '8px';
+      host.style.bottom = '8px';
+      state.shortcutCaptureAction = null;
+      renderSettings();
+      setShortcutMessage('All settings reset to defaults.', 'ok');
+    });
+
+    shadow.addEventListener('keydown', event => {
+      if (state.shortcutCaptureAction) handleShortcutCapture(event);
+    }, true);
+
+    refs.settingsClose?.addEventListener('click', closeSettings);
+    refs.settingsBack?.addEventListener('click', event => {
+      if (event.target === refs.settingsBack) closeSettings();
+    });
 
     const fitPanelToViewport = () => {
       if (
@@ -18794,6 +19380,10 @@
     const showWorkspace = workspace => {
       const next = workspace === 'qa' ? 'qa' : 'fill';
       state.workspace = next;
+
+      if (state.settings?.general?.rememberWorkspace) {
+        updateSetting('general', 'lastWorkspace', next);
+      }
 
       refs.fillTab?.classList.toggle('active', next === 'fill');
       refs.qaTab?.classList.toggle('active', next === 'qa');
@@ -19019,14 +19609,14 @@
         } else {
           refs.fillBtn.textContent = 'Fill Form';
           refs.fillBtn.classList.remove('danger');
-          refs.fillBtn.onclick = showModeDialog;
+          refs.fillBtn.onclick = () => requestFillAction({ source: 'button' });
           if (refs.qaRunBtn) {
             refs.qaRunBtn.textContent = 'Run Functional QA';
             refs.qaRunBtn.classList.remove('danger');
-            refs.qaRunBtn.onclick = runSmartQaAudit;
+            refs.qaRunBtn.onclick = () => runSmartQaAudit({ source: 'button' });
           }
           if (refs.qaRefreshBtn) {
-            refs.qaRefreshBtn.onclick = runSmartQaAudit;
+            refs.qaRefreshBtn.onclick = () => runSmartQaAudit({ source: 'button' });
           }
           if (refs.qaExportBtn) {
             refs.qaExportBtn.disabled = !state.qaReport;
@@ -19037,16 +19627,32 @@
         }
       },
 
-      showModeDialog() {
+      showModeDialog(context = {}) {
+        state.pendingFillContext = context || {};
         refs.modal.style.display = 'flex';
       },
 
+      openSettings,
+      closeSettings,
+      refreshSettings: renderSettings,
+      setShortcutMessage,
+      applyShortcutHints,
       showWorkspace,
       minimize,
-      restore
+      restore,
+      toggle() {
+        if (host.style.display === 'none') {
+          host.style.display = 'block';
+          restore();
+        } else if (refs.panel.style.display === 'none') {
+          restore();
+        } else {
+          minimize();
+        }
+      }
     };
 
-    refs.fillBtn.onclick = showModeDialog;
+    refs.fillBtn.onclick = () => requestFillAction({ source: 'button' });
     refs.correctBtn.onclick = () =>
       runSmartAction(
         'recheck'
@@ -19057,8 +19663,8 @@
         'validate'
       );
 
-    refs.undoBtn.onclick =
-      smartUndo;
+    refs.undoBtn.onclick = () =>
+      smartUndo(null, 'button');
 
     refs.newBtn.onclick = () => {
       // A fresh synthetic applicant is global to this userscript; child
@@ -19069,8 +19675,8 @@
       newApplicant();
     };
 
-    refs.debugBtn.onclick =
-      smartDebugExport;
+    refs.debugBtn.onclick = () =>
+      smartDebugExport(null);
 
     refs.fillTab.onclick = () =>
       showWorkspace('fill');
@@ -19078,8 +19684,8 @@
     refs.qaTab.onclick = () =>
       showWorkspace('qa');
 
-    refs.qaRunBtn.onclick =
-      runSmartQaAudit;
+    refs.qaRunBtn.onclick = () =>
+      runSmartQaAudit({ source: 'button' });
 
     const bindQaAction = (button, handler) => {
       if (!button) return;
@@ -19121,7 +19727,6 @@
     $('errorsCard').onclick = () => navigateSmartStat('errors');
     $('manualCard').onclick = () => navigateSmartStat('manual');
 
-    cleanupLegacyDateWidgetDamage();
     installLiveValidation();
 
     fitPanelToViewport();
@@ -19134,6 +19739,7 @@
       }
     );
 
+    refs.settingsBtn.onclick = openSettings;
     $('minimize').onclick = minimize;
     refs.mini.onclick = restore;
 
@@ -19144,10 +19750,14 @@
     $('minChoice').onclick = () => {
       refs.modal.style.display = 'none';
 
+      const context = state.pendingFillContext || {};
+      state.pendingFillContext = null;
       runSmartAction(
         'fill',
         {
-          mode: 'minimum'
+          mode: 'minimum',
+          preferredAgentId: context.preferredAgentId || null,
+          source: context.source || 'button'
         }
       );
     };
@@ -19155,20 +19765,26 @@
     $('allChoice').onclick = () => {
       refs.modal.style.display = 'none';
 
+      const context = state.pendingFillContext || {};
+      state.pendingFillContext = null;
       runSmartAction(
         'fill',
         {
-          mode: 'all'
+          mode: 'all',
+          preferredAgentId: context.preferredAgentId || null,
+          source: context.source || 'button'
         }
       );
     };
 
     $('cancelChoice').onclick = () => {
+      state.pendingFillContext = null;
       refs.modal.style.display = 'none';
     };
 
     refs.modal.addEventListener('click', e => {
       if (e.target === refs.modal) {
+        state.pendingFillContext = null;
         refs.modal.style.display = 'none';
       }
     });
@@ -19213,17 +19829,35 @@
         refs.mini.releasePointerCapture?.(e.pointerId);
       } catch {}
 
+      if (moved && state.settings?.general?.rememberPosition) {
+        try {
+          const rect = host.getBoundingClientRect();
+          GM_setValue(`${PANEL_POSITION_KEY_PREFIX}${location.hostname}`, {
+            left: rect.left,
+            top: rect.top
+          });
+        } catch {}
+      }
+
       if (!moved) {
         restore();
       }
     });
 
     state.panel.refreshProfile();
-    showWorkspace(state.workspace || 'fill');
+    renderSettings();
+    const initialWorkspace = state.settings?.general?.rememberWorkspace
+      ? state.settings?.general?.lastWorkspace || 'fill'
+      : 'fill';
+    showWorkspace(initialWorkspace);
     if (state.qaReport) {
       state.panel.setQaReport(state.qaReport);
     }
     updateCounters();
+
+    if (options.auto && state.settings?.general?.startMinimized) {
+      minimize();
+    }
   };
 
   const maybeResumeAfterReload = () => {
@@ -19231,73 +19865,82 @@
 
     if (
       !session?.active ||
+      session?.resumeAllowed !== true ||
+      session?.actionKind !== 'fill' ||
+      !session?.actionId ||
       session.hostname !== location.hostname
     ) {
-      return;
+      return false;
     }
 
-    const age =
-      Date.now() -
-      Number(
-        session.updatedAt ||
-        session.startedAt ||
-        0
-      );
+    const age = Date.now() - Number(session.updatedAt || session.startedAt || 0);
+    const expiresAt = Number(session.actionExpiresAt || 0);
 
-    if (
-      age > 60000
-    ) {
+    if (age > 60000 || !expiresAt || Date.now() > expiresAt) {
       clearRunSession();
-      return;
+      return false;
     }
 
-    if (
-      Number(session.resumeCount || 0) >= 1
-    ) {
+    if (Number(session.resumeCount || 0) >= 1) {
       clearRunSession();
-
       setTimeout(() => {
         mountPanel();
         state.panel?.setStatus(
           'The form reloaded more than once. Automatic resume stopped to prevent a loop.'
         );
       }, 700);
+      return false;
+    }
 
-      return;
+    const authorization = beginAuthorizedAction('fill', {
+      source: 'reload-continuation',
+      id: String(session.actionId),
+      expiresAt,
+      continuation: true
+    });
+
+    if (!authorization) {
+      clearRunSession();
+      return false;
     }
 
     writeRunSession({
-      resumeCount:
-        Number(
-          session.resumeCount || 0
-        ) + 1
+      resumeCount: Number(session.resumeCount || 0) + 1,
+      resumeAllowed: true,
+      actionId: authorization.id,
+      actionKind: 'fill',
+      actionExpiresAt: authorization.expiresAt
     });
 
-    setTimeout(() => {
+    setTimeout(async () => {
       mountPanel();
-
-      state.panel?.setStatus(
-        'Page reload detected. Resuming Turbo Fill once...'
-      );
-
-      fillForm(
-        session.mode || 'all',
-        {
-          resumed: true
+      state.panel?.setStatus('Page reload detected. Resuming the authorized Fill once...');
+      try {
+        await fillForm(session.mode || 'all', { resumed: true });
+      } finally {
+        if (!state.pageUnloading) {
+          revokeAuthorizedAction(authorization.id, state.stopRequested ? 'resume-stopped' : 'resume-completed');
         }
-      );
+      }
     }, 850);
+
+    return true;
   };
 
   if (IS_TOP) {
     installTopBridge();
+    installTopShortcutEngine();
 
     GM_registerMenuCommand(
       'Activate Smart FormSense',
       mountPanel
     );
 
-    maybeResumeAfterReload();
+    const resuming = maybeResumeAfterReload();
+
+    if (!resuming && state.settings?.general?.autoShow) {
+      mountPanel({ auto: true });
+    }
   } else {
     installFrameAgent();
   }
