@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Smart FormSense
 // @namespace    smart-form-filler
-// @version      17.14.0
+// @version      17.15.0
 // @description  Intelligent form filling and QA testing for authorized web-form validation, readiness checks, embedded forms, safe repair, and synthetic test data.
 // @author       Akash Singh
 // @match        *://*/*
@@ -46,7 +46,7 @@
 
   const SETTINGS_KEY = 'STFF_V17_14_SETTINGS';
   const PANEL_POSITION_KEY_PREFIX = 'STFF_V17_14_PANEL_POSITION:';
-  const SETTINGS_VERSION = 1;
+  const SETTINGS_VERSION = 2;
   const ACTION_DEFAULT_TTL_MS = 5 * 60 * 1000;
 
   const BRIDGE_MARKER = '__STFF_V17_7_BRIDGE__';
@@ -115,7 +115,9 @@
     qaReportAgentId: null,
     qaDebugAwaiting: false,
     qaNavIndex: 0,
-    qaProgressPercent: 0
+    qaProgressPercent: 0,
+    panelScale: 100,
+    statusRefreshTimer: null
   };
 
   const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
@@ -200,7 +202,7 @@
     );
 
     console.error(
-      `Smart FormSense V17.14.0 [${stage}]`,
+      `Smart FormSense V17.15.0 [${stage}]`,
       error
     );
 
@@ -268,9 +270,11 @@
     general: {
       autoShow: false,
       startMinimized: false,
-      rememberPosition: true,
-      rememberWorkspace: true,
-      showShortcutHints: true,
+      rememberPosition: false,
+      rememberWorkspace: false,
+      showShortcutHints: false,
+      completionNotifications: true,
+      defaultWorkspace: 'fill',
       lastWorkspace: 'fill'
     },
     fill: {
@@ -311,6 +315,19 @@
         const value = stored.shortcuts[key];
         if (typeof value === 'string') next.shortcuts[key] = value;
       }
+    }
+
+    const storedVersion = Number(stored.version || 0);
+    if (storedVersion < 2) {
+      next.general.rememberPosition = false;
+      next.general.rememberWorkspace = false;
+      next.general.showShortcutHints = false;
+      next.general.completionNotifications = true;
+      next.general.defaultWorkspace = 'fill';
+    }
+
+    if (!['fill', 'qa'].includes(next.general.defaultWorkspace)) {
+      next.general.defaultWorkspace = 'fill';
     }
 
     next.version = SETTINGS_VERSION;
@@ -11652,8 +11669,10 @@
     state.stats.errors.clear();
     state.stats.manual.clear();
     state.panel?.setStatus(`Undo complete. Restored ${restored} field(s).`);
-    updateCounters();
+    state.panel?.setMode('ready');
+    refreshCurrentStatus();
     setProgress(0, 'Ready');
+    return restored;
   };
 
   const newApplicant = () => {
@@ -11669,7 +11688,8 @@
     state.formModel.clear();
     state.panel?.refreshProfile();
     state.panel?.setStatus(`New applicant created: ${profile.fullName}`);
-    updateCounters();
+    state.panel?.setMode('ready');
+    refreshCurrentStatus();
     setProgress(0, 'Ready');
   };
 
@@ -11688,15 +11708,69 @@
     }
   };
 
-  const updateCounters = () => {
+  const refreshCurrentStatus = () => {
+    const next = {
+      filled: new Set(),
+      preserved: new Set(),
+      review: new Set(),
+      errors: new Set(),
+      manual: new Set()
+    };
+
+    try {
+      for (const doc of collectDocuments()) {
+        for (const el of allFields(doc)) {
+          if (!el || isLikelyInternalField(el)) continue;
+          const key = fieldKey(el);
+          if (!key) continue;
+          const target = visualTarget(el) || el;
+          const expected = state.lastScriptValues.get(key);
+
+          if (expected && sameState(currentState(el), expected)) {
+            next.filled.add(key);
+          } else if (fieldHasValue(el)) {
+            next.preserved.add(key);
+          }
+
+          if (target?.getAttribute?.(REVIEW_ATTR)) next.review.add(key);
+          if (target?.getAttribute?.(ERROR_ATTR)) next.errors.add(key);
+          if (target?.getAttribute?.(MANUAL_ATTR)) next.manual.add(key);
+        }
+      }
+    } catch {}
+
+    state.stats.filled = next.filled;
+    state.stats.preserved = next.preserved;
+    state.stats.review = next.review;
+    state.stats.errors = next.errors;
+    state.stats.manual = next.manual;
+
     state.panel?.setCounters({
-      filled: state.stats.filled.size,
-      preserved: state.stats.preserved.size,
-      review: state.stats.review.size,
-      errors: state.stats.errors.size,
-      manual: state.stats.manual.size
+      filled: next.filled.size,
+      preserved: next.preserved.size,
+      review: next.review.size,
+      errors: next.errors.size,
+      manual: next.manual.size
     });
+
+    return {
+      filled: next.filled.size,
+      preserved: next.preserved.size,
+      review: next.review.size,
+      errors: next.errors.size,
+      manual: next.manual.size
+    };
   };
+
+  const scheduleCurrentStatusRefresh = (delay = 40) => {
+    if (state.statusRefreshTimer) clearTimeout(state.statusRefreshTimer);
+    state.statusRefreshTimer = setTimeout(() => {
+      state.statusRefreshTimer = null;
+      refreshCurrentStatus();
+    }, Math.max(0, Number(delay || 0)));
+  };
+
+  const updateCounters = () => refreshCurrentStatus();
 
 
   const statSet = type => {
@@ -11902,7 +11976,7 @@
         state.stats.filled.delete(key);
       }
 
-      updateCounters();
+      scheduleCurrentStatusRefresh(25);
     };
 
     document.addEventListener('input', observeTrustedEdit, true);
@@ -12385,7 +12459,7 @@
     const report = {
       reportVersion: 1,
       generatedBy:
-        'Smart FormSense V17.14.0',
+        'Smart FormSense V17.15.0',
       generatedAt:
         new Date().toISOString(),
       mode:
@@ -12550,7 +12624,7 @@
       return report;
     } catch (error) {
       console.error(
-        'Smart FormSense V17.14.0 debug export:',
+        'Smart FormSense V17.15.0 debug export:',
         error
       );
 
@@ -13637,7 +13711,7 @@
       product:
         'Smart FormSense',
       productVersion:
-        '17.14.0',
+        '17.15.0',
       generatedAt,
       auditType:
         'Non-destructive Form Readiness Audit',
@@ -13912,6 +13986,55 @@
       ? `<section class="sectionBlock"><div class="sectionHead"><div><span class="eyebrow blueEye">QA COVERAGE</span><h2>What Smart FormSense checked</h2></div><span class="countBadge blueBadge">${checkedThings.length}</span></div><div class="checkedGrid">${checkedThings.map(item => `<div class="checkedCard"><span class="checkDot">•</span><span>${esc(item)}</span></div>`).join('')}</div></section>`
       : '';
 
+    const detailCases = (qa.testCases || []).filter(item =>
+      item && item.status && item.name && item.category !== 'Form Detection'
+    );
+    const detailGroups = new Map();
+    for (const item of detailCases) {
+      const groupName = qaCleanLabel(item.field || item.category || 'Form Journey');
+      const group = detailGroups.get(groupName) || { name: groupName, rows: [] };
+      group.rows.push(item);
+      detailGroups.set(groupName, group);
+    }
+
+    const detailStatus = item => {
+      if (item.status === 'passed') return { cls: 'detailPass', icon: '✓', label: 'Passed' };
+      if (item.status === 'failed' || item.status === 'blocker') return { cls: 'detailFail', icon: '✕', label: 'Failed' };
+      return { cls: 'detailReview', icon: '!', label: item.status === 'manual' ? 'Manual' : 'Review' };
+    };
+
+    const detailAttempt = item => {
+      const evidence = item.evidence || {};
+      const hasEvidenceValue = Object.prototype.hasOwnProperty.call(evidence, 'attemptedValue');
+      const isValueCase = ['Input Validation', 'Mandatory Validation', 'Basic Field Behaviour'].includes(String(item.category || ''));
+      if (!hasEvidenceValue && !isValueCase) return null;
+      const value = hasEvidenceValue ? evidence.attemptedValue : item.attemptedValue;
+      return value === '' ? '"" (empty)' : JSON.stringify(String(value ?? ''));
+    };
+
+    const detailedHtml = detailGroups.size
+      ? `<section class="sectionBlock"><div class="sectionHead"><div><span class="eyebrow blueEye">DETAILED VALIDATION</span><h2>Exactly what was tested</h2></div><span class="countBadge blueBadge">${detailCases.length}</span></div><div class="detailIntro">Related checks are grouped by field. Each validation shows the exact value Smart FormSense used, the trigger, and what the website actually did.</div>${[...detailGroups.values()].map(group => {
+          const passedCount = group.rows.filter(row => row.status === 'passed').length;
+          const failedCount = group.rows.filter(row => ['failed', 'blocker'].includes(row.status)).length;
+          const groupClass = failedCount ? 'detailGroupFail' : passedCount === group.rows.length ? 'detailGroupPass' : 'detailGroupReview';
+          return `<details class="detailGroup ${groupClass}" ${failedCount ? 'open' : ''}>
+            <summary><span>${esc(group.name)}</span><b>${passedCount}/${group.rows.length} passed</b></summary>
+            <div class="detailRows">${group.rows.map(item => {
+              const statusInfo = detailStatus(item);
+              const attempted = detailAttempt(item);
+              const trigger = item.evidence?.trigger || item.evidence?.buttonText || item.evidence?.method || '';
+              return `<div class="detailRow ${statusInfo.cls}">
+                <div class="detailRowHead"><span class="detailIcon">${statusInfo.icon}</span><strong>${esc(item.name)}</strong><span class="detailLabel">${statusInfo.label}</span></div>
+                ${attempted !== null ? `<div class="detailValue"><b>Tested value:</b> <code>${esc(attempted)}</code></div>` : ''}
+                ${trigger ? `<div class="detailLine"><b>Trigger:</b> ${esc(trigger)}</div>` : ''}
+                ${item.expected ? `<div class="detailLine"><b>Expected:</b> ${esc(item.expected)}</div>` : ''}
+                <div class="detailLine"><b>Observed:</b> ${esc(item.actual || 'No additional observation was recorded.')}</div>
+              </div>`;
+            }).join('')}</div>
+          </details>`;
+        }).join('')}</section>`
+      : '';
+
     const manualHtml = '';
 
     const uncoveredHtml = uncovered.length
@@ -13925,7 +14048,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Smart FormSense QA Report</title>
 <style>
-*{box-sizing:border-box}body{margin:0;background:#f5f7fb;color:#202435;font-family:Inter,Segoe UI,Arial,sans-serif}.wrap{max-width:900px;margin:auto;padding:22px 18px 48px}.reportActions{position:sticky;top:10px;z-index:20;display:flex;justify-content:flex-end;margin-bottom:10px}.pdfBtn{border:0;border-radius:11px;padding:10px 15px;background:#4f46e5;color:#fff;font-size:11px;font-weight:900;cursor:pointer;box-shadow:0 8px 22px rgba(79,70,229,.22)}.pdfBtn:hover{background:#4338ca}.hero{background:linear-gradient(135deg,#ffffff 0%,#f7f5ff 58%,#eef7ff 100%);border:1px solid #e5e7f2;border-radius:22px;padding:24px;box-shadow:0 14px 36px rgba(61,50,123,.07)}.brand{font-size:12px;font-weight:900;letter-spacing:.08em;color:#6657e8}.hero h1{font-size:24px;margin:6px 0 4px}.meta{font-size:11px;color:#777d8e;line-height:1.55}.status{display:inline-flex;align-items:center;margin-top:14px;padding:7px 11px;border-radius:999px;font-size:11px;font-weight:900}.goodStatus{background:#dcfce7;color:#166534}.reviewStatus{background:#fef3c7;color:#92400e}.issueStatus{background:#fee2e2;color:#991b1b}.partialStatus{background:#e0e7ff;color:#3730a3}.overview{margin-top:12px;font-size:13px;line-height:1.6;color:#4d5568}.summary{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:18px}.metric{border-radius:14px;padding:13px 10px;border:1px solid}.metric b{display:block;font-size:20px;line-height:1.1}.metric span{display:block;font-size:9px;font-weight:850;letter-spacing:.04em;margin-top:5px}.coverageMetric{background:#eff6ff;border-color:#bfdbfe;color:#1d4ed8}.issueMetric{background:#fff1f2;border-color:#fecdd3;color:#be123c}.reviewMetric{background:#fffbeb;border-color:#fde68a;color:#a16207}.passMetric{background:#f0fdf4;border-color:#bbf7d0;color:#15803d}.coverageBar{height:7px;background:#dbeafe;border-radius:999px;overflow:hidden;margin-top:8px}.coverageFill{height:100%;background:linear-gradient(90deg,#4f46e5,#06b6d4);border-radius:999px}.journeyGrid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:12px}.journeyCard{background:#fff;border:1px solid #e6e8ef;border-radius:13px;padding:11px 12px}.journeyCard span{font-size:9px;color:#7b8190;font-weight:800}.journeyCard b{display:block;margin-top:4px;font-size:11px}.good{color:#15803d}.bad{color:#b91c1c}.reviewTone{color:#a16207}.partial{margin-top:14px;background:#fff7ed;border:1px solid #fed7aa;border-radius:13px;padding:11px 13px;font-size:11px;color:#9a3412}.sectionBlock{margin-top:28px}.sectionHead{display:flex;align-items:end;justify-content:space-between;margin-bottom:10px}.sectionHead h2{font-size:17px;margin:3px 0 0}.eyebrow{font-size:9px;font-weight:900;letter-spacing:.12em}.redEye{color:#dc2626}.amberEye{color:#d97706}.blueEye{color:#2563eb}.countBadge{min-width:28px;height:28px;border-radius:999px;display:grid;place-items:center;font-size:11px;font-weight:900}.redBadge{background:#fee2e2;color:#b91c1c}.amberBadge{background:#fef3c7;color:#92400e}.blueBadge{background:#dbeafe;color:#1d4ed8}.item{display:flex;gap:12px;background:#fff;border:1px solid #e5e7ed;border-radius:15px;padding:14px;margin:9px 0;box-shadow:0 5px 16px rgba(30,41,59,.035)}.item.issue{border-color:#fecaca;background:linear-gradient(135deg,#fff,#fff7f7)}.iconBox{width:28px;height:28px;border-radius:9px;display:grid;place-items:center;font-weight:950;flex:0 0 auto}.issueIcon{background:#fee2e2;color:#b91c1c}.itemBody{min-width:0;flex:1}.itemTitle{font-size:14px;font-weight:900}.fields,.what,.action{margin-top:6px;font-size:11px;line-height:1.58;color:#606778}.fields b,.action b{color:#343949}.action{background:#fff;border:1px solid #fee2e2;border-radius:9px;padding:9px 10px}.checkedGrid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}.checkedCard{display:flex;align-items:center;gap:8px;background:#fff;border:1px solid #dbeafe;border-radius:12px;padding:10px 11px;color:#334155;font-size:11px;font-weight:700}.checkDot{width:20px;height:20px;border-radius:7px;display:grid;place-items:center;background:#dbeafe;color:#1d4ed8;font-size:13px;font-weight:950;flex:0 0 auto}.fieldChips{display:flex;flex-wrap:wrap;gap:7px;background:#fff;border:1px solid #fde68a;border-radius:14px;padding:12px}.fieldChips span{background:#fffbeb;border:1px solid #fde68a;color:#92400e;border-radius:999px;padding:6px 9px;font-size:10px;font-weight:750}.missedChips{border-color:#fecaca}.missedChips span{background:#fff1f2;border-color:#fecaca;color:#991b1b}.passed{margin-top:26px;background:linear-gradient(135deg,#ecfdf5,#f0fdf4);border:1px solid #bbf7d0;border-radius:15px;padding:14px;color:#166534;font-size:12px;font-weight:750}.note{margin-top:18px;background:#fff;border:1px solid #e7e9ef;border-radius:13px;padding:12px;font-size:10px;line-height:1.6;color:#858b99}.footer{text-align:center;margin-top:24px;font-size:10px;color:#979baa}@media(max-width:680px){.summary{grid-template-columns:repeat(2,1fr)}.journeyGrid,.checkedGrid{grid-template-columns:1fr}.hero{padding:18px}}@media print{body{background:#fff;font-size:10px}.wrap{padding:0 3mm;max-width:none}.reportActions{display:none!important}.hero,.item{box-shadow:none}.hero{padding:14px;border-radius:14px}.hero h1{font-size:20px}.summary,.journeyGrid{gap:6px}.metric,.journeyCard{padding:8px}.sectionBlock{margin-top:16px;break-inside:avoid}.sectionHead{margin-bottom:6px}.checkedGrid{gap:5px}.checkedCard{padding:7px 9px}.passed{margin-top:14px;padding:10px}.note{margin-top:10px;padding:9px}.footer{margin-top:10px}}
+*{box-sizing:border-box}body{margin:0;background:#f5f7fb;color:#202435;font-family:Inter,Segoe UI,Arial,sans-serif}.wrap{max-width:900px;margin:auto;padding:22px 18px 48px}.reportActions{position:sticky;top:10px;z-index:20;display:flex;justify-content:flex-end;margin-bottom:10px}.pdfBtn{border:0;border-radius:11px;padding:10px 15px;background:#4f46e5;color:#fff;font-size:11px;font-weight:900;cursor:pointer;box-shadow:0 8px 22px rgba(79,70,229,.22)}.pdfBtn:hover{background:#4338ca}.hero{background:linear-gradient(135deg,#ffffff 0%,#f7f5ff 58%,#eef7ff 100%);border:1px solid #e5e7f2;border-radius:22px;padding:24px;box-shadow:0 14px 36px rgba(61,50,123,.07)}.brand{font-size:12px;font-weight:900;letter-spacing:.08em;color:#6657e8}.hero h1{font-size:24px;margin:6px 0 4px}.meta{font-size:11px;color:#777d8e;line-height:1.55}.status{display:inline-flex;align-items:center;margin-top:14px;padding:7px 11px;border-radius:999px;font-size:11px;font-weight:900}.goodStatus{background:#dcfce7;color:#166534}.reviewStatus{background:#fef3c7;color:#92400e}.issueStatus{background:#fee2e2;color:#991b1b}.partialStatus{background:#e0e7ff;color:#3730a3}.overview{margin-top:12px;font-size:13px;line-height:1.6;color:#4d5568}.summary{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:18px}.metric{border-radius:14px;padding:13px 10px;border:1px solid}.metric b{display:block;font-size:20px;line-height:1.1}.metric span{display:block;font-size:9px;font-weight:850;letter-spacing:.04em;margin-top:5px}.coverageMetric{background:#eff6ff;border-color:#bfdbfe;color:#1d4ed8}.issueMetric{background:#fff1f2;border-color:#fecdd3;color:#be123c}.reviewMetric{background:#fffbeb;border-color:#fde68a;color:#a16207}.passMetric{background:#f0fdf4;border-color:#bbf7d0;color:#15803d}.coverageBar{height:7px;background:#dbeafe;border-radius:999px;overflow:hidden;margin-top:8px}.coverageFill{height:100%;background:linear-gradient(90deg,#4f46e5,#06b6d4);border-radius:999px}.journeyGrid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:12px}.journeyCard{background:#fff;border:1px solid #e6e8ef;border-radius:13px;padding:11px 12px}.journeyCard span{font-size:9px;color:#7b8190;font-weight:800}.journeyCard b{display:block;margin-top:4px;font-size:11px}.good{color:#15803d}.bad{color:#b91c1c}.reviewTone{color:#a16207}.partial{margin-top:14px;background:#fff7ed;border:1px solid #fed7aa;border-radius:13px;padding:11px 13px;font-size:11px;color:#9a3412}.sectionBlock{margin-top:28px}.sectionHead{display:flex;align-items:end;justify-content:space-between;margin-bottom:10px}.sectionHead h2{font-size:17px;margin:3px 0 0}.eyebrow{font-size:9px;font-weight:900;letter-spacing:.12em}.redEye{color:#dc2626}.amberEye{color:#d97706}.blueEye{color:#2563eb}.countBadge{min-width:28px;height:28px;border-radius:999px;display:grid;place-items:center;font-size:11px;font-weight:900}.redBadge{background:#fee2e2;color:#b91c1c}.amberBadge{background:#fef3c7;color:#92400e}.blueBadge{background:#dbeafe;color:#1d4ed8}.item{display:flex;gap:12px;background:#fff;border:1px solid #e5e7ed;border-radius:15px;padding:14px;margin:9px 0;box-shadow:0 5px 16px rgba(30,41,59,.035)}.item.issue{border-color:#fecaca;background:linear-gradient(135deg,#fff,#fff7f7)}.iconBox{width:28px;height:28px;border-radius:9px;display:grid;place-items:center;font-weight:950;flex:0 0 auto}.issueIcon{background:#fee2e2;color:#b91c1c}.itemBody{min-width:0;flex:1}.itemTitle{font-size:14px;font-weight:900}.fields,.what,.action{margin-top:6px;font-size:11px;line-height:1.58;color:#606778}.fields b,.action b{color:#343949}.action{background:#fff;border:1px solid #fee2e2;border-radius:9px;padding:9px 10px}.checkedGrid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}.checkedCard{display:flex;align-items:center;gap:8px;background:#fff;border:1px solid #dbeafe;border-radius:12px;padding:10px 11px;color:#334155;font-size:11px;font-weight:700}.checkDot{width:20px;height:20px;border-radius:7px;display:grid;place-items:center;background:#dbeafe;color:#1d4ed8;font-size:13px;font-weight:950;flex:0 0 auto}.fieldChips{display:flex;flex-wrap:wrap;gap:7px;background:#fff;border:1px solid #fde68a;border-radius:14px;padding:12px}.fieldChips span{background:#fffbeb;border:1px solid #fde68a;color:#92400e;border-radius:999px;padding:6px 9px;font-size:10px;font-weight:750}.detailIntro{font-size:11px;color:#697184;line-height:1.55;margin:-2px 0 10px}.detailGroup{background:#fff;border:1px solid #e5e7ed;border-radius:14px;margin:9px 0;overflow:hidden}.detailGroup summary{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 13px;cursor:pointer;font-size:12px;font-weight:900}.detailGroup summary b{font-size:10px;color:#6b7280}.detailGroupPass{border-left:4px solid #22c55e}.detailGroupFail{border-left:4px solid #ef4444}.detailGroupReview{border-left:4px solid #f59e0b}.detailRows{border-top:1px solid #eef0f4}.detailRow{padding:11px 13px;border-top:1px solid #f0f1f5}.detailRow:first-child{border-top:0}.detailRowHead{display:flex;align-items:center;gap:7px}.detailRowHead strong{font-size:11px;flex:1}.detailIcon{width:20px;height:20px;border-radius:7px;display:grid;place-items:center;font-weight:950}.detailLabel{font-size:8px;font-weight:900;text-transform:uppercase;border-radius:999px;padding:3px 6px}.detailPass .detailIcon,.detailPass .detailLabel{background:#dcfce7;color:#166534}.detailFail .detailIcon,.detailFail .detailLabel{background:#fee2e2;color:#991b1b}.detailReview .detailIcon,.detailReview .detailLabel{background:#fef3c7;color:#92400e}.detailValue,.detailLine{font-size:10px;line-height:1.5;color:#606778;margin-top:5px}.detailValue code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;background:#f6f7fb;color:#312e81;border-radius:6px;padding:2px 5px;word-break:break-all}.detailLine b,.detailValue b{color:#343949}.missedChips{border-color:#fecaca}.missedChips span{background:#fff1f2;border-color:#fecaca;color:#991b1b}.passed{margin-top:26px;background:linear-gradient(135deg,#ecfdf5,#f0fdf4);border:1px solid #bbf7d0;border-radius:15px;padding:14px;color:#166534;font-size:12px;font-weight:750}.note{margin-top:18px;background:#fff;border:1px solid #e7e9ef;border-radius:13px;padding:12px;font-size:10px;line-height:1.6;color:#858b99}.footer{text-align:center;margin-top:24px;font-size:10px;color:#979baa}@media(max-width:680px){.summary{grid-template-columns:repeat(2,1fr)}.journeyGrid,.checkedGrid{grid-template-columns:1fr}.hero{padding:18px}}@media print{body{background:#fff;font-size:10px}.wrap{padding:0 3mm;max-width:none}.reportActions{display:none!important}.hero,.item{box-shadow:none}.hero{padding:14px;border-radius:14px}.hero h1{font-size:20px}.summary,.journeyGrid{gap:6px}.metric,.journeyCard{padding:8px}.sectionBlock{margin-top:16px;break-inside:avoid}.sectionHead{margin-bottom:6px}.checkedGrid{gap:5px}.checkedCard{padding:7px 9px}.passed{margin-top:14px;padding:10px}.note{margin-top:10px;padding:9px}.footer{margin-top:10px}}
 </style>
 </head>
 <body>
@@ -13934,7 +14057,7 @@
   <div class="hero">
     <div class="brand">✦ SMART FORMSENSE QA</div>
     <h1>${esc(qa.page?.title || 'Form')}</h1>
-    <div class="meta">${esc(qa.page?.hostname || location.hostname || '')}<br>${esc(generated)} • v${esc(qa.productVersion || '17.14.0')}</div>
+    <div class="meta">${esc(qa.page?.hostname || location.hostname || '')}<br>${esc(generated)} • v${esc(qa.productVersion || '17.15.0')}</div>
     <div class="status ${statusClass}">${esc(status)}</div>
     <div class="overview">${esc(overview)}</div>
 
@@ -13955,6 +14078,7 @@
   ${qa.incomplete ? `<div class="partial"><b>Partial report.</b> ${esc(qa.summary?.headline || 'QA did not complete.')}</div>` : ''}
   ${confirmedHtml}
   ${checkedHtml}
+  ${detailedHtml}
   ${manualHtml}
   ${uncoveredHtml}
 
@@ -14152,7 +14276,7 @@
       product:
         'Smart FormSense',
       productVersion:
-        '17.14.0',
+        '17.15.0',
       generatedAt:
         new Date().toISOString(),
       purpose:
@@ -14242,7 +14366,7 @@
       return report;
     } catch (error) {
       console.error(
-        'Smart FormSense V17.14.0 QA debug export:',
+        'Smart FormSense V17.15.0 QA debug export:',
         error
       );
 
@@ -14868,52 +14992,53 @@
       );
     };
 
+  const completionDetailFor = (action, result = null) => {
+    const c = result?.counters || refreshCurrentStatus();
+    if (action === 'fill') return `Filled ${Number(c?.filled || 0)} · Existing ${Number(c?.preserved || 0)} · Review ${Number(c?.review || 0)}`;
+    if (action === 'validate') return `${Number(c?.errors || 0)} error(s) · ${Number(c?.review || 0)} review`;
+    if (action === 'recheck') return `${Number(c?.errors || 0)} error(s) remaining · ${Number(c?.review || 0)} review`;
+    return '';
+  };
+
+  const actionCompletionTitle = action => ({
+    fill: '✓ Form filling completed',
+    validate: '✓ Validation completed',
+    recheck: '✓ Recheck completed'
+  }[action] || '✓ Smart FormSense completed');
+
+  const autoScrollAfterValidate = (result = null) => {
+    const c = result?.counters || refreshCurrentStatus();
+    const type = Number(c?.errors || 0) > 0 ? 'errors' : Number(c?.review || 0) > 0 ? 'review' : '';
+    if (!type) return;
+    setTimeout(() => {
+      try { navigateSmartStat(type); } catch {}
+    }, 120);
+  };
+
   const runSmartAction =
     async (
       action,
       extra = {}
     ) => {
-      if (
-        !IS_TOP ||
-        state.running ||
-        state.activeAction
-      ) {
-        return;
-      }
+      if (!IS_TOP || state.running || state.activeAction) return;
 
-      const authorization = beginAuthorizedAction(
-        action,
-        { source: extra.source || 'button' }
-      );
-
+      const authorization = beginAuthorizedAction(action, { source: extra.source || 'button' });
       if (!authorization) return;
 
-      state.panel?.setStatus(
-        'Locating the active form...'
-      );
+      state.panel?.setStatus('Locating the active form...');
+      let completed = false;
+      let result = null;
 
       try {
         let context = null;
-        const preferred = extra.preferredAgentId
-          ? remoteAgentById(extra.preferredAgentId)
-          : null;
-
-        if (preferred?.source) {
-          context = { kind: 'remote', local: localFormMetrics(), agent: preferred };
-        } else {
-          context = await chooseExecutionContext();
-        }
+        const preferred = extra.preferredAgentId ? remoteAgentById(extra.preferredAgentId) : null;
+        if (preferred?.source) context = { kind: 'remote', local: localFormMetrics(), agent: preferred };
+        else context = await chooseExecutionContext();
 
         if (context.kind === 'remote') {
-          await sendRemoteCommand(
-            context.agent,
-            action,
-            extra
-          );
-          return;
-        }
-
-        if (context.kind === 'none') {
+          result = await sendRemoteCommand(context.agent, action, extra);
+          completed = true;
+        } else if (context.kind === 'none') {
           state.panel?.setProgress(0, 'No fillable form detected');
           state.panel?.setStatus(
             hasEmbeddedFormHints()
@@ -14921,16 +15046,18 @@
               : 'No meaningful fillable form was found on this page.'
           );
           return;
+        } else {
+          state.lastRemoteAgentId = null;
+          if (action === 'fill') await fillForm(extra.mode || 'all');
+          else if (action === 'validate') await deepValidateAndAssist();
+          else if (action === 'recheck') await recheckAndCorrect();
+          completed = true;
         }
 
-        state.lastRemoteAgentId = null;
-
-        if (action === 'fill') {
-          await fillForm(extra.mode || 'all');
-        } else if (action === 'validate') {
-          await deepValidateAndAssist();
-        } else if (action === 'recheck') {
-          await recheckAndCorrect();
+        refreshCurrentStatus();
+        if (action === 'validate') autoScrollAfterValidate(result);
+        if (completed) {
+          state.panel?.notify?.(actionCompletionTitle(action), completionDetailFor(action, result), 'success');
         }
       } catch (error) {
         state.running = false;
@@ -14938,14 +15065,11 @@
         state.activeRemoteRequestId = null;
         state.activeRemoteAction = null;
         state.panel?.setBusy(false);
-        state.panel?.setStatus(
-          `Smart FormSense action failed safely: ${error?.message || 'unknown error'}`
-        );
-        setProgress(
-          100,
-          `Action stopped safely: ${error?.message || 'unknown error'}`
-        );
+        state.panel?.setStatus(`Smart FormSense action failed safely: ${error?.message || 'unknown error'}`);
+        state.panel?.notify?.('⚠ Smart FormSense action stopped', error?.message || 'Unknown error', 'error');
+        setProgress(100, `Action stopped safely: ${error?.message || 'unknown error'}`);
       } finally {
+        scheduleCurrentStatusRefresh(40);
         if (!state.pageUnloading) {
           revokeAuthorizedAction(authorization.id, state.stopRequested ? 'stopped' : 'completed');
         }
@@ -16123,11 +16247,14 @@
     };
 
     if (semantic === 'email') {
-      add('email-invalid', 'Reject malformed email', 'qa.invalid@', 'reject');
-      add('email-valid', 'Accept valid email', 'qa.test.user@gmail.com', 'accept');
+      add('email-missing-at', 'Reject email without @', 'akash.gmail.com', 'reject');
+      add('email-missing-user', 'Reject email without username', '@gmail.com', 'reject');
+      add('email-incomplete-domain', 'Reject incomplete email domain', 'akash@gmail', 'reject');
+      add('email-valid', 'Accept valid email', 'smartformsense.qa@gmail.com', 'accept');
     } else if (semantic === 'mobile') {
       add('mobile-alpha', 'Reject alphabetic mobile number', '98ABCD1234', 'reject');
       add('mobile-short', 'Reject short mobile number', '98765', 'reject');
+      add('mobile-long', 'Reject mobile number longer than 10 digits', '98765432101', 'reject');
       add('mobile-valid', 'Accept valid 10-digit mobile number', '9876543210', 'accept');
     } else if (semantic === 'aadhaar') {
       add('aadhaar-alpha', 'Reject alphabetic Aadhaar value', '12AB56789012', 'reject');
@@ -16158,7 +16285,9 @@
       }
     } else if (semantic === 'name') {
       add('name-numeric', 'Reject numeric-only name', '123456', 'reject');
-      add('name-valid', 'Accept normal name', 'Test User', 'accept');
+      add('name-symbols', 'Reject symbol-only name', '@#$%', 'reject');
+      add('name-short', 'Check very short name', 'A', 'reject');
+      add('name-valid', 'Accept normal name', 'Test Akash Singh', 'accept');
     }
 
     const maxLength = Number(el.getAttribute?.('maxlength'));
@@ -16202,14 +16331,109 @@
     return cases.slice(0, 4);
   };
 
+  const qaValidationSafetyAnchors = (focusEl, fields = []) => {
+    const anchors = [];
+    for (const el of fields || []) {
+      if (!el?.isConnected || el === focusEl || isLikelyInternalField(el)) continue;
+      const label = normalize([
+        qaHumanLabel(el),
+        el.name,
+        el.id,
+        el.getAttribute?.('placeholder')
+      ].filter(Boolean).join(' '));
+      const required = !!(qaRequiredSignals(el).visible || qaRequiredSignals(el).configured || isRequired(el));
+      const captchaLike = /captcha|verification code|security code|i am not a robot/.test(label);
+      const consentLike = normalize(el.type) === 'checkbox' && /consent|agree|declaration|terms|privacy/.test(label);
+      if ((required || captchaLike || consentLike) && !fieldHasValue(el)) {
+        anchors.push({ fieldKey: fieldKey(el), label: qaCleanLabel(qaHumanLabel(el), el), type: captchaLike ? 'captcha' : consentLike ? 'consent' : 'required' });
+      }
+    }
+    return anchors;
+  };
+
+  const qaTriggerValidationProbe = async (el, fields = []) => {
+    const buttons = qaFindJourneyButtons();
+    const anchors = qaValidationSafetyAnchors(el, fields);
+    const progression = state.settings?.qa?.progression || 'auto-safe';
+
+    if (buttons.safe[0] && progression === 'auto-safe' && anchors.length) {
+      const result = await qaClickJourneyButton(buttons.safe[0], fields);
+      return {
+        ...result,
+        trigger: `Clicked ${qaButtonText(buttons.safe[0]) || 'Next / Continue'}`,
+        safetyAnchors: anchors,
+        protectedFinal: false
+      };
+    }
+
+    const finalButton = buttons.protectedFinal[0] || null;
+    const form = finalButton?.form || finalButton?.closest?.('form') || el?.form || el?.closest?.('form') || null;
+    if (finalButton && form) {
+      const beforeValidation = qaValidationDigest(fields);
+      let browserValid = null;
+      try {
+        browserValid = typeof form.reportValidity === 'function'
+          ? !!form.reportValidity()
+          : typeof form.checkValidity === 'function'
+            ? !!form.checkValidity()
+            : null;
+      } catch {}
+      await sleep(120);
+      const afterValidation = qaValidationDigest(
+        visibleFillableFields().filter(item => !isLikelyInternalField(item))
+      );
+      const beforeKeys = new Set(beforeValidation.entries.map(item => `${item.fieldKey || ''}|${normalize(item.text)}`));
+      const newValidationEntries = afterValidation.entries.filter(
+        item => !beforeKeys.has(`${item.fieldKey || ''}|${normalize(item.text)}`)
+      );
+      return {
+        trigger: `Protected ${qaButtonText(finalButton) || 'Submit'} validation check`,
+        protectedFinal: true,
+        clicked: false,
+        progressed: false,
+        browserValid,
+        validationBefore: beforeValidation,
+        validationAfter: afterValidation,
+        newValidationEntries,
+        safetyAnchors: anchors
+      };
+    }
+
+    return {
+      trigger: 'Field blur/change validation',
+      protectedFinal: false,
+      clicked: false,
+      progressed: false,
+      validationAfter: qaValidationDigest(fields),
+      newValidationEntries: [],
+      safetyAnchors: anchors
+    };
+  };
+
   const qaRunOneFieldCase = async (el, testCase) => {
     const before = qaVisibleFeedback(el);
     const snapshot = qaSnapshotFieldValue(el);
     const entry = await qaAttemptUserEntry(el, testCase.value);
-    const after = qaVisibleFeedback(el);
+    let after = qaVisibleFeedback(el);
     const exact = entry.acceptedValue === entry.attemptedValue;
-    const newFeedback = after.invalid && (!before.invalid || after.signature !== before.signature);
+    const liveFields = visibleFillableFields().filter(item => !isLikelyInternalField(item));
 
+    let triggerEvidence = null;
+    if (exact && !after.invalid) {
+      triggerEvidence = await qaTriggerValidationProbe(el, liveFields);
+      const mapped = triggerEvidence?.validationAfter?.entries?.find(item => item.fieldKey === fieldKey(el));
+      if (mapped) {
+        after = {
+          invalid: true,
+          signature: normalize(mapped.text || 'validation'),
+          text: mapped.text || 'Validation appeared after form action.'
+        };
+      } else {
+        after = qaVisibleFeedback(el);
+      }
+    }
+
+    const newFeedback = after.invalid && (!before.invalid || after.signature !== before.signature);
     let status = 'passed';
     let actual = '';
 
@@ -16219,14 +16443,22 @@
         actual = `The control prevented or normalized the invalid entry. Accepted value: ${JSON.stringify(entry.acceptedValue)}.`;
       } else if (newFeedback || after.invalid) {
         status = 'passed';
-        actual = `The invalid value produced validation feedback${after.text ? `: ${after.text}` : '.'}`;
+        actual = `The invalid value was rejected${triggerEvidence?.trigger ? ` after ${triggerEvidence.trigger}` : ''}${after.text ? `: ${after.text}` : '.'}`;
+      } else if (triggerEvidence?.progressed) {
+        status = 'failed';
+        actual = `The invalid value ${JSON.stringify(entry.acceptedValue)} was allowed to progress after ${triggerEvidence.trigger || 'the form action'}.`;
       } else {
         status = 'review';
-        actual = 'The invalid value could be entered without immediate feedback. Smart FormSense will confirm it against Next/Continue before calling it a defect.';
+        actual = triggerEvidence?.protectedFinal
+          ? 'The value produced no confirmed validation during the protected final-action check. Smart FormSense did not execute the irreversible final submission.'
+          : 'The invalid value could be entered and no confirmed validation appeared after the available safe trigger.';
       }
-    } else if (exact && !after.invalid) {
+    } else if (exact && !after.invalid && !triggerEvidence?.progressed) {
       status = 'passed';
-      actual = 'The valid value was accepted without a validation error.';
+      actual = `The valid value was accepted without a validation error${triggerEvidence?.trigger ? ` during ${triggerEvidence.trigger}` : ''}.`;
+    } else if (triggerEvidence?.progressed) {
+      status = 'passed';
+      actual = `The valid value was accepted and the form progressed after ${triggerEvidence.trigger || 'the form action'}.`;
     } else {
       status = 'failed';
       actual = exact
@@ -16234,18 +16466,25 @@
         : `The valid value could not be entered as expected. Accepted value: ${JSON.stringify(entry.acceptedValue)}.`;
     }
 
-    await qaRestoreFieldValue(el, snapshot);
+    if (el?.isConnected) await qaRestoreFieldValue(el, snapshot);
 
     return {
       status,
       actual,
       attemptedValue: entry.attemptedValue,
+      progressed: !!triggerEvidence?.progressed,
       evidence: {
         method: entry.method,
         attemptedValue: entry.attemptedValue,
         acceptedValue: entry.acceptedValue,
         feedback: after.text || '',
-        restored: true
+        trigger: triggerEvidence?.trigger || 'Field blur/change validation',
+        protectedFinal: !!triggerEvidence?.protectedFinal,
+        clicked: !!triggerEvidence?.clicked || !!triggerEvidence?.buttonText,
+        progressed: !!triggerEvidence?.progressed,
+        safetyAnchors: triggerEvidence?.safetyAnchors || [],
+        validationEntries: triggerEvidence?.newValidationEntries || [],
+        restored: !!el?.isConnected
       }
     };
   };
@@ -16293,17 +16532,46 @@
     const nativeMissing = !!el.validity?.valueMissing;
     const feedbackAppeared = after.invalid && (!before.invalid || after.signature !== before.signature);
 
-    const status = nativeMissing || feedbackAppeared ? 'passed' : 'review';
-    const actual = status === 'passed'
+    let status = nativeMissing || feedbackAppeared ? 'passed' : 'review';
+    let actual = status === 'passed'
       ? `Empty required value produced validation feedback${after.text ? `: ${after.text}` : '.'}`
-      : 'No field-level validation appeared after leaving the required field empty. It may validate only when the user continues or submits.';
+      : 'No field-level validation appeared after leaving the required field empty.';
+    let triggerEvidence = null;
 
-    await qaRestoreFieldValue(el, snapshot);
+    if (status !== 'passed') {
+      const liveFields = visibleFillableFields().filter(item => !isLikelyInternalField(item));
+      triggerEvidence = await qaTriggerValidationProbe(el, liveFields);
+      const mapped = triggerEvidence?.validationAfter?.entries?.find(item => item.fieldKey === fieldKey(el));
+      const direct = qaVisibleFeedback(el);
+      if (mapped || direct.invalid) {
+        status = 'passed';
+        actual = `Empty required value was blocked after ${triggerEvidence?.trigger || 'the form action'}${mapped?.text || direct.text ? `: ${mapped?.text || direct.text}` : '.'}`;
+      } else if (triggerEvidence?.progressed) {
+        status = 'failed';
+        actual = `The form progressed even though this required field was empty after ${triggerEvidence?.trigger || 'the form action'}.`;
+      } else {
+        actual = triggerEvidence?.protectedFinal
+          ? 'No required-field feedback was confirmed during the protected final-action validation check. Final submission was not executed.'
+          : 'The form stayed on the step, but this required field still needs confirmation.';
+      }
+    }
+
+    if (el?.isConnected) await qaRestoreFieldValue(el, snapshot);
 
     return {
       status,
       actual,
-      feedback: after.text || ''
+      attemptedValue: '',
+      feedback: after.text || '',
+      evidence: triggerEvidence
+        ? {
+            trigger: triggerEvidence.trigger,
+            protectedFinal: !!triggerEvidence.protectedFinal,
+            progressed: !!triggerEvidence.progressed,
+            safetyAnchors: triggerEvidence.safetyAnchors || [],
+            validationEntries: triggerEvidence.newValidationEntries || []
+          }
+        : { trigger: 'Field-level required validation' }
     };
   };
 
@@ -16474,7 +16742,7 @@
       : {
           reportVersion: 7,
           product: 'Smart FormSense',
-          productVersion: '17.14.0',
+          productVersion: '17.15.0',
           generatedAt: new Date().toISOString(),
           auditType: 'Black-box Functional Form QA',
           page: {
@@ -16511,7 +16779,7 @@
     const cleanReason = String(reason || '').slice(0, 500);
     return {
       ...base,
-      productVersion: '17.14.0',
+      productVersion: '17.15.0',
       reportVersion: Math.max(5, Number(base.reportVersion || 0)),
       runState,
       incomplete: runState !== 'completed',
@@ -16662,7 +16930,7 @@
       return {
         reportVersion: 7,
         product: 'Smart FormSense',
-        productVersion: '17.14.0',
+        productVersion: '17.15.0',
         generatedAt,
         completedAt: ['completed', 'stopped', 'failed'].includes(runState) ? new Date().toISOString() : null,
         auditType: 'Black-box Functional Form QA',
@@ -16872,7 +17140,8 @@
             status: result.status,
             expected: 'A required field should stop the applicant when left empty and show a useful message at the right time.',
             actual: result.actual,
-            evidence: { method: 'field-blank-probe', feedback: result.feedback || '' },
+            attemptedValue: '',
+            evidence: { method: 'field-blank-probe', feedback: result.feedback || '', ...(result.evidence || {}) },
             guidance: result.status === 'review'
               ? 'Use the form Continue/Submit action once and confirm this field is caught before the applicant can proceed.'
               : ''
@@ -16936,6 +17205,7 @@
           if (result.status === 'review' && testCase.expectation === 'reject') {
             journeyCandidates.push({ el, testCase });
           }
+          if (result.progressed || !el?.isConnected) break;
         }
 
         const textLikeForBasic =
@@ -17195,6 +17465,11 @@
           : `Functional QA completed • ${report.fieldsChecked}/${report.fieldsAudited} fields covered • ${report.counts.critical} blocker(s) • ${report.counts.warning} failed`
       );
       finishReportPreferences(report);
+      state.panel?.notify?.(
+        report.incomplete ? '⚠ Functional QA stopped' : '✓ Functional QA completed',
+        `${Number(report.counts?.passed || 0)} passed · ${Number(report.counts?.warning || 0)} failed · ${Number(report.counts?.observation || 0)} review`,
+        report.incomplete || Number(report.counts?.warning || 0) ? 'warning' : 'success'
+      );
       return report;
     } catch (error) {
       const reason = error?.message || 'unknown error';
@@ -17330,13 +17605,15 @@
       );
 
       if (agent?.source) {
-        await sendRemoteCommand(agent, 'undo', { source });
-        return;
+        const result = await sendRemoteCommand(agent, 'undo', { source });
+        state.panel?.notify?.('↶ Undo completed', 'Embedded Smart FormSense changes restored', 'success');
+        return result;
       }
 
       state.running = true;
       state.panel?.setBusy(true);
-      undo();
+      const restored = undo();
+      state.panel?.notify?.('↶ Undo completed', `${Number(restored || 0)} Smart FormSense change(s) restored`, 'success');
     } catch (error) {
       state.panel?.setStatus(`Undo stopped safely: ${error?.message || 'unknown error'}`);
     } finally {
@@ -18089,6 +18366,7 @@
 
           try {
             undo();
+            refreshCurrentStatus();
             send('REMOTE_STATUS', { text: 'Embedded form changes undone.' });
             send('REMOTE_COUNTERS', { counters: counters() });
           } finally {
@@ -18357,7 +18635,8 @@
           width:min(320px,calc(100vw - 12px));
           max-height:calc(100vh - 12px);
           border-radius:16px;
-          overflow:auto;
+          overflow-y:auto;
+          overflow-x:hidden;
           background:#fff;
           color:#172033;
           font-family:Inter,Arial,sans-serif;
@@ -18407,6 +18686,20 @@
           transition:.16s ease
         }
         .windowBtn:hover{background:rgba(255,255,255,.28)}
+        .hero{touch-action:none;cursor:grab}
+        .hero.dragging{cursor:grabbing}
+        .hero button,.hero a{cursor:pointer}
+        .profileBottom{display:flex;align-items:center;justify-content:space-between;gap:8px;min-width:0}
+        .profileBottom>span{min-width:0;flex:1}
+        .zoomControls{display:flex;align-items:center;gap:3px;flex:0 0 auto}
+        .zoomBtn{border:0;background:rgba(255,255,255,.16);color:#fff;height:20px;min-width:20px;padding:0 5px;border-radius:6px;font-size:9px;font-weight:850;cursor:pointer;display:grid;place-items:center}
+        .zoomBtn:hover{background:rgba(255,255,255,.28)}
+        .zoomReset{min-width:34px;font-size:8px}
+        .toastStack{position:fixed;right:12px;bottom:12px;width:min(290px,calc(100vw - 24px));display:grid;gap:7px;z-index:60;pointer-events:none}
+        .toast{background:#fff;border:1px solid #e7e3f5;border-radius:11px;padding:9px 10px;box-shadow:0 14px 34px rgba(37,28,76,.18);font-family:Inter,Arial,sans-serif;animation:toastIn .18s ease;color:#312e46}
+        .toast.success{border-left:4px solid #22c55e}.toast.warning{border-left:4px solid #f59e0b}.toast.error{border-left:4px solid #ef4444}
+        .toast b{display:block;font-size:10px}.toast span{display:block;margin-top:2px;font-size:8px;color:#777084;line-height:1.4}
+        @keyframes toastIn{from{opacity:0;transform:translateY(7px)}to{opacity:1;transform:translateY(0)}}
         .profile{
           margin-top:6px;
           position:relative;
@@ -18427,6 +18720,9 @@
         }
         .body{
           padding:9px;
+          min-width:0;
+          max-width:100%;
+          overflow-x:hidden;
           background:linear-gradient(180deg,#fff 0%,#faf9ff 100%)
         }
         .tagline{font-size:8px;opacity:.88;margin-top:2px;font-weight:650}
@@ -18520,7 +18816,7 @@
         .qaIssueMessage{font-size:8px;color:#7b7488;margin-top:2px;line-height:1.35}
         .qaEmpty{font-size:9px;color:#777084;text-align:center;padding:12px 8px;border:1px dashed #ddd6fe;border-radius:9px;background:#fff}
         .qaHint{font-size:8px;color:#8a8fa0;line-height:1.35;margin-top:5px}
-        .panel.qaMode .profile,.panel.qaMode .help,.panel.qaMode .creator{display:none}
+        .panel.qaMode .profile,.panel.qaMode .help{display:none}
         .panel.qaMode .body{padding:8px}
         .panel.qaMode .hero{padding-bottom:8px}
         .qaCompactHead{display:flex;align-items:center;justify-content:space-between;gap:10px;border:1px solid #e4defb;border-radius:11px;padding:8px 9px;background:linear-gradient(135deg,#f8f7ff,#fff);margin-bottom:7px}
@@ -18828,7 +19124,6 @@
         .shortcutTable{display:grid;gap:6px}.shortcutRow{display:grid;grid-template-columns:minmax(120px,1fr) auto auto auto;align-items:center;gap:6px;border:1px solid #e9e5f2;border-radius:10px;padding:8px}.shortcutName{font-size:9px;font-weight:800}.shortcutChip{font-size:8px;font-weight:850;background:#f3f0ff;color:#5b4bff;border-radius:7px;padding:5px 7px;white-space:nowrap}.shortcutBtn{border:1px solid #e4dfed;background:#fff;border-radius:7px;padding:5px 7px;font-size:8px;cursor:pointer;color:#635d70}.shortcutBtn.capture{background:#fff7ed;color:#c2410c;border-color:#fed7aa}
         .settingsMessage{min-height:18px;margin-top:9px;font-size:8.5px;color:#6b7280}.settingsMessage.error{color:#dc2626}.settingsMessage.ok{color:#15803d}
         .shortcutHint{font-size:7.5px;opacity:.78;margin-left:4px;font-weight:700}
-        .shortcutEnabled[data-shortcut]::after{content:'  ' attr(data-shortcut);font-size:7px;font-weight:700;opacity:.72;margin-left:4px}
         @media(max-width:620px){.settingsBack{padding:0}.settingsModal{width:100vw;height:100vh;max-height:none;border-radius:0}.settingsLayout{grid-template-columns:1fr;display:flex;flex-direction:column}.settingsNav{border-right:0;border-bottom:1px solid #eeeaf7;flex-direction:row;overflow:auto;padding:8px}.settingsNavBtn{white-space:nowrap}.settingsContent{padding:13px}.shortcutRow{grid-template-columns:1fr auto}.shortcutRow .shortcutBtn{grid-row:2}.shortcutChip{justify-self:end}}
         button:disabled{opacity:.55;cursor:wait}
       </style>
@@ -18847,7 +19142,14 @@
           <div class="profile">
             <strong id="pName"></strong>
             <span id="pId"></span>
-            <span id="pEmail"></span>
+            <div class="profileBottom">
+              <span id="pEmail"></span>
+              <div class="zoomControls" aria-label="Smart FormSense panel zoom">
+                <button class="zoomBtn" id="zoomDown" type="button" title="Zoom out Smart FormSense">−</button>
+                <button class="zoomBtn zoomReset" id="zoomReset" type="button" title="Reset Smart FormSense zoom">100%</button>
+                <button class="zoomBtn" id="zoomUp" type="button" title="Zoom in Smart FormSense">+</button>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -18943,7 +19245,7 @@
             </div>
 
             <div class="qaActions">
-              <button type="button" class="secondary qaOpenReport" id="qaExportBtn" disabled title="Open the readable QA report in a new tab">Open Report</button>
+              <button type="button" class="secondary qaOpenReport" id="qaExportBtn" disabled title="Open the readable QA report in a new tab">View Detailed Report</button>
               <button type="button" class="secondary" id="qaDebugBtn" title="Download technical QA diagnostics">Export Debug</button>
             </div>
           </div>
@@ -18963,11 +19265,12 @@
           </details>
 
           <div class="creator">
-            Created with love ❤️ <strong>Akash Singh</strong><br>
-            <span id="creatorEmail"></span>
+            Created with love ❤️ <strong>Akash Singh</strong> · <span id="creatorEmail"></span>
           </div>
         </div>
       </div>
+
+      <div class="toastStack" id="toastStack" aria-live="polite"></div>
 
       <div class="mini" id="mini" title="Click to restore">
         <div class="miniIcon">✦</div>
@@ -19000,34 +19303,30 @@
       <div class="settingsBack" id="settingsBack">
         <div class="settingsModal" role="dialog" aria-modal="true" aria-label="Smart FormSense Settings">
           <div class="settingsHead">
-            <div><h2>⚙ Smart FormSense Settings</h2><p>Personalize behavior without weakening the built-in safety rules.</p></div>
+            <div><h2>⚙ Smart FormSense Settings</h2><p>Personalize how Smart FormSense works for you.</p></div>
             <button class="settingsClose" id="settingsClose" title="Close Settings">×</button>
           </div>
           <div class="settingsLayout">
             <nav class="settingsNav" id="settingsNav">
-              <button class="settingsNavBtn active" data-settings-target="safety">🔒 Safety</button>
-              <button class="settingsNavBtn" data-settings-target="general">⚙ General</button>
+              <button class="settingsNavBtn active" data-settings-target="general">⚙ General</button>
               <button class="settingsNavBtn" data-settings-target="fill">⚡ Form Filling</button>
               <button class="settingsNavBtn" data-settings-target="qa">🧪 Functional QA</button>
               <button class="settingsNavBtn" data-settings-target="reports">📄 Reports</button>
               <button class="settingsNavBtn" data-settings-target="shortcuts">⌨ Shortcuts</button>
             </nav>
             <main class="settingsContent">
-              <section class="settingsSection active" data-settings-section="safety">
-                <h3>Safety — Always On</h3><div class="settingsIntro">These protections are permanent and cannot be disabled.</div>
-                <div class="settingCard lockCard"><div class="settingRow"><div class="settingText"><b>No background form changes</b><span>Opening a page or typing manually never authorizes Smart FormSense to modify the form.</span></div><span class="lockBadge">LOCKED ON</span></div></div>
-                <div class="settingCard lockCard"><div class="settingRow"><div class="settingText"><b>Existing values protected during Fill</b><span>Manual and website-prefilled values are preserved exactly.</span></div><span class="lockBadge">LOCKED ON</span></div></div>
-                <div class="settingCard lockCard"><div class="settingRow"><div class="settingText"><b>Final submission protected</b><span>Submit, payment and finalize actions are never triggered automatically.</span></div><span class="lockBadge">LOCKED ON</span></div></div>
-                <div class="settingCard lockCard"><div class="settingRow"><div class="settingText"><b>Undo only Smart FormSense changes</b><span>Later manual edits are never overwritten by Undo.</span></div><span class="lockBadge">LOCKED ON</span></div></div>
-              </section>
-
-              <section class="settingsSection" data-settings-section="general">
+              <section class="settingsSection active" data-settings-section="general">
                 <h3>General</h3><div class="settingsIntro">Control how the Smart FormSense panel behaves.</div>
                 <div class="settingCard"><div class="settingRow"><div class="settingText"><b>Show panel automatically on page load</b><span>Default is off.</span></div><label class="switch"><input id="settingAutoShow" type="checkbox"><span class="slider"></span></label></div></div>
                 <div class="settingCard"><div class="settingRow"><div class="settingText"><b>Start panel minimized</b><span>Used only when automatic panel display is enabled.</span></div><label class="switch"><input id="settingStartMinimized" type="checkbox"><span class="slider"></span></label></div></div>
-                <div class="settingCard"><div class="settingRow"><div class="settingText"><b>Remember panel position</b><span>Stored separately for each website.</span></div><label class="switch"><input id="settingRememberPosition" type="checkbox"><span class="slider"></span></label></div></div>
-                <div class="settingCard"><div class="settingRow"><div class="settingText"><b>Remember last Fill / QA workspace</b></div><label class="switch"><input id="settingRememberWorkspace" type="checkbox"><span class="slider"></span></label></div></div>
-                <div class="settingCard"><div class="settingRow"><div class="settingText"><b>Show shortcut hints on buttons</b></div><label class="switch"><input id="settingShortcutHints" type="checkbox"><span class="slider"></span></label></div></div>
+                <div class="settingCard"><div class="settingRow"><div class="settingText"><b>Remember panel position</b><span>Keep the panel in the same position on this website.</span></div><label class="switch"><input id="settingRememberPosition" type="checkbox"><span class="slider"></span></label></div></div>
+                <div class="settingCard"><div class="settingRow"><div class="settingText"><b>Remember last workspace</b><span>Reopen Smart FormSense where you left off.</span></div><label class="switch"><input id="settingRememberWorkspace" type="checkbox"><span class="slider"></span></label></div></div>
+                <div class="settingCard"><div class="settingText"><b>Default workspace</b><span>Used whenever Remember last workspace is off.</span></div><div class="radioGroup">
+                  <label class="radioChoice"><input type="radio" name="settingDefaultWorkspace" value="fill"><span><strong>Form Filling</strong></span></label>
+                  <label class="radioChoice"><input type="radio" name="settingDefaultWorkspace" value="qa"><span><strong>Functional QA</strong></span></label>
+                </div></div>
+                <div class="settingCard"><div class="settingRow"><div class="settingText"><b>Show completion notifications</b><span>Show a brief message when Smart FormSense completes an action.</span></div><label class="switch"><input id="settingCompletionNotifications" type="checkbox"><span class="slider"></span></label></div></div>
+                <div class="settingCard"><div class="settingRow"><div class="settingText"><b>Show shortcut hints on hover</b><span>Show the configured shortcut only when you hover an action button.</span></div><label class="switch"><input id="settingShortcutHints" type="checkbox"><span class="slider"></span></label></div></div>
                 <button class="settingsAction dangerLite" id="resetAllSettings">Reset all settings</button>
               </section>
 
@@ -19048,7 +19347,6 @@
                   <label class="radioChoice"><input type="radio" name="settingQaProgression" value="ask"><span><strong>Ask before every progression</strong></span></label>
                   <label class="radioChoice"><input type="radio" name="settingQaProgression" value="never"><span><strong>Never progress automatically</strong></span></label>
                 </div></div>
-                <div class="settingCard lockCard"><div class="settingRow"><div class="settingText"><b>Final submission protection</b></div><span class="lockBadge">LOCKED ON</span></div></div>
               </section>
 
               <section class="settingsSection" data-settings-section="reports">
@@ -19105,6 +19403,10 @@
       qaObservation: $('qaObservation'),
       qaPassed: $('qaPassed'),
       creatorEmail: $('creatorEmail'),
+      zoomDown: $('zoomDown'),
+      zoomReset: $('zoomReset'),
+      zoomUp: $('zoomUp'),
+      toastStack: $('toastStack'),
       mode: $('mode'),
       elapsed: $('elapsed'),
       bar: $('bar'),
@@ -19147,13 +19449,12 @@
       for (const [button, action] of mapping) {
         if (!button) continue;
         const shortcut = state.settings?.shortcuts?.[action] || '';
-        if (state.settings?.general?.showShortcutHints && shortcut) {
-          button.dataset.shortcut = displayShortcut(shortcut);
-          button.classList.add('shortcutEnabled');
-        } else {
-          delete button.dataset.shortcut;
-          button.classList.remove('shortcutEnabled');
-        }
+        const label = shortcutActionLabel(action);
+        button.removeAttribute('data-shortcut');
+        button.classList.remove('shortcutEnabled');
+        button.title = state.settings?.general?.showShortcutHints && shortcut
+          ? `${label} • ${displayShortcut(shortcut)}`
+          : label;
       }
     };
 
@@ -19182,10 +19483,14 @@
       setChecked('settingRememberPosition', s.general.rememberPosition);
       setChecked('settingRememberWorkspace', s.general.rememberWorkspace);
       setChecked('settingShortcutHints', s.general.showShortcutHints);
+      setChecked('settingCompletionNotifications', s.general.completionNotifications);
       setChecked('settingAutoDependencies', s.fill.autoDependencies);
       setChecked('settingAutoOpenReport', s.qa.autoOpenReport);
       setChecked('settingAutoDebugExport', s.reports.autoDebugExport);
 
+      shadow.querySelectorAll('input[name="settingDefaultWorkspace"]').forEach(input => {
+        input.checked = input.value === (s.general.defaultWorkspace || 'fill');
+      });
       shadow.querySelectorAll('input[name="settingFillBehavior"]').forEach(input => {
         input.checked = input.value === s.fill.behavior;
       });
@@ -19228,9 +19533,16 @@
     bindSettingToggle('settingRememberPosition', 'general', 'rememberPosition');
     bindSettingToggle('settingRememberWorkspace', 'general', 'rememberWorkspace');
     bindSettingToggle('settingShortcutHints', 'general', 'showShortcutHints');
+    bindSettingToggle('settingCompletionNotifications', 'general', 'completionNotifications');
     bindSettingToggle('settingAutoDependencies', 'fill', 'autoDependencies');
     bindSettingToggle('settingAutoOpenReport', 'qa', 'autoOpenReport');
     bindSettingToggle('settingAutoDebugExport', 'reports', 'autoDebugExport');
+
+    shadow.querySelectorAll('input[name="settingDefaultWorkspace"]').forEach(input => {
+      input.addEventListener('change', () => {
+        if (input.checked) updateSetting('general', 'defaultWorkspace', input.value === 'qa' ? 'qa' : 'fill');
+      });
+    });
 
     shadow.querySelectorAll('input[name="settingFillBehavior"]').forEach(input => {
       input.addEventListener('change', () => {
@@ -19302,79 +19614,19 @@
       if (event.target === refs.settingsBack) closeSettings();
     });
 
+    const applyPanelZoom = () => {
+      const percent = clamp(Number(state.panelScale || 100), 70, 140);
+      state.panelScale = percent;
+      if (refs.panel) refs.panel.style.zoom = String(percent / 100);
+      if (refs.zoomReset) refs.zoomReset.textContent = `${percent}%`;
+    };
+
     const fitPanelToViewport = () => {
-      if (
-        !refs.panel ||
-        refs.panel.style.display ===
-          'none'
-      ) {
-        return;
-      }
-
-      refs.panel.style.zoom = '1';
-      refs.panel.style.maxHeight =
-        'calc(100vh - 16px)';
-      refs.panel.style.overflowY =
-        'auto';
-
-      requestAnimationFrame(() => {
-        const availableH =
-          Math.max(
-            260,
-            window.innerHeight - 12
-          );
-
-        const availableW =
-          Math.max(
-            240,
-            window.innerWidth - 12
-          );
-
-        const naturalH =
-          refs.panel.scrollHeight;
-
-        const naturalW =
-          refs.panel.scrollWidth;
-
-        const scale =
-          Math.min(
-            1,
-            availableH /
-              Math.max(
-                naturalH,
-                1
-              ),
-            availableW /
-              Math.max(
-                naturalW,
-                1
-              )
-          );
-
-        if (
-          scale < 0.98 &&
-          typeof CSS !==
-            'undefined' &&
-          CSS.supports?.(
-            'zoom',
-            '0.9'
-          )
-        ) {
-          refs.panel.style.zoom =
-            String(
-              Math.max(
-                0.72,
-                scale
-              )
-            );
-
-          refs.panel.style.maxHeight =
-            'none';
-
-          refs.panel.style.overflow =
-            'visible';
-        }
-      });
+      if (!refs.panel || refs.panel.style.display === 'none') return;
+      refs.panel.style.maxHeight = 'calc(100vh - 16px)';
+      refs.panel.style.overflowY = 'auto';
+      refs.panel.style.overflowX = 'hidden';
+      applyPanelZoom();
     };
 
     const showWorkspace = workspace => {
@@ -19548,6 +19800,27 @@
             `;
           })
           .join('');
+      },
+
+      notify(title, detail = '', tone = 'success') {
+        if (!state.settings?.general?.completionNotifications || !refs.toastStack) return;
+        const toast = document.createElement('div');
+        toast.className = `toast ${['success', 'warning', 'error'].includes(tone) ? tone : 'success'}`;
+        const heading = document.createElement('b');
+        heading.textContent = String(title || 'Smart FormSense');
+        toast.appendChild(heading);
+        if (detail) {
+          const message = document.createElement('span');
+          message.textContent = String(detail);
+          toast.appendChild(message);
+        }
+        refs.toastStack.appendChild(toast);
+        setTimeout(() => {
+          toast.style.opacity = '0';
+          toast.style.transform = 'translateY(4px)';
+          toast.style.transition = 'opacity .18s ease,transform .18s ease';
+          setTimeout(() => toast.remove(), 220);
+        }, 3600);
       },
 
       setCounters(c) {
@@ -19740,6 +20013,21 @@
     );
 
     refs.settingsBtn.onclick = openSettings;
+    refs.zoomDown?.addEventListener('click', event => {
+      event.stopPropagation();
+      state.panelScale = clamp(Number(state.panelScale || 100) - 10, 70, 140);
+      applyPanelZoom();
+    });
+    refs.zoomReset?.addEventListener('click', event => {
+      event.stopPropagation();
+      state.panelScale = 100;
+      applyPanelZoom();
+    });
+    refs.zoomUp?.addEventListener('click', event => {
+      event.stopPropagation();
+      state.panelScale = clamp(Number(state.panelScale || 100) + 10, 70, 140);
+      applyPanelZoom();
+    });
     $('minimize').onclick = minimize;
     refs.mini.onclick = restore;
 
@@ -19790,6 +20078,48 @@
     });
 
     let drag = null;
+    let panelDrag = null;
+    const panelDragHandle = refs.panel?.querySelector?.('.hero') || null;
+
+    panelDragHandle?.addEventListener('pointerdown', e => {
+      if (e.button !== undefined && e.button !== 0) return;
+      if (e.target?.closest?.('button,a,input,select,textarea,[role="button"]')) return;
+      const rect = host.getBoundingClientRect();
+      panelDrag = { x: e.clientX, y: e.clientY, left: rect.left, top: rect.top, moved: false };
+      panelDragHandle.classList.add('dragging');
+      panelDragHandle.setPointerCapture?.(e.pointerId);
+    });
+
+    panelDragHandle?.addEventListener('pointermove', e => {
+      if (!panelDrag) return;
+      const dx = e.clientX - panelDrag.x;
+      const dy = e.clientY - panelDrag.y;
+      if (Math.abs(dx) + Math.abs(dy) > 3) panelDrag.moved = true;
+      if (!panelDrag.moved) return;
+      const rect = refs.panel.getBoundingClientRect();
+      host.style.right = 'auto';
+      host.style.bottom = 'auto';
+      host.style.left = `${clamp(panelDrag.left + dx, 6, Math.max(6, window.innerWidth - Math.min(rect.width, window.innerWidth - 6)))}px`;
+      host.style.top = `${clamp(panelDrag.top + dy, 6, Math.max(6, window.innerHeight - 42))}px`;
+    });
+
+    panelDragHandle?.addEventListener('pointerup', e => {
+      const moved = !!panelDrag?.moved;
+      panelDrag = null;
+      panelDragHandle.classList.remove('dragging');
+      try { panelDragHandle.releasePointerCapture?.(e.pointerId); } catch {}
+      if (moved && state.settings?.general?.rememberPosition) {
+        try {
+          const rect = host.getBoundingClientRect();
+          GM_setValue(`${PANEL_POSITION_KEY_PREFIX}${location.hostname}`, { left: rect.left, top: rect.top });
+        } catch {}
+      }
+    });
+
+    panelDragHandle?.addEventListener('pointercancel', () => {
+      panelDrag = null;
+      panelDragHandle.classList.remove('dragging');
+    });
 
     refs.mini.addEventListener('pointerdown', e => {
       drag = {
@@ -19848,12 +20178,14 @@
     renderSettings();
     const initialWorkspace = state.settings?.general?.rememberWorkspace
       ? state.settings?.general?.lastWorkspace || 'fill'
-      : 'fill';
+      : state.settings?.general?.defaultWorkspace || 'fill';
     showWorkspace(initialWorkspace);
     if (state.qaReport) {
       state.panel.setQaReport(state.qaReport);
     }
-    updateCounters();
+    state.panelScale = 100;
+    applyPanelZoom();
+    refreshCurrentStatus();
 
     if (options.auto && state.settings?.general?.startMinimized) {
       minimize();
