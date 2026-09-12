@@ -1,0 +1,31 @@
+name: Smart FormSense v17.15.0 temporary export
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/formsense-v17-15-export.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+      - name: Verify released source
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -q '^// @version      17.15.0$' Smart_Form_Filler.user.js
+          test "$(git hash-object Smart_Form_Filler.user.js)" = '0ff562d9958d403265cfc2a6dcbb77690395be4d'
+      - name: Export exact userscript
+        uses: actions/upload-artifact@v4
+        with:
+          name: formsense-v17-15-production
+          path: Smart_Form_Filler.user.js
+          if-no-files-found: error
