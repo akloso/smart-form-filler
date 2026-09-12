@@ -1,0 +1,87 @@
+name: Smart FormSense v17.15.0 release
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/formsense-v17-15-release.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Verify current production source
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git hash-object Smart_Form_Filler.user.js)" = "fb2b1e1da7fc5f199c786b4be0a169bed7990caf"
+          grep -q '^// @version      17.14.0$' Smart_Form_Filler.user.js
+
+      - name: Reconstruct validated patch
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat .github/formsense-v17-15/part00.b64 .github/formsense-v17-15/part01.b64 .github/formsense-v17-15/part02.b64 > /tmp/formsense-v17-15-patch.gz.b64
+          echo '4dac3d986621cd02888f4e12f6fd0dc6c55b18726330060cf53cf4ffcdae79ab  /tmp/formsense-v17-15-patch.gz.b64' | sha256sum -c -
+          base64 -d /tmp/formsense-v17-15-patch.gz.b64 | gzip -dc > /tmp/formsense_v17_15_patch.py
+          echo 'bbd446fe8e7ba01635cfcb312f3423bf724b49d4bdb2f6141698f8c87c7bb44c  /tmp/formsense_v17_15_patch.py' | sha256sum -c -
+          python3 -m py_compile /tmp/formsense_v17_15_patch.py
+
+      - name: Build v17.15.0
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 /tmp/formsense_v17_15_patch.py
+          node --check Smart_Form_Filler.user.js
+
+      - name: Release invariant checks
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -q '^// @version      17.15.0$' Smart_Form_Filler.user.js
+          grep -q '^// @match        \*://\*/\*$' Smart_Form_Filler.user.js
+          ! grep -q '^// @noframes' Smart_Form_Filler.user.js
+          test "$(grep -o 'commitSelectedRadioGroups(' Smart_Form_Filler.user.js | wc -l)" -eq 0
+          test "$(grep -o 'meritto' Smart_Form_Filler.user.js | wc -l)" -eq 1
+          test "$(grep -o 'akash.singh@meritto.com' Smart_Form_Filler.user.js | wc -l)" -eq 1
+          grep -q 'const SETTINGS_VERSION = 2;' Smart_Form_Filler.user.js
+          grep -q 'rememberPosition: false' Smart_Form_Filler.user.js
+          grep -q 'rememberWorkspace: false' Smart_Form_Filler.user.js
+          grep -q 'showShortcutHints: false' Smart_Form_Filler.user.js
+          grep -q 'completionNotifications: true' Smart_Form_Filler.user.js
+          grep -q "defaultWorkspace: 'fill'" Smart_Form_Filler.user.js
+          grep -q 'const refreshCurrentStatus = () => {' Smart_Form_Filler.user.js
+          grep -q 'const applyPanelZoom = () => {' Smart_Form_Filler.user.js
+          grep -q 'const qaTriggerValidationProbe = async' Smart_Form_Filler.user.js
+          grep -q 'Exactly what was tested' Smart_Form_Filler.user.js
+          grep -q '>View Detailed Report</button>' Smart_Form_Filler.user.js
+          ! grep -q 'data-settings-target="safety"' Smart_Form_Filler.user.js
+          ! grep -q '.shortcutEnabled\[data-shortcut\]::after' Smart_Form_Filler.user.js
+          grep -q 'overflow-x:hidden' Smart_Form_Filler.user.js
+          grep -q 'protectedFinal.push(el)' Smart_Form_Filler.user.js
+          grep -q 'protectedFinal: true' Smart_Form_Filler.user.js
+          grep -q 'Created with love ❤️ <strong>Akash Singh</strong> · <span id="creatorEmail"></span>' Smart_Form_Filler.user.js
+          test "$(git diff --name-only | wc -l)" -eq 1
+          test "$(git diff --name-only)" = 'Smart_Form_Filler.user.js'
+          echo "built_blob=$(git hash-object Smart_Form_Filler.user.js)"
+
+      - name: Commit production userscript only
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'Smart FormSense Release'
+          git config user.email 'actions@users.noreply.github.com'
+          git add Smart_Form_Filler.user.js
+          test "$(git diff --cached --name-only | wc -l)" -eq 1
+          test "$(git diff --cached --name-only)" = 'Smart_Form_Filler.user.js'
+          git commit -m 'Release Smart FormSense v17.15.0'
+          git push origin HEAD:main
