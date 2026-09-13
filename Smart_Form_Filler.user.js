@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Smart FormSense
 // @namespace    smart-form-filler
-// @version      17.17.0
+// @version      17.18.0
 // @description  Automatic form filling and functional QA testing for authorized web-form validation, safe progression, embedded forms, and synthetic test data.
 // @author       Akash Singh
 // @match        *://*/*
@@ -53,7 +53,7 @@
   const SETTINGS_VERSION = 4;
   const ACTION_DEFAULT_TTL_MS = 5 * 60 * 1000;
   const PRODUCT_NAME = 'Smart FormSense';
-  const SCRIPT_VERSION = '17.17.0';
+  const SCRIPT_VERSION = '17.18.0';
   const FEEDBACK_ENDPOINT = 'https://formspree.io/f/xbgjvoaw';
   const UPDATE_RAW_URL = 'https://raw.githubusercontent.com/akloso/smart-form-filler/main/Smart_Form_Filler.user.js';
   const UPDATE_CHECK_KEY = 'STFF_UPDATE_CHECK_V1';
@@ -216,7 +216,7 @@
     );
 
     console.error(
-      `Smart FormSense V17.17.0 [${stage}]`,
+      `Smart FormSense V17.18.0 [${stage}]`,
       error
     );
 
@@ -12486,7 +12486,7 @@
     const report = {
       reportVersion: 1,
       generatedBy:
-        'Smart FormSense V17.17.0',
+        'Smart FormSense V17.18.0',
       generatedAt:
         new Date().toISOString(),
       mode:
@@ -12651,7 +12651,7 @@
       return report;
     } catch (error) {
       console.error(
-        'Smart FormSense V17.17.0 debug export:',
+        'Smart FormSense V17.18.0 debug export:',
         error
       );
 
@@ -13738,7 +13738,7 @@
       product:
         'Smart FormSense',
       productVersion:
-        '17.17.0',
+        '17.18.0',
       generatedAt,
       auditType:
         'Non-destructive Form Readiness Audit',
@@ -14085,7 +14085,7 @@
   <div class="hero">
     <div class="brand">✦ SMART FORMSENSE QA</div>
     <h1>${esc(qa.page?.title || 'Form')}</h1>
-    <div class="meta">${esc(qa.page?.hostname || location.hostname || '')}<br>${esc(generated)} • v${esc(qa.productVersion || '17.17.0')}</div>
+    <div class="meta">${esc(qa.page?.hostname || location.hostname || '')}<br>${esc(generated)} • v${esc(qa.productVersion || '17.18.0')}</div>
     <div class="status ${statusClass}">${esc(status)}</div>
     <div class="overview">${esc(overview)}</div>
 
@@ -14304,7 +14304,7 @@
       product:
         'Smart FormSense',
       productVersion:
-        '17.17.0',
+        '17.18.0',
       generatedAt:
         new Date().toISOString(),
       purpose:
@@ -14399,7 +14399,7 @@
       return report;
     } catch (error) {
       console.error(
-        'Smart FormSense V17.17.0 QA debug export:',
+        'Smart FormSense V17.18.0 QA debug export:',
         error
       );
 
@@ -16886,7 +16886,7 @@
       : {
           reportVersion: 7,
           product: 'Smart FormSense',
-          productVersion: '17.17.0',
+          productVersion: '17.18.0',
           generatedAt: new Date().toISOString(),
           auditType: 'Black-box Functional Form QA',
           page: {
@@ -16923,7 +16923,7 @@
     const cleanReason = String(reason || '').slice(0, 500);
     return {
       ...base,
-      productVersion: '17.17.0',
+      productVersion: '17.18.0',
       reportVersion: Math.max(5, Number(base.reportVersion || 0)),
       runState,
       incomplete: runState !== 'completed',
@@ -17074,7 +17074,7 @@
       return {
         reportVersion: 7,
         product: 'Smart FormSense',
-        productVersion: '17.17.0',
+        productVersion: '17.18.0',
         generatedAt,
         completedAt: ['completed', 'stopped', 'failed'].includes(runState) ? new Date().toISOString() : null,
         auditType: 'Black-box Functional Form QA',
@@ -19049,41 +19049,44 @@
           display:flex;
           justify-content:space-between;
           align-items:center;
-          gap:10px;
+          gap:8px;
           position:relative;
           z-index:1
         }
-        .title{font-weight:850;font-size:13px;letter-spacing:.05px}
-        .windowBtns{display:flex;gap:6px}
+        .top>div:first-child{min-width:0;flex:1}
+        .title{font-weight:850;font-size:13px;letter-spacing:.05px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+        .windowBtns{display:flex;align-items:center;gap:4px;flex:0 0 auto}
         .windowBtn{
           border:0;
           background:rgba(255,255,255,.17);
           color:#fff;
-          width:24px;
-          height:24px;
+          width:25px;
+          height:25px;
+          padding:0;
           border-radius:8px;
           cursor:pointer;
-          font-size:17px;
           line-height:1;
           display:grid;
           place-items:center;
-          transition:.16s ease
+          transition:background .16s ease,transform .16s ease,box-shadow .16s ease
         }
-        .windowBtn:hover{background:rgba(255,255,255,.28)}
+        .windowBtn:hover{background:rgba(255,255,255,.28);transform:translateY(-1px)}
+        .windowBtn:active{transform:translateY(0) scale(.96)}
+        .uiIcon{width:14px;height:14px;display:block;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;pointer-events:none;flex:0 0 auto}
         .updateBtn{display:none;position:relative;background:linear-gradient(135deg,#fff,#ffe4e6)!important;color:#dc2626!important;box-shadow:0 0 0 0 rgba(239,68,68,.65)}
         .updateBtn.updateAvailable{display:grid;animation:updateBreathe 1.65s ease-in-out infinite;box-shadow:0 0 12px rgba(239,68,68,.7),0 0 24px rgba(249,115,22,.38)}
-        .updateBtn.updateAvailable:after{content:"";position:absolute;right:-2px;top:-2px;width:8px;height:8px;border-radius:50%;background:#ef4444;border:2px solid #fff;box-shadow:0 0 8px rgba(239,68,68,.9)}
+        .updateBtn.updateAvailable:after{content:"";position:absolute;right:-3px;top:-3px;width:9px;height:9px;border-radius:50%;background:#ef4444;border:2px solid #fff;box-shadow:0 0 8px rgba(239,68,68,.9)}
         @keyframes updateBreathe{0%,100%{transform:scale(1);filter:brightness(1)}50%{transform:scale(1.12);filter:brightness(1.16)}}
         .developerOnly{display:none!important}.developerOnly.devVisible{display:block!important}
         .versionTap{border:0;background:transparent;color:#8a8fa0;font:inherit;padding:0;cursor:pointer}.versionTap:hover{color:#5b4bff;text-decoration:underline}
         .feedbackBack{display:none;position:fixed;inset:0;width:100vw;height:100vh;background:rgba(19,15,40,.48);backdrop-filter:blur(5px);align-items:center;justify-content:center;padding:18px;z-index:45}
         .feedbackModal{width:min(430px,calc(100vw - 24px));max-height:calc(100vh - 24px);overflow:auto;background:#fff;border:1px solid #e7e2f6;border-radius:18px;box-shadow:0 30px 90px rgba(17,12,45,.32);color:#26213a;padding:15px}
-        .feedbackHead{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}.feedbackHead h3{margin:0;font-size:15px}.feedbackHead p{margin:3px 0 0;font-size:9px;color:#817a91;line-height:1.4}.feedbackClose{border:0;background:#f3f0fb;color:#655d78;width:29px;height:29px;border-radius:9px;cursor:pointer;font-size:16px}
-        .feedbackLabel{display:block;font-size:9px;font-weight:850;color:#403a55;margin:12px 0 6px}.feedbackCategories{display:grid;grid-template-columns:repeat(2,1fr);gap:6px}.feedbackCategory{border:1px solid #e6e1f1;background:#fff;border-radius:9px;padding:7px 6px;font-size:9px;font-weight:800;color:#5c556c;cursor:pointer}.feedbackCategory.selected{border-color:#8b5cf6;background:#f5f3ff;color:#5b4bff;box-shadow:0 0 0 1px #c4b5fd inset}
-        .feedbackStars{display:flex;gap:5px}.feedbackStar{border:0;background:transparent;font-size:22px;line-height:1;color:#c9c3d7;cursor:pointer;padding:1px}.feedbackStar.selected{color:#f59e0b}
+        .feedbackHead{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}.feedbackHead h3{margin:0;font-size:15px}.feedbackHead p{margin:3px 0 0;font-size:9.5px;color:#817a91;line-height:1.4}.feedbackClose{border:1px solid #e8e4f1;background:#f7f5fb;color:#554e68;width:30px;height:30px;border-radius:9px;cursor:pointer;font-size:17px;display:grid;place-items:center;transition:.15s ease}.feedbackClose:hover{background:#eeeaff;color:#4338ca;border-color:#d8d0f5}
+        .feedbackLabel{display:block;font-size:9.5px;font-weight:850;color:#403a55;margin:12px 0 6px}.feedbackCategories{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}.feedbackCategory{position:relative;min-height:35px;border:1px solid #e6e1f1;background:#fff;border-radius:9px;padding:7px 22px 7px 7px;font-size:9.5px;font-weight:800;color:#5c556c;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:4px;transition:.15s ease}.feedbackCategory:hover{border-color:#cfc5ef;background:#faf9ff}.feedbackCategory.selected{border-color:#7c3aed;background:#f3f0ff;color:#5b21b6;box-shadow:0 0 0 1px #b9a7f6 inset}.feedbackCategory.selected:after{content:"✓";position:absolute;right:7px;top:50%;transform:translateY(-50%);width:14px;height:14px;border-radius:50%;display:grid;place-items:center;background:#7c3aed;color:#fff;font-size:9px;font-weight:900}
+        .feedbackStars{display:flex;gap:5px}.feedbackStar{border:0;background:transparent;font-size:22px;line-height:1;color:#c9c3d7;cursor:pointer;padding:2px;border-radius:6px}.feedbackStar:hover{background:#fff7ed;color:#f59e0b}.feedbackStar.selected{color:#f59e0b}
         .feedbackModal textarea,.feedbackModal input[type=email]{width:100%;box-sizing:border-box;border:1px solid #ded9eb;border-radius:9px;padding:9px;font:inherit;font-size:10px;color:#312e46;background:#fff;outline:none}.feedbackModal textarea{min-height:92px;resize:vertical}.feedbackModal textarea:focus,.feedbackModal input[type=email]:focus{border-color:#8b5cf6;box-shadow:0 0 0 3px rgba(139,92,246,.1)}
-        .feedbackSend{width:100%;margin-top:12px;border:0;border-radius:10px;padding:9px 10px;background:linear-gradient(135deg,#5b4bff,#8b5cf6,#d946ef);color:#fff;font-weight:850;cursor:pointer}.feedbackSend:disabled{opacity:.65}.feedbackMessage{min-height:18px;margin-top:7px;font-size:8.5px;color:#6b7280}.feedbackMessage.error{color:#dc2626}
-        .feedbackSuccessToast{pointer-events:auto;position:relative;padding-right:34px!important}.feedbackSuccessClose{position:absolute;right:7px;top:7px;width:20px;height:20px;border:0;border-radius:6px;background:#f3f4f6;color:#6b7280;cursor:pointer;font-size:13px;display:grid;place-items:center}
+        .feedbackSend{width:100%;margin-top:12px;border:0;border-radius:10px;padding:9px 10px;background:linear-gradient(135deg,#5b4bff,#8b5cf6,#d946ef);color:#fff;font-weight:850;cursor:pointer}.feedbackSend:disabled{opacity:.65}.feedbackMessage{min-height:18px;margin-top:7px;font-size:9px;color:#6b7280}.feedbackMessage.error{color:#dc2626}
+        .feedbackSuccessToast{pointer-events:auto;position:relative;padding-right:42px!important}.feedbackSuccessClose{position:absolute;right:8px;top:8px;width:26px;height:26px;border:1px solid #d9dce4;border-radius:8px;background:#f8fafc;color:#374151;cursor:pointer;display:grid;place-items:center;transition:.15s ease}.feedbackSuccessClose:hover{background:#eef2ff;color:#312e81;border-color:#c7d2fe;transform:scale(1.04)}.feedbackSuccessClose .uiIcon{width:13px;height:13px}
         .updateStatus{font-size:8.5px;color:#756e84;line-height:1.45;margin-top:6px}.updateStatus strong{color:#443d56}.updateActions{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}.updateNow{display:none}.updateNow.visible{display:inline-block;background:#fff1f2;border-color:#fecdd3;color:#dc2626;font-weight:900;box-shadow:0 0 14px rgba(239,68,68,.18)}
         .hero{touch-action:none;cursor:grab}
         .hero.dragging{cursor:grabbing}
@@ -19093,11 +19096,11 @@
         .zoomControls{display:flex;align-items:center;gap:3px;flex:0 0 auto}
         .zoomBtn{border:0;background:rgba(255,255,255,.16);color:#fff;height:20px;min-width:20px;padding:0 5px;border-radius:6px;font-size:9px;font-weight:850;cursor:pointer;display:grid;place-items:center}
         .zoomBtn:hover{background:rgba(255,255,255,.28)}
-        .zoomReset{min-width:34px;font-size:8px}
+        .zoomReset{min-width:34px;font-size:8.5px}
         .toastStack{position:fixed;right:12px;bottom:12px;width:min(290px,calc(100vw - 24px));display:grid;gap:7px;z-index:60;pointer-events:none}
-        .toast{background:#fff;border:1px solid #e7e3f5;border-radius:11px;padding:9px 10px;box-shadow:0 14px 34px rgba(37,28,76,.18);font-family:Inter,Arial,sans-serif;animation:toastIn .18s ease;color:#312e46}
+        .toast{background:#fff;border:1px solid #e7e3f5;border-radius:11px;padding:10px 11px;box-shadow:0 14px 34px rgba(37,28,76,.18);font-family:Inter,Arial,sans-serif;animation:toastIn .18s ease;color:#312e46}
         .toast.success{border-left:4px solid #22c55e}.toast.warning{border-left:4px solid #f59e0b}.toast.error{border-left:4px solid #ef4444}
-        .toast b{display:block;font-size:10px}.toast span{display:block;margin-top:2px;font-size:8px;color:#777084;line-height:1.4}
+        .toast b{display:block;font-size:10.5px}.toast span{display:block;margin-top:3px;font-size:8.5px;color:#777084;line-height:1.45}
         @keyframes toastIn{from{opacity:0;transform:translateY(7px)}to{opacity:1;transform:translateY(0)}}
         .profile{
           margin-top:6px;
@@ -19124,7 +19127,7 @@
           overflow-x:hidden;
           background:linear-gradient(180deg,#fff 0%,#faf9ff 100%)
         }
-        .tagline{font-size:8px;opacity:.88;margin-top:2px;font-weight:650}
+        .tagline{font-size:8.5px;opacity:.9;margin-top:2px;font-weight:650}
         .modeTabs{
           display:grid;
           grid-template-columns:1fr 1fr;
@@ -19163,7 +19166,7 @@
         .qaScore{font-size:26px;line-height:1.05;font-weight:900;color:#4f46e5;margin-top:3px}
         .qaRating{font-size:9px;color:#6b7280;margin-top:3px}
         .qaProgressBox{margin:7px 0 3px;padding:7px 8px;border:1px solid #e7e3f5;border-radius:10px;background:#fff}
-        .qaProgressMeta{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:8px;color:#706a7f;margin-bottom:5px}
+        .qaProgressMeta{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:8.5px;color:#706a7f;margin-bottom:5px}
         .qaProgressMeta span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
         .qaProgressMeta b{font-size:9px;color:#5b4bff;flex:0 0 auto}
         .qaProgressTrack{height:8px;background:#eeeafe;border-radius:999px;overflow:hidden}
@@ -19182,7 +19185,7 @@
           background:#fff
         }
         .qaStat b{display:block;font-size:13px;line-height:1}
-        .qaStat span{display:block;font-size:7px;margin-top:3px;color:#777084;font-weight:750}
+        .qaStat span{display:block;font-size:8px;margin-top:3px;color:#777084;font-weight:750}
         .qaCritical b{color:#dc2626}
         .qaWarning b{color:#d97706}
         .qaObservation b{color:#2563eb}
@@ -19205,27 +19208,27 @@
         }
         .qaIssue:disabled{cursor:default;opacity:1}
         .qaIssueTop{display:flex;align-items:center;gap:5px}
-        .qaPill{font-size:7px;font-weight:900;text-transform:uppercase;padding:2px 5px;border-radius:999px}
+        .qaPill{font-size:8px;font-weight:900;text-transform:uppercase;padding:2px 5px;border-radius:999px}
         .qaPill.critical{background:#fff1f2;color:#dc2626}
         .qaPill.warning{background:#fff7ed;color:#d97706}
         .qaPill.observation{background:#eff6ff;color:#2563eb}
         .qaIssueTitle{font-size:9px;font-weight:850;color:#312e46;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1}
-        .qaIssueCount{font-size:7px;font-weight:900;color:#6d4aff;background:#f3f0ff;border-radius:999px;padding:2px 5px;flex:0 0 auto}
-        .qaIssueField{font-size:8px;color:#665e78;margin-top:4px;font-weight:750}
-        .qaIssueMessage{font-size:8px;color:#7b7488;margin-top:2px;line-height:1.35}
+        .qaIssueCount{font-size:8px;font-weight:900;color:#6d4aff;background:#f3f0ff;border-radius:999px;padding:2px 5px;flex:0 0 auto}
+        .qaIssueField{font-size:8.5px;color:#665e78;margin-top:4px;font-weight:750}
+        .qaIssueMessage{font-size:8.5px;color:#7b7488;margin-top:2px;line-height:1.4}
         .qaEmpty{font-size:9px;color:#777084;text-align:center;padding:12px 8px;border:1px dashed #ddd6fe;border-radius:9px;background:#fff}
-        .qaHint{font-size:8px;color:#8a8fa0;line-height:1.35;margin-top:5px}
+        .qaHint{font-size:8.5px;color:#8a8fa0;line-height:1.4;margin-top:5px}
         .panel.qaMode .profile,.panel.qaMode .help{display:none}
         .panel.qaMode .body{padding:8px}
         .panel.qaMode .hero{padding-bottom:8px}
         .qaCompactHead{display:flex;align-items:center;justify-content:space-between;gap:10px;border:1px solid #e4defb;border-radius:11px;padding:8px 9px;background:linear-gradient(135deg,#f8f7ff,#fff);margin-bottom:7px}
-        .qaCompactHead .qaScoreLabel{text-align:left;font-size:8px}
+        .qaCompactHead .qaScoreLabel{text-align:left;font-size:8.5px}
         .qaCompactHead .qaScore{font-size:21px;text-align:left;margin-top:1px}
-        .qaCompactHead .qaRating{margin:0;text-align:right;max-width:165px;font-size:8px;line-height:1.35}
+        .qaCompactHead .qaRating{margin:0;text-align:right;max-width:165px;font-size:8.5px;line-height:1.4}
         .compactStats{margin:6px 0;gap:4px}
         .compactStats .qaStat{padding:5px 2px}
         .compactStats .qaStat b{font-size:12px}
-        .compactStats .qaStat span{font-size:7px}
+        .compactStats .qaStat span{font-size:8px}
         .compactIssues{max-height:118px;margin-top:5px}
         .compactIssues .qaIssue{padding:6px 7px}
         .compactIssues .qaIssueMessage{font-size:7.5px;line-height:1.3}
@@ -19272,11 +19275,12 @@
         }
         .stats{
           display:grid;
-          grid-template-columns:repeat(5,1fr);
+          grid-template-columns:repeat(5,minmax(0,1fr));
           gap:4px;
           margin:7px 0
         }
         .stat{
+          min-width:0;
           border-radius:10px;
           padding:6px 3px;
           text-align:center;
@@ -19293,7 +19297,7 @@
         .stat:active{transform:translateY(0) scale(.985)}
         .stat b{font-size:14px;display:block;line-height:1}
         .stat span{
-          font-size:8px;
+          font-size:8.5px;
           font-weight:750;
           margin-top:3px;
           display:block;
@@ -19329,10 +19333,11 @@
         }
         .utilityGrid{
           display:grid;
-          grid-template-columns:repeat(2,1fr);
+          grid-template-columns:repeat(2,minmax(0,1fr));
           gap:5px;
           margin-top:5px
         }
+        .utilityGrid #debugBtn.devVisible{grid-column:1/-1;width:100%}
         .secondary{
           border:1px solid #e3def8;
           background:#fff;
@@ -19350,26 +19355,28 @@
           color:#dc2626!important
         }
         .status{
-          font-size:9px;
-          color:#636b7c;
-          line-height:1.35;
-          margin-top:6px;
-          padding:6px 7px;
-          border-radius:8px;
-          background:linear-gradient(135deg,#f5f3ff,#fff7fb);
-          min-height:25px;
-          max-height:44px;
-          overflow:auto
+          font-size:9.5px;
+          color:#5d6475;
+          line-height:1.42;
+          margin-top:7px;
+          padding:7px 8px;
+          border:1px solid #ece8f7;
+          border-radius:9px;
+          background:linear-gradient(135deg,#f7f5ff,#fffafd);
+          min-height:28px;
+          max-height:54px;
+          overflow:auto;
+          scrollbar-width:thin
         }
         .legend{
-          font-size:8px;
+          font-size:8.5px;
           color:#8a8fa0;
           margin-top:5px;
           line-height:1.35
         }
         details.help{
           margin-top:4px;
-          font-size:8px;
+          font-size:8.5px;
           color:#8a8fa0
         }
         details.help summary{
@@ -19382,7 +19389,7 @@
           padding-top:7px;
           border-top:1px solid #eeeaf8;
           text-align:center;
-          font-size:8px;
+          font-size:8.5px;
           line-height:1.45;
           color:#8a8fa0;
           word-break:break-word
@@ -19515,14 +19522,16 @@
         .settingsNav{padding:11px;border-right:1px solid #eeeaf7;background:#faf9fd;display:flex;flex-direction:column;gap:5px}
         .settingsNavBtn{border:0;background:transparent;text-align:left;padding:9px 10px;border-radius:9px;color:#696279;font-size:10px;font-weight:800;cursor:pointer}.settingsNavBtn.active{background:#eeeaff;color:#5b4bff}
         .settingsContent{padding:16px 18px;overflow:auto}.settingsSection{display:none}.settingsSection.active{display:block}.settingsSection h3{margin:0 0 4px;font-size:14px}.settingsIntro{font-size:9px;color:#817a91;line-height:1.45;margin-bottom:12px}
-        .settingCard{border:1px solid #e9e5f2;border-radius:12px;padding:10px 11px;margin:8px 0;background:#fff}.settingRow{display:flex;align-items:flex-start;justify-content:space-between;gap:14px}.settingText b{display:block;font-size:10px;color:#342e48}.settingText span{display:block;font-size:8.5px;color:#858092;line-height:1.4;margin-top:2px}
-        .lockCard{background:#f8fafc;border-color:#e2e8f0}.lockBadge{font-size:8px;font-weight:900;color:#15803d;background:#dcfce7;border-radius:999px;padding:4px 7px;white-space:nowrap}
+        .settingCard{border:1px solid #e9e5f2;border-radius:12px;padding:10px 11px;margin:8px 0;background:#fff}.settingRow{display:flex;align-items:flex-start;justify-content:space-between;gap:14px}.settingText b{display:block;font-size:10px;color:#342e48}.settingText span{display:block;font-size:9px;color:#858092;line-height:1.4;margin-top:2px}
+        .lockCard{background:#f8fafc;border-color:#e2e8f0}.lockBadge{font-size:8.5px;font-weight:900;color:#15803d;background:#dcfce7;border-radius:999px;padding:4px 7px;white-space:nowrap}
         .switch{position:relative;width:36px;height:21px;flex:0 0 auto}.switch input{opacity:0;width:0;height:0}.slider{position:absolute;inset:0;background:#d9d5e5;border-radius:999px;cursor:pointer;transition:.18s}.slider:before{content:"";position:absolute;width:15px;height:15px;left:3px;top:3px;background:#fff;border-radius:50%;box-shadow:0 2px 6px rgba(0,0,0,.18);transition:.18s}.switch input:checked + .slider{background:#6d4aff}.switch input:checked + .slider:before{transform:translateX(15px)}
-        .radioGroup{display:grid;gap:7px;margin-top:8px}.radioChoice{display:flex;align-items:flex-start;gap:8px;border:1px solid #e8e4f1;border-radius:10px;padding:9px;cursor:pointer}.radioChoice input{margin-top:1px}.radioChoice strong{display:block;font-size:9.5px}.radioChoice span{display:block;font-size:8px;color:#837d90;margin-top:2px;line-height:1.35}
+        .radioGroup{display:grid;gap:7px;margin-top:8px}.radioChoice{display:flex;align-items:flex-start;gap:8px;border:1px solid #e8e4f1;border-radius:10px;padding:9px;cursor:pointer}.radioChoice input{margin-top:1px}.radioChoice strong{display:block;font-size:9.5px}.radioChoice span{display:block;font-size:8.5px;color:#837d90;margin-top:2px;line-height:1.4}
         .settingsAction{border:1px solid #ddd6fe;background:#f7f5ff;color:#5b4bff;border-radius:9px;padding:7px 9px;font-size:9px;font-weight:850;cursor:pointer}.settingsAction.dangerLite{border-color:#fecdd3;background:#fff1f2;color:#be123c}
-        .shortcutTable{display:grid;gap:6px}.shortcutRow{display:grid;grid-template-columns:minmax(120px,1fr) auto auto auto;align-items:center;gap:6px;border:1px solid #e9e5f2;border-radius:10px;padding:8px}.shortcutName{font-size:9px;font-weight:800}.shortcutChip{font-size:8px;font-weight:850;background:#f3f0ff;color:#5b4bff;border-radius:7px;padding:5px 7px;white-space:nowrap}.shortcutBtn{border:1px solid #e4dfed;background:#fff;border-radius:7px;padding:5px 7px;font-size:8px;cursor:pointer;color:#635d70}.shortcutBtn.capture{background:#fff7ed;color:#c2410c;border-color:#fed7aa}
+        .shortcutTable{display:grid;gap:6px}.shortcutRow{display:grid;grid-template-columns:minmax(120px,1fr) auto auto auto;align-items:center;gap:6px;border:1px solid #e9e5f2;border-radius:10px;padding:8px}.shortcutName{font-size:9px;font-weight:800}.shortcutChip{font-size:8.5px;font-weight:850;background:#f3f0ff;color:#5b4bff;border-radius:7px;padding:5px 7px;white-space:nowrap}.shortcutBtn{border:1px solid #e4dfed;background:#fff;border-radius:7px;padding:5px 7px;font-size:8.5px;cursor:pointer;color:#635d70}.shortcutBtn.capture{background:#fff7ed;color:#c2410c;border-color:#fed7aa}
         .settingsMessage{min-height:18px;margin-top:9px;font-size:8.5px;color:#6b7280}.settingsMessage.error{color:#dc2626}.settingsMessage.ok{color:#15803d}
-        .shortcutHint{font-size:7.5px;opacity:.78;margin-left:4px;font-weight:700}
+        .shortcutHint{font-size:8px;opacity:.8;margin-left:4px;font-weight:700}
+        button:focus-visible,summary:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-visible{outline:2px solid #8b5cf6;outline-offset:2px}
+        .hero button:focus-visible{outline-color:#fff;box-shadow:0 0 0 2px rgba(91,75,255,.55)}
         @media(max-width:620px){.settingsBack{padding:0}.settingsModal{width:100vw;height:100vh;max-height:none;border-radius:0}.settingsLayout{grid-template-columns:1fr;display:flex;flex-direction:column}.settingsNav{border-right:0;border-bottom:1px solid #eeeaf7;flex-direction:row;overflow:auto;padding:8px}.settingsNavBtn{white-space:nowrap}.settingsContent{padding:13px}.shortcutRow{grid-template-columns:1fr auto}.shortcutRow .shortcutBtn{grid-row:2}.shortcutChip{justify-self:end}}
         button:disabled{opacity:.55;cursor:wait}
       </style>
@@ -19532,11 +19541,11 @@
           <div class="top">
             <div><div class="title">✦ Smart FormSense</div><div class="tagline">Intelligent Form Filling & QA Testing</div></div>
             <div class="windowBtns">
-              <button class="windowBtn updateBtn" id="updateBtn" title="Update available">⬆</button>
-              <button class="windowBtn" id="feedbackBtn" title="Send Feedback">💬</button>
-              <button class="windowBtn" id="settingsBtn" title="Settings">⚙</button>
-              <button class="windowBtn" id="minimize" title="Minimize">−</button>
-              <button class="windowBtn" id="close" title="Close">×</button>
+              <button class="windowBtn updateBtn" id="updateBtn" title="Update available" aria-label="Update Smart FormSense"><svg class="uiIcon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12"></path><path d="m8 11 4 4 4-4"></path><path d="M5 20h14"></path></svg></button>
+              <button class="windowBtn" id="feedbackBtn" title="Send Feedback" aria-label="Send Feedback"><svg class="uiIcon" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15a4 4 0 0 1-4 4H8l-5 3v-6a4 4 0 0 1-1-3V7a4 4 0 0 1 4-4h11a4 4 0 0 1 4 4z"></path><path d="M7 9h10"></path><path d="M7 13h6"></path></svg></button>
+              <button class="windowBtn" id="settingsBtn" title="Settings" aria-label="Settings"><svg class="uiIcon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.06.06-2.83 2.83-.06-.06A1.7 1.7 0 0 0 15 19.4a1.7 1.7 0 0 0-1 .6 1.7 1.7 0 0 0-.4 1.1V21h-4v-.1A1.7 1.7 0 0 0 8.6 19.4a1.7 1.7 0 0 0-1.88.34l-.06.06-2.83-2.83.06-.06A1.7 1.7 0 0 0 4.6 15a1.7 1.7 0 0 0-.6-1 1.7 1.7 0 0 0-1.1-.4H3v-4h.1A1.7 1.7 0 0 0 4.6 8.6a1.7 1.7 0 0 0-.34-1.88l-.06-.06 2.83-2.83.06.06A1.7 1.7 0 0 0 9 4.6a1.7 1.7 0 0 0 1-.6 1.7 1.7 0 0 0 .4-1.1V3h4v.1A1.7 1.7 0 0 0 15.4 4.6a1.7 1.7 0 0 0 1.88-.34l.06-.06 2.83 2.83-.06.06A1.7 1.7 0 0 0 19.4 9c.18.37.48.67.85.85.34.16.71.24 1.08.23H21v4h-.1A1.7 1.7 0 0 0 19.4 15z"></path></svg></button>
+              <button class="windowBtn" id="minimize" title="Minimize" aria-label="Minimize"><svg class="uiIcon" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"></path></svg></button>
+              <button class="windowBtn" id="close" title="Close" aria-label="Close"><svg class="uiIcon" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12"></path><path d="m18 6-12 12"></path></svg></button>
             </div>
           </div>
 
@@ -19666,7 +19675,7 @@
           </details>
 
           <div class="creator">
-            Created with love ❤️ <strong>Akash Singh</strong> · <span id="creatorEmail"></span> · <button class="versionTap" id="versionTap" type="button">v17.17.0</button>
+            Created with love ❤️ <strong>Akash Singh</strong> · <span id="creatorEmail"></span> · <button class="versionTap" id="versionTap" type="button">v17.18.0</button>
           </div>
         </div>
       </div>
@@ -19705,7 +19714,7 @@
       <div class="feedbackBack" id="feedbackBack">
         <div class="feedbackModal" role="dialog" aria-modal="true" aria-label="Share feedback">
           <div class="feedbackHead">
-            <div><h3>💬 Share Feedback</h3><p>Help improve Smart FormSense.</p></div>
+            <div><h3>Share Feedback</h3><p>Help improve Smart FormSense.</p></div>
             <button type="button" class="feedbackClose" id="feedbackClose" title="Close feedback">×</button>
           </div>
           <span class="feedbackLabel">What are you sharing?</span>
@@ -19717,7 +19726,7 @@
             <button type="button" class="feedbackCategory" data-feedback-category="Experience">🎨 Experience</button>
             <button type="button" class="feedbackCategory" data-feedback-category="Other">💬 Other</button>
           </div>
-          <span class="feedbackLabel">Your experience <span style="font-weight:500;color:#8a8495">(optional)</span></span>
+          <span class="feedbackLabel">Rating <span style="font-weight:500;color:#8a8495">(optional)</span></span>
           <div class="feedbackStars" id="feedbackStars" aria-label="Rating out of five">
             <button type="button" class="feedbackStar" data-feedback-rating="1">★</button><button type="button" class="feedbackStar" data-feedback-rating="2">★</button><button type="button" class="feedbackStar" data-feedback-rating="3">★</button><button type="button" class="feedbackStar" data-feedback-rating="4">★</button><button type="button" class="feedbackStar" data-feedback-rating="5">★</button>
           </div>
@@ -19794,7 +19803,7 @@
                 <div class="settingCard"><div class="settingRow"><div class="settingText"><b>Automatically check for updates</b><span>Checks at most once every 12 hours.</span></div><label class="switch"><input id="settingAutoCheckUpdates" type="checkbox"><span class="slider"></span></label></div></div>
                 <div class="settingCard">
                   <div class="settingText"><b>Version status</b><span id="updateStatusText">Checking update status…</span></div>
-                  <div class="updateStatus">Current: <strong id="currentVersionText">v17.17.0</strong> · Latest: <strong id="latestVersionText">—</strong></div>
+                  <div class="updateStatus">Current: <strong id="currentVersionText">v17.18.0</strong> · Latest: <strong id="latestVersionText">—</strong></div>
                   <div class="updateActions"><button class="settingsAction" id="checkUpdatesBtn" type="button">Check for updates</button><button class="settingsAction updateNow" id="updateNowSettings" type="button">Update Smart FormSense</button></div>
                 </div>
               </section>
@@ -19894,6 +19903,23 @@
     let developerTapReset = null;
     let developerExpiryTimer = null;
 
+    const positionToastStack = () => {
+      if (!refs.toastStack || host.style.display === 'none') return;
+      const target = refs.panel?.style?.display === 'none' ? refs.mini : refs.panel;
+      if (!target) return;
+      const rect = target.getBoundingClientRect();
+      if (!rect.width || !rect.height) return;
+      const right = Math.max(12, Math.min(window.innerWidth - 12, window.innerWidth - rect.right));
+      refs.toastStack.style.right = `${right}px`;
+      if (rect.top >= 92) {
+        refs.toastStack.style.top = 'auto';
+        refs.toastStack.style.bottom = `${Math.max(12, window.innerHeight - rect.top + 8)}px`;
+      } else {
+        refs.toastStack.style.bottom = 'auto';
+        refs.toastStack.style.top = `${Math.min(window.innerHeight - 12, rect.bottom + 8)}px`;
+      }
+    };
+
     const refreshDeveloperUi = () => {
       const active = developerModeActive();
       [refs.debugBtn, refs.qaDebugBtn].forEach(button => {
@@ -19973,12 +19999,14 @@
       close.type = 'button';
       close.className = 'feedbackSuccessClose';
       close.title = 'Dismiss';
-      close.textContent = '×';
+      close.setAttribute('aria-label', 'Dismiss feedback notification');
+      close.innerHTML = '<svg class="uiIcon" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12"></path><path d="m18 6-12 12"></path></svg>';
       let removed = false;
       const remove = () => { if (removed) return; removed = true; toast.remove(); };
       close.addEventListener('click', remove);
       toast.append(heading, message, close);
       refs.toastStack.appendChild(toast);
+      positionToastStack();
       setTimeout(remove, 10000);
     };
 
@@ -20257,12 +20285,14 @@
       resetHostPosition();
       refs.panel.style.display = 'none';
       refs.mini.style.display = 'flex';
+      positionToastStack();
     };
 
     const restore = () => {
       refs.mini.style.display = 'none';
       refs.panel.style.display = 'block';
       fitPanelToViewport();
+      positionToastStack();
       requestAnimationFrame(() => {
         if (host.style.left && host.style.left !== 'auto') {
           const rect = refs.panel.getBoundingClientRect();
@@ -20428,6 +20458,7 @@
           toast.appendChild(message);
         }
         refs.toastStack.appendChild(toast);
+        positionToastStack();
         setTimeout(() => {
           toast.style.opacity = '0';
           toast.style.transform = 'translateY(4px)';
@@ -20534,6 +20565,7 @@
         refs.mini.style.display = 'none';
         refs.panel.style.display = 'block';
         fitPanelToViewport();
+        positionToastStack();
       },
       toggle() {
         if (host.style.display === 'none') {
@@ -20770,6 +20802,7 @@
       host.style.bottom = 'auto';
       host.style.left = `${clamp(panelDrag.left + dx, 6, Math.max(6, window.innerWidth - Math.min(rect.width, window.innerWidth - 6)))}px`;
       host.style.top = `${clamp(panelDrag.top + dy, 6, Math.max(6, window.innerHeight - 42))}px`;
+      positionToastStack();
     });
 
     panelDragHandle?.addEventListener('pointerup', e => {
@@ -20812,6 +20845,7 @@
       host.style.bottom = 'auto';
       host.style.left = `${clamp(drag.left + dx, 6, window.innerWidth - 190)}px`;
       host.style.top = `${clamp(drag.top + dy, 6, window.innerHeight - 50)}px`;
+      positionToastStack();
     });
 
     refs.mini.addEventListener('pointerup', e => {
