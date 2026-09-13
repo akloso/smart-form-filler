@@ -1,8 +1,8 @@
 // ==UserScript==
-// @name         Smart FormSense
+// @name         Auto Form Filler and Auto QA Testing
 // @namespace    smart-form-filler
-// @version      17.15.0
-// @description  Intelligent form filling and QA testing for authorized web-form validation, readiness checks, embedded forms, safe repair, and synthetic test data.
+// @version      17.16.0
+// @description  Automatic form filling and functional QA testing for authorized web-form validation, safe progression, embedded forms, and synthetic test data.
 // @author       Akash Singh
 // @match        *://*/*
 // @run-at       document-idle
@@ -45,8 +45,7 @@
   const STABLE_QUIET_MS = 280;
 
   const SETTINGS_KEY = 'STFF_V17_14_SETTINGS';
-  const PANEL_POSITION_KEY_PREFIX = 'STFF_V17_14_PANEL_POSITION:';
-  const SETTINGS_VERSION = 2;
+  const SETTINGS_VERSION = 3;
   const ACTION_DEFAULT_TTL_MS = 5 * 60 * 1000;
 
   const BRIDGE_MARKER = '__STFF_V17_7_BRIDGE__';
@@ -116,6 +115,7 @@
     qaDebugAwaiting: false,
     qaNavIndex: 0,
     qaProgressPercent: 0,
+    qaFieldDiagnostics: [],
     panelScale: 100,
     statusRefreshTimer: null
   };
@@ -202,7 +202,7 @@
     );
 
     console.error(
-      `Smart FormSense V17.15.0 [${stage}]`,
+      `Auto Form Filler and Auto QA Testing V17.16.0 [${stage}]`,
       error
     );
 
@@ -270,16 +270,15 @@
     general: {
       autoShow: false,
       startMinimized: false,
-      rememberPosition: false,
       rememberWorkspace: false,
       showShortcutHints: false,
       completionNotifications: true,
+      notificationDuration: 'normal',
       defaultWorkspace: 'fill',
       lastWorkspace: 'fill'
     },
     fill: {
-      behavior: 'ask',
-      autoDependencies: true
+      behavior: 'ask'
     },
     qa: {
       progression: 'auto-safe',
@@ -319,15 +318,25 @@
 
     const storedVersion = Number(stored.version || 0);
     if (storedVersion < 2) {
-      next.general.rememberPosition = false;
       next.general.rememberWorkspace = false;
       next.general.showShortcutHints = false;
       next.general.completionNotifications = true;
       next.general.defaultWorkspace = 'fill';
     }
+    if (storedVersion < 3) {
+      next.general.notificationDuration = 'normal';
+    }
+
+    // Panel position and dependency handling are core behaviour in v17.16+,
+    // not user preferences. Ignore legacy persisted values for those keys.
+    delete next.general.rememberPosition;
+    delete next.fill.autoDependencies;
 
     if (!['fill', 'qa'].includes(next.general.defaultWorkspace)) {
       next.general.defaultWorkspace = 'fill';
+    }
+    if (!['short', 'normal', 'long'].includes(next.general.notificationDuration)) {
+      next.general.notificationDuration = 'normal';
     }
 
     next.version = SETTINGS_VERSION;
@@ -11462,7 +11471,7 @@
       const sweep =
         await quickMissedFieldSweep({
           maxMs: 2600,
-          handleDependencies: state.settings?.fill?.autoDependencies !== false
+          handleDependencies: true
         });
 
       if (
@@ -12459,7 +12468,7 @@
     const report = {
       reportVersion: 1,
       generatedBy:
-        'Smart FormSense V17.15.0',
+        'Auto Form Filler and Auto QA Testing V17.16.0',
       generatedAt:
         new Date().toISOString(),
       mode:
@@ -12606,7 +12615,7 @@
           .slice(0, 60);
 
       const filename =
-        `Smart_FormSense_V17_11_1_Debug_${host}_${stamp}.json`;
+        `Auto_Form_Filler_Auto_QA_Testing_V17_11_1_Debug_${host}_${stamp}.json`;
 
       downloadTextFile(
         filename,
@@ -12624,7 +12633,7 @@
       return report;
     } catch (error) {
       console.error(
-        'Smart FormSense V17.15.0 debug export:',
+        'Auto Form Filler and Auto QA Testing V17.16.0 debug export:',
         error
       );
 
@@ -12638,7 +12647,7 @@
 
 
   // ==========================================================
-  // Smart FormSense QA audit
+  // Auto Form Filler and Auto QA Testing QA audit
   // ==========================================================
   const qaRequiredSignals = el => {
     if (!el) {
@@ -13016,7 +13025,7 @@
         title:
           'No meaningful active form detected',
         message:
-          'Smart FormSense could not find a meaningful visible form in this execution context.',
+          'Auto Form Filler and Auto QA Testing could not find a meaningful visible form in this execution context.',
         expected:
           'A meaningful operational form with fillable controls',
         actual:
@@ -13147,7 +13156,7 @@
           title:
             'Required rule should be functionally confirmed',
           message:
-            `${label} is visibly marked as required, but Smart FormSense could not confirm the rule from native, ARIA, or common validator attributes. The form may still enforce it through JavaScript.`,
+            `${label} is visibly marked as required, but Auto Form Filler and Auto QA Testing could not confirm the rule from native, ARIA, or common validator attributes. The form may still enforce it through JavaScript.`,
           el,
           expected:
             'A visible required indicator with an enforceable required rule',
@@ -13168,7 +13177,7 @@
           title:
             'Required field is not visibly marked',
           message:
-            `${label} appears to be technically required but Smart FormSense could not find a visible required/mandatory indicator.`,
+            `${label} appears to be technically required but Auto Form Filler and Auto QA Testing could not find a visible required/mandatory indicator.`,
           el,
           expected:
             'Required field clearly indicated to the user',
@@ -13709,9 +13718,9 @@
     return {
       reportVersion: 3,
       product:
-        'Smart FormSense',
+        'Auto Form Filler and Auto QA Testing',
       productVersion:
-        '17.15.0',
+        '17.16.0',
       generatedAt,
       auditType:
         'Non-destructive Form Readiness Audit',
@@ -13983,7 +13992,7 @@
       : '';
 
     const checkedHtml = checkedThings.length
-      ? `<section class="sectionBlock"><div class="sectionHead"><div><span class="eyebrow blueEye">QA COVERAGE</span><h2>What Smart FormSense checked</h2></div><span class="countBadge blueBadge">${checkedThings.length}</span></div><div class="checkedGrid">${checkedThings.map(item => `<div class="checkedCard"><span class="checkDot">•</span><span>${esc(item)}</span></div>`).join('')}</div></section>`
+      ? `<section class="sectionBlock"><div class="sectionHead"><div><span class="eyebrow blueEye">QA COVERAGE</span><h2>What Auto Form Filler and Auto QA Testing checked</h2></div><span class="countBadge blueBadge">${checkedThings.length}</span></div><div class="checkedGrid">${checkedThings.map(item => `<div class="checkedCard"><span class="checkDot">•</span><span>${esc(item)}</span></div>`).join('')}</div></section>`
       : '';
 
     const detailCases = (qa.testCases || []).filter(item =>
@@ -14013,7 +14022,7 @@
     };
 
     const detailedHtml = detailGroups.size
-      ? `<section class="sectionBlock"><div class="sectionHead"><div><span class="eyebrow blueEye">DETAILED VALIDATION</span><h2>Exactly what was tested</h2></div><span class="countBadge blueBadge">${detailCases.length}</span></div><div class="detailIntro">Related checks are grouped by field. Each validation shows the exact value Smart FormSense used, the trigger, and what the website actually did.</div>${[...detailGroups.values()].map(group => {
+      ? `<section class="sectionBlock"><div class="sectionHead"><div><span class="eyebrow blueEye">DETAILED VALIDATION</span><h2>Exactly what was tested</h2></div><span class="countBadge blueBadge">${detailCases.length}</span></div><div class="detailIntro">Related checks are grouped by field. Each validation shows the exact value Auto Form Filler and Auto QA Testing used, the trigger, and what the website actually did.</div>${[...detailGroups.values()].map(group => {
           const passedCount = group.rows.filter(row => row.status === 'passed').length;
           const failedCount = group.rows.filter(row => ['failed', 'blocker'].includes(row.status)).length;
           const groupClass = failedCount ? 'detailGroupFail' : passedCount === group.rows.length ? 'detailGroupPass' : 'detailGroupReview';
@@ -14027,6 +14036,7 @@
                 <div class="detailRowHead"><span class="detailIcon">${statusInfo.icon}</span><strong>${esc(item.name)}</strong><span class="detailLabel">${statusInfo.label}</span></div>
                 ${attempted !== null ? `<div class="detailValue"><b>Tested value:</b> <code>${esc(attempted)}</code></div>` : ''}
                 ${trigger ? `<div class="detailLine"><b>Trigger:</b> ${esc(trigger)}</div>` : ''}
+                ${item.evidence?.clicked !== undefined ? `<div class="detailLine"><b>Action clicked:</b> ${item.evidence.clicked ? 'Yes' : 'No'}${item.evidence.protectedFinal ? ' · Protected final action' : ''}</div>` : ''}
                 ${item.expected ? `<div class="detailLine"><b>Expected:</b> ${esc(item.expected)}</div>` : ''}
                 <div class="detailLine"><b>Observed:</b> ${esc(item.actual || 'No additional observation was recorded.')}</div>
               </div>`;
@@ -14046,7 +14056,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Smart FormSense QA Report</title>
+<title>Auto Form Filler and Auto QA Testing QA Report</title>
 <style>
 *{box-sizing:border-box}body{margin:0;background:#f5f7fb;color:#202435;font-family:Inter,Segoe UI,Arial,sans-serif}.wrap{max-width:900px;margin:auto;padding:22px 18px 48px}.reportActions{position:sticky;top:10px;z-index:20;display:flex;justify-content:flex-end;margin-bottom:10px}.pdfBtn{border:0;border-radius:11px;padding:10px 15px;background:#4f46e5;color:#fff;font-size:11px;font-weight:900;cursor:pointer;box-shadow:0 8px 22px rgba(79,70,229,.22)}.pdfBtn:hover{background:#4338ca}.hero{background:linear-gradient(135deg,#ffffff 0%,#f7f5ff 58%,#eef7ff 100%);border:1px solid #e5e7f2;border-radius:22px;padding:24px;box-shadow:0 14px 36px rgba(61,50,123,.07)}.brand{font-size:12px;font-weight:900;letter-spacing:.08em;color:#6657e8}.hero h1{font-size:24px;margin:6px 0 4px}.meta{font-size:11px;color:#777d8e;line-height:1.55}.status{display:inline-flex;align-items:center;margin-top:14px;padding:7px 11px;border-radius:999px;font-size:11px;font-weight:900}.goodStatus{background:#dcfce7;color:#166534}.reviewStatus{background:#fef3c7;color:#92400e}.issueStatus{background:#fee2e2;color:#991b1b}.partialStatus{background:#e0e7ff;color:#3730a3}.overview{margin-top:12px;font-size:13px;line-height:1.6;color:#4d5568}.summary{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:18px}.metric{border-radius:14px;padding:13px 10px;border:1px solid}.metric b{display:block;font-size:20px;line-height:1.1}.metric span{display:block;font-size:9px;font-weight:850;letter-spacing:.04em;margin-top:5px}.coverageMetric{background:#eff6ff;border-color:#bfdbfe;color:#1d4ed8}.issueMetric{background:#fff1f2;border-color:#fecdd3;color:#be123c}.reviewMetric{background:#fffbeb;border-color:#fde68a;color:#a16207}.passMetric{background:#f0fdf4;border-color:#bbf7d0;color:#15803d}.coverageBar{height:7px;background:#dbeafe;border-radius:999px;overflow:hidden;margin-top:8px}.coverageFill{height:100%;background:linear-gradient(90deg,#4f46e5,#06b6d4);border-radius:999px}.journeyGrid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:12px}.journeyCard{background:#fff;border:1px solid #e6e8ef;border-radius:13px;padding:11px 12px}.journeyCard span{font-size:9px;color:#7b8190;font-weight:800}.journeyCard b{display:block;margin-top:4px;font-size:11px}.good{color:#15803d}.bad{color:#b91c1c}.reviewTone{color:#a16207}.partial{margin-top:14px;background:#fff7ed;border:1px solid #fed7aa;border-radius:13px;padding:11px 13px;font-size:11px;color:#9a3412}.sectionBlock{margin-top:28px}.sectionHead{display:flex;align-items:end;justify-content:space-between;margin-bottom:10px}.sectionHead h2{font-size:17px;margin:3px 0 0}.eyebrow{font-size:9px;font-weight:900;letter-spacing:.12em}.redEye{color:#dc2626}.amberEye{color:#d97706}.blueEye{color:#2563eb}.countBadge{min-width:28px;height:28px;border-radius:999px;display:grid;place-items:center;font-size:11px;font-weight:900}.redBadge{background:#fee2e2;color:#b91c1c}.amberBadge{background:#fef3c7;color:#92400e}.blueBadge{background:#dbeafe;color:#1d4ed8}.item{display:flex;gap:12px;background:#fff;border:1px solid #e5e7ed;border-radius:15px;padding:14px;margin:9px 0;box-shadow:0 5px 16px rgba(30,41,59,.035)}.item.issue{border-color:#fecaca;background:linear-gradient(135deg,#fff,#fff7f7)}.iconBox{width:28px;height:28px;border-radius:9px;display:grid;place-items:center;font-weight:950;flex:0 0 auto}.issueIcon{background:#fee2e2;color:#b91c1c}.itemBody{min-width:0;flex:1}.itemTitle{font-size:14px;font-weight:900}.fields,.what,.action{margin-top:6px;font-size:11px;line-height:1.58;color:#606778}.fields b,.action b{color:#343949}.action{background:#fff;border:1px solid #fee2e2;border-radius:9px;padding:9px 10px}.checkedGrid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}.checkedCard{display:flex;align-items:center;gap:8px;background:#fff;border:1px solid #dbeafe;border-radius:12px;padding:10px 11px;color:#334155;font-size:11px;font-weight:700}.checkDot{width:20px;height:20px;border-radius:7px;display:grid;place-items:center;background:#dbeafe;color:#1d4ed8;font-size:13px;font-weight:950;flex:0 0 auto}.fieldChips{display:flex;flex-wrap:wrap;gap:7px;background:#fff;border:1px solid #fde68a;border-radius:14px;padding:12px}.fieldChips span{background:#fffbeb;border:1px solid #fde68a;color:#92400e;border-radius:999px;padding:6px 9px;font-size:10px;font-weight:750}.detailIntro{font-size:11px;color:#697184;line-height:1.55;margin:-2px 0 10px}.detailGroup{background:#fff;border:1px solid #e5e7ed;border-radius:14px;margin:9px 0;overflow:hidden}.detailGroup summary{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 13px;cursor:pointer;font-size:12px;font-weight:900}.detailGroup summary b{font-size:10px;color:#6b7280}.detailGroupPass{border-left:4px solid #22c55e}.detailGroupFail{border-left:4px solid #ef4444}.detailGroupReview{border-left:4px solid #f59e0b}.detailRows{border-top:1px solid #eef0f4}.detailRow{padding:11px 13px;border-top:1px solid #f0f1f5}.detailRow:first-child{border-top:0}.detailRowHead{display:flex;align-items:center;gap:7px}.detailRowHead strong{font-size:11px;flex:1}.detailIcon{width:20px;height:20px;border-radius:7px;display:grid;place-items:center;font-weight:950}.detailLabel{font-size:8px;font-weight:900;text-transform:uppercase;border-radius:999px;padding:3px 6px}.detailPass .detailIcon,.detailPass .detailLabel{background:#dcfce7;color:#166534}.detailFail .detailIcon,.detailFail .detailLabel{background:#fee2e2;color:#991b1b}.detailReview .detailIcon,.detailReview .detailLabel{background:#fef3c7;color:#92400e}.detailValue,.detailLine{font-size:10px;line-height:1.5;color:#606778;margin-top:5px}.detailValue code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;background:#f6f7fb;color:#312e81;border-radius:6px;padding:2px 5px;word-break:break-all}.detailLine b,.detailValue b{color:#343949}.missedChips{border-color:#fecaca}.missedChips span{background:#fff1f2;border-color:#fecaca;color:#991b1b}.passed{margin-top:26px;background:linear-gradient(135deg,#ecfdf5,#f0fdf4);border:1px solid #bbf7d0;border-radius:15px;padding:14px;color:#166534;font-size:12px;font-weight:750}.note{margin-top:18px;background:#fff;border:1px solid #e7e9ef;border-radius:13px;padding:12px;font-size:10px;line-height:1.6;color:#858b99}.footer{text-align:center;margin-top:24px;font-size:10px;color:#979baa}@media(max-width:680px){.summary{grid-template-columns:repeat(2,1fr)}.journeyGrid,.checkedGrid{grid-template-columns:1fr}.hero{padding:18px}}@media print{body{background:#fff;font-size:10px}.wrap{padding:0 3mm;max-width:none}.reportActions{display:none!important}.hero,.item{box-shadow:none}.hero{padding:14px;border-radius:14px}.hero h1{font-size:20px}.summary,.journeyGrid{gap:6px}.metric,.journeyCard{padding:8px}.sectionBlock{margin-top:16px;break-inside:avoid}.sectionHead{margin-bottom:6px}.checkedGrid{gap:5px}.checkedCard{padding:7px 9px}.passed{margin-top:14px;padding:10px}.note{margin-top:10px;padding:9px}.footer{margin-top:10px}}
 </style>
@@ -14057,7 +14067,7 @@
   <div class="hero">
     <div class="brand">✦ SMART FORMSENSE QA</div>
     <h1>${esc(qa.page?.title || 'Form')}</h1>
-    <div class="meta">${esc(qa.page?.hostname || location.hostname || '')}<br>${esc(generated)} • v${esc(qa.productVersion || '17.15.0')}</div>
+    <div class="meta">${esc(qa.page?.hostname || location.hostname || '')}<br>${esc(generated)} • v${esc(qa.productVersion || '17.16.0')}</div>
     <div class="status ${statusClass}">${esc(status)}</div>
     <div class="overview">${esc(overview)}</div>
 
@@ -14083,8 +14093,8 @@
   ${uncoveredHtml}
 
   <div class="passed">✓ ${passed} automated checks were confirmed OK. Field coverage: ${fieldCoverage}%. Validation coverage: ${validationCoverage}%.</div>
-  <div class="note">Field names are shown only when Smart FormSense genuinely missed them or when a confirmed issue needs attention. Pending checks stay summarized. Exact test values and technical evidence remain in <b>Export Debug</b>.</div>
-  <div class="footer">Created with love ❤️ Akash Singh • Smart FormSense</div>
+  <div class="note">Field names are shown only when Auto Form Filler and Auto QA Testing genuinely missed them or when a confirmed issue needs attention. Pending checks stay summarized. Exact test values and technical evidence remain in <b>Export Debug</b>.</div>
+  <div class="footer">Created with love ❤️ Akash Singh • Auto Form Filler and Auto QA Testing</div>
 </div>
 <script>try{document.getElementById("qaDownloadPdf")?.addEventListener("click",function(e){e.preventDefault();window.print();});}catch(e){}</script>
 </body>
@@ -14139,7 +14149,7 @@
       .slice(0, 60);
 
     downloadTextFile(
-      `Smart_FormSense_QA_Report_${host}_${stamp}.html`,
+      `Auto_Form_Filler_Auto_QA_Testing_QA_Report_${host}_${stamp}.html`,
       html,
       'text/html;charset=utf-8'
     );
@@ -14274,9 +14284,9 @@
     return {
       reportVersion: 2,
       product:
-        'Smart FormSense',
+        'Auto Form Filler and Auto QA Testing',
       productVersion:
-        '17.15.0',
+        '17.16.0',
       generatedAt:
         new Date().toISOString(),
       purpose:
@@ -14294,8 +14304,13 @@
       },
       qaAudit:
         qa,
+      diagnosticContext: state.qaReportAgentId
+        ? { activeContext: 'embedded-form', agentId: state.qaReportAgentId, hostPage: location.hostname }
+        : { activeContext: IS_FRAME ? 'frame' : 'host-page', agentId: null, hostPage: location.hostname },
       qaFieldDiagnostics:
-        qaFields,
+        state.qaReportAgentId && state.qaFieldDiagnostics?.length ? state.qaFieldDiagnostics : qaFields,
+      hostPageFieldDiagnostics:
+        state.qaReportAgentId ? qaFields : [],
       technicalDiagnostics:
         buildDebugReport(),
       runtime: {
@@ -14318,7 +14333,7 @@
           Number(state.qaProgressPercent || 0)
       },
       notes: [
-        'This file is intentionally technical and is meant to be shared for troubleshooting Smart FormSense QA detection.',
+        'This file is intentionally technical and is meant to be shared for troubleshooting Auto Form Filler and Auto QA Testing QA detection.',
         'It can contain page/form metadata and synthetic test values. Review it before sharing outside the QA/development team.',
         'Preserved user-entered values remain subject to the redaction rules used by the standard debug exporter.'
       ]
@@ -14351,7 +14366,7 @@
           .slice(0, 60);
 
       downloadTextFile(
-        `Smart_FormSense_QA_Debug_${host}_${stamp}.json`,
+        `Auto_Form_Filler_Auto_QA_Testing_QA_Debug_${host}_${stamp}.json`,
         JSON.stringify(
           report,
           null,
@@ -14366,7 +14381,7 @@
       return report;
     } catch (error) {
       console.error(
-        'Smart FormSense V17.15.0 QA debug export:',
+        'Auto Form Filler and Auto QA Testing V17.16.0 QA debug export:',
         error
       );
 
@@ -14868,7 +14883,7 @@
       const authorization = serializedActiveAuthorization();
 
       if (!authorization || authorization.kind !== canonicalActionKind(action)) {
-        return Promise.reject(new Error('No authorized Smart FormSense action is active'));
+        return Promise.reject(new Error('No authorized Auto Form Filler and Auto QA Testing action is active'));
       }
 
       const requestId =
@@ -15004,7 +15019,7 @@
     fill: '✓ Form filling completed',
     validate: '✓ Validation completed',
     recheck: '✓ Recheck completed'
-  }[action] || '✓ Smart FormSense completed');
+  }[action] || '✓ Auto Form Filler and Auto QA Testing completed');
 
   const autoScrollAfterValidate = (result = null) => {
     const c = result?.counters || refreshCurrentStatus();
@@ -15065,8 +15080,8 @@
         state.activeRemoteRequestId = null;
         state.activeRemoteAction = null;
         state.panel?.setBusy(false);
-        state.panel?.setStatus(`Smart FormSense action failed safely: ${error?.message || 'unknown error'}`);
-        state.panel?.notify?.('⚠ Smart FormSense action stopped', error?.message || 'Unknown error', 'error');
+        state.panel?.setStatus(`Auto Form Filler and Auto QA Testing action failed safely: ${error?.message || 'unknown error'}`);
+        state.panel?.notify?.('⚠ Auto Form Filler and Auto QA Testing action stopped', error?.message || 'Unknown error', 'error');
         setProgress(100, `Action stopped safely: ${error?.message || 'unknown error'}`);
       } finally {
         scheduleCurrentStatusRefresh(40);
@@ -15079,7 +15094,7 @@
 
 
   // ==========================================================
-  // Smart FormSense Functional QA engine (black-box, reversible)
+  // Auto Form Filler and Auto QA Testing Functional QA engine (black-box, reversible)
   // ==========================================================
   const qaDispatchInteraction = (el, includeBlur = true) => {
     if (!el || !requireActionPermission('form-events', el, 'qaDispatchInteraction')) return false;
@@ -15313,6 +15328,7 @@
     ].filter(Boolean).join(' '));
 
     if (type === 'file') return 'file';
+    if (/captcha|verification code|security code|i am not a robot/.test(ownContext)) return 'captcha';
     if (/percentage.*cgpa|cgpa.*percentage/.test(ownContext)) return 'marks_metric';
     if (/email|e mail/.test(ownContext)) return 'email';
     if (/mobile|phone|contact number|telephone/.test(ownContext)) return 'mobile';
@@ -15323,6 +15339,7 @@
     if (/date of birth|birth date|\bdob\b/.test(ownContext)) return 'dob';
     if (/year of passing|passing year|pass year|completion year/.test(ownContext)) return 'passing_year';
     if (/first name|middle name|last name|full name|father.*name|mother.*name|guardian.*name|applicant name|parent name/.test(ownContext)) return 'name';
+    if (/(?:^|\s)name(?:\s|$)/.test(ownContext)) return 'name';
     if (/mother tongue|native language|first language|language spoken/.test(ownContext)) return 'language';
     if (/country/.test(ownContext)) return 'country';
     if (/state|province/.test(ownContext)) return 'state';
@@ -15346,6 +15363,10 @@
     let text = String(label || 'Unnamed field').replace(/\s+/g, ' ').trim();
     if (normalize(el?.type) === 'radio') text = text.replace(/^(?:yes|no)\s+/i, '');
     text = text.replace(/\s*\*+\s*$/, '').trim();
+    const duplicatedId = text.match(/^(.+?)\s+ID\s+(.+)$/i);
+    if (duplicatedId && normalize(duplicatedId[1]) === normalize(duplicatedId[2])) {
+      text = duplicatedId[1].trim();
+    }
     if (/i hereby declare|declaration|i agree/i.test(text) && text.length > 70) return 'Declaration Agreement';
     if (/permanent address same as address for correspondence/i.test(text)) return 'Permanent Address Same as Correspondence?';
     return text.length > 92 ? `${text.slice(0, 89).trim()}…` : text;
@@ -15426,6 +15447,17 @@
     ''
   );
 
+  const qaIsHighRiskFinalAction = el => /\bpay\b|payment|generate application|confirm admission|finali[sz]e|place order|complete application|finish application|purchase|checkout/.test(qaButtonText(el));
+
+  const qaIsSubmitLikeAction = el => {
+    if (!el) return false;
+    const text = qaButtonText(el);
+    const type = normalize(el.type || el.getAttribute?.('type') || '');
+    if (type === 'submit') return true;
+    if (String(el.tagName || '').toUpperCase() === 'BUTTON' && (!type || type === 'submit')) return true;
+    return /\bsubmit\b|send\s+(?:form|enquiry|request)|register|enquire|apply\s+now|sign\s+up/.test(text);
+  };
+
   const qaFindJourneyButtons = () => {
     const safe = [];
     const protectedFinal = [];
@@ -15439,13 +15471,13 @@
       const text = qaButtonText(el);
       if (!text) continue;
 
-      if (/\bsubmit\b|\bpay\b|payment|generate application|confirm admission|finali[sz]e|place order|complete application|finish application/.test(text)) {
-        protectedFinal.push(el);
+      if (/^(?:next|continue|proceed)$|save\s*(?:&|and)\s*(?:next|continue|proceed)|continue to|proceed to|next step|go next/.test(text)) {
+        safe.push(el);
         continue;
       }
 
-      if (/^(?:next|continue|proceed)$|save\s*(?:&|and)\s*(?:next|continue|proceed)|continue to|proceed to|next step|go next/.test(text)) {
-        safe.push(el);
+      if (qaIsHighRiskFinalAction(el) || qaIsSubmitLikeAction(el)) {
+        protectedFinal.push(el);
         continue;
       }
 
@@ -15464,41 +15496,90 @@
       .join('|')
   });
 
-  const qaClickJourneyButton = async (button, fields = []) => {
-    const protectedText = qaButtonText(button);
-    if (/\bsubmit\b|\bpay\b|payment|generate application|confirm admission|finali[sz]e|place order|complete application|finish application/.test(protectedText)) {
-      return { progressed: false, submitAttempted: false, buttonText: protectedText, validationAfter: { entries: [], count: 0 }, newValidationEntries: [], protectedFinal: true };
+  const qaClickJourneyButton = async (button, fields = [], options = {}) => {
+    const protectedFinal = qaIsSubmitLikeAction(button) || qaIsHighRiskFinalAction(button);
+    const highRisk = qaIsHighRiskFinalAction(button);
+    const safetyAnchors = Array.isArray(options.safetyAnchors) ? options.safetyAnchors : [];
+
+    if (highRisk) {
+      return {
+        progressed: false,
+        submitAttempted: false,
+        clicked: false,
+        buttonText: qaButtonText(button),
+        validationAfter: { entries: [], count: 0 },
+        newValidationEntries: [],
+        protectedFinal: true,
+        highRiskFinal: true,
+        safetyAnchors
+      };
     }
-    if (!activeActionIs('qa') || !requireActionPermission('safe-progression', button, 'qaJourneyClick')) {
-      return { progressed: false, submitAttempted: false, buttonText: qaButtonText(button), validationAfter: { entries: [], count: 0 }, newValidationEntries: [], blockedByAuthorization: true };
+
+    if (protectedFinal && !options.allowProtectedFinal) {
+      return {
+        progressed: false,
+        submitAttempted: false,
+        clicked: false,
+        buttonText: qaButtonText(button),
+        validationAfter: { entries: [], count: 0 },
+        newValidationEntries: [],
+        protectedFinal: true,
+        safetyAnchors
+      };
     }
+
+    if (!activeActionIs('qa') || !requireActionPermission('safe-progression', button, protectedFinal ? 'qaProtectedSubmitProbe' : 'qaJourneyClick')) {
+      return {
+        progressed: false,
+        submitAttempted: false,
+        clicked: false,
+        buttonText: qaButtonText(button),
+        validationAfter: { entries: [], count: 0 },
+        newValidationEntries: [],
+        blockedByAuthorization: true,
+        protectedFinal,
+        safetyAnchors
+      };
+    }
+
     const before = qaJourneyState();
     const beforeValidation = qaValidationDigest(fields);
     const form = button?.form || button?.closest?.('form') || null;
     let submitAttempted = false;
+    let submitPrevented = false;
 
-    const observeSubmit = () => {
+    const observeSubmit = event => {
       submitAttempted = true;
+      if (protectedFinal) {
+        try { event.preventDefault(); } catch {}
+        submitPrevented = true;
+      }
     };
 
     try { form?.addEventListener('submit', observeSubmit, true); } catch {}
-    try { button.click(); } catch {}
 
+    let clicked = false;
+    try {
+      button.click();
+      clicked = true;
+    } catch {}
+
+    const maxWait = protectedFinal ? 1300 : 4200;
     const started = Date.now();
     let after = qaJourneyState();
     let afterValidation = qaValidationDigest(
       visibleFillableFields().filter(el => !isLikelyInternalField(el))
     );
 
-    while (Date.now() - started < 4200) {
-      await sleep(180);
+    while (Date.now() - started < maxWait) {
+      await sleep(protectedFinal ? 120 : 180);
       after = qaJourneyState();
       const currentFields = visibleFillableFields().filter(el => !isLikelyInternalField(el));
       afterValidation = qaValidationDigest(currentFields);
       const progressed = before.url !== after.url || before.keys !== after.keys;
       const validationChanged = beforeValidation.signature !== afterValidation.signature;
-      if (progressed || validationChanged) {
-        await sleep(350);
+      if (progressed || validationChanged || (protectedFinal && Date.now() - started >= 650)) {
+        await sleep(protectedFinal ? 120 : 350);
         after = qaJourneyState();
         afterValidation = qaValidationDigest(
           visibleFillableFields().filter(el => !isLikelyInternalField(el))
@@ -15519,13 +15600,17 @@
     return {
       before,
       after,
+      clicked,
       submitAttempted,
+      submitPrevented,
       progressed: before.url !== after.url || before.keys !== after.keys,
       buttonText: qaButtonText(button),
       validationBefore: beforeValidation,
       validationAfter: afterValidation,
       newValidationEntries,
-      waitedMs: Date.now() - started
+      waitedMs: Date.now() - started,
+      protectedFinal,
+      safetyAnchors
     };
   };
 
@@ -15675,7 +15760,7 @@
     };
 
     try { document.addEventListener('click', onClick, true); } catch {}
-    state.panel?.setStatus?.('Manual step needed: click the form Continue / Save & Next / Submit button. Smart FormSense will watch the result.');
+    state.panel?.setStatus?.('Manual step needed: click the form Continue / Save & Next / Submit button. Auto Form Filler and Auto QA Testing will watch the result.');
     state.panel?.setQaProgress?.(94, 'Manual step: click Continue / Submit on the form');
 
     const started = Date.now();
@@ -15990,7 +16075,7 @@
       rows.push({
         status: 'review',
         name: 'Safe progression disabled in Settings',
-        actual: `A safe ${qaButtonText(button) || 'Next / Continue'} action was detected, but Smart FormSense is configured not to progress automatically.`
+        actual: `A safe ${qaButtonText(button) || 'Next / Continue'} action was detected, but Auto Form Filler and Auto QA Testing is configured not to progress automatically.`
       });
       return rows;
     }
@@ -15998,7 +16083,7 @@
     if (button && progression === 'ask') {
       let approved = false;
       try {
-        approved = window.confirm(`Smart FormSense QA found a safe “${qaButtonText(button) || 'Next / Continue'}” action. Run this progression check now?`);
+        approved = window.confirm(`Auto Form Filler and Auto QA Testing QA found a safe “${qaButtonText(button) || 'Next / Continue'}” action. Run this progression check now?`);
       } catch {}
       if (!approved) {
         rows.push({
@@ -16011,6 +16096,38 @@
     }
 
     if (!button) {
+      const finalButton = buttons.protectedFinal.find(item => !qaIsHighRiskFinalAction(item)) || null;
+      if (finalButton) {
+        const focusEl = liveFields.find(item => qaSemanticFor(item) !== 'captcha') || liveFields[0] || null;
+        const anchors = qaValidationSafetyAnchors(focusEl, liveFields);
+        const captchaOrConsent = anchors.some(anchor => ['captcha', 'consent'].includes(anchor.type));
+        const requiredCount = anchors.filter(anchor => anchor.type === 'required').length;
+        if (captchaOrConsent || requiredCount >= 2) {
+          const auto = await qaClickJourneyButton(finalButton, liveFields, {
+            allowProtectedFinal: true,
+            safetyAnchors: anchors
+          });
+          const fresh = auto.newValidationEntries || [];
+          rows.push({
+            status: auto.clicked && !auto.progressed ? 'passed' : 'review',
+            name: 'Protected final validation action',
+            actual: auto.clicked
+              ? `Auto Form Filler and Auto QA Testing clicked ${qaButtonText(finalButton) || 'Submit'} in protected validation mode. Final submission remained blocked${fresh.length ? ` and ${fresh.length} fresh validation message(s) appeared` : ''}.`
+              : 'The final validation action could not be exercised automatically.',
+            evidence: {
+              method: 'protected-final-validation',
+              clicked: !!auto.clicked,
+              submitAttempted: !!auto.submitAttempted,
+              submitPrevented: !!auto.submitPrevented,
+              progressed: !!auto.progressed,
+              validationEntries: fresh,
+              safetyAnchors: anchors
+            }
+          });
+          return rows;
+        }
+      }
+
       if (buttons.protectedFinal.length || buttons.other.length) {
         const manual = await qaWaitForManualProgress(liveFields, 15000);
         if (manual.observed) {
@@ -16021,7 +16138,7 @@
             status: manual.progressed || newEntries.length > 0 ? 'passed' : 'review',
             name: 'Manual Continue / Submit check',
             actual: manual.progressed
-              ? `Your ${manual.clickedText || 'form action'} click moved the form forward and Smart FormSense detected the new step.`
+              ? `Your ${manual.clickedText || 'form action'} click moved the form forward and Auto Form Filler and Auto QA Testing detected the new step.`
               : newEntries.length > 0
                 ? `Your ${manual.clickedText || 'form action'} click triggered validation on ${newEntries.length} field(s).`
                 : 'A form action was clicked, but progression or fresh validation could not be confirmed.',
@@ -16040,8 +16157,8 @@
             status: 'review',
             name: 'Continue / Submit needs a manual click',
             actual: buttons.protectedFinal.length
-              ? 'The available progression action looks like a final Submit or transaction action, so Smart FormSense left the click to the user.'
-              : 'Smart FormSense could not identify a safe progression button automatically.',
+              ? 'The available progression action looks like a final Submit or transaction action, so Auto Form Filler and Auto QA Testing left the click to the user.'
+              : 'Auto Form Filler and Auto QA Testing could not identify a safe progression button automatically.',
             evidence: { method: 'manual-assisted-journey', waitedMs: manual.waitedMs }
           });
         }
@@ -16121,7 +16238,7 @@
             el,
             status: 'review',
             name: 'Required field still needs confirmation',
-            actual: 'The form was blocked, but Smart FormSense could not map a validation message to this required field on this attempt.'
+            actual: 'The form was blocked, but Auto Form Filler and Auto QA Testing could not map a validation message to this required field on this attempt.'
           });
         }
       } else if (click.validationAfter.count > 0) {
@@ -16356,8 +16473,8 @@
     const anchors = qaValidationSafetyAnchors(el, fields);
     const progression = state.settings?.qa?.progression || 'auto-safe';
 
-    if (buttons.safe[0] && progression === 'auto-safe' && anchors.length) {
-      const result = await qaClickJourneyButton(buttons.safe[0], fields);
+    if (buttons.safe[0] && progression !== 'never') {
+      const result = await qaClickJourneyButton(buttons.safe[0], fields, { safetyAnchors: anchors });
       return {
         ...result,
         trigger: `Clicked ${qaButtonText(buttons.safe[0]) || 'Next / Continue'}`,
@@ -16366,35 +16483,34 @@
       };
     }
 
-    const finalButton = buttons.protectedFinal[0] || null;
-    const form = finalButton?.form || finalButton?.closest?.('form') || el?.form || el?.closest?.('form') || null;
-    if (finalButton && form) {
-      const beforeValidation = qaValidationDigest(fields);
-      let browserValid = null;
-      try {
-        browserValid = typeof form.reportValidity === 'function'
-          ? !!form.reportValidity()
-          : typeof form.checkValidity === 'function'
-            ? !!form.checkValidity()
-            : null;
-      } catch {}
-      await sleep(120);
-      const afterValidation = qaValidationDigest(
-        visibleFillableFields().filter(item => !isLikelyInternalField(item))
-      );
-      const beforeKeys = new Set(beforeValidation.entries.map(item => `${item.fieldKey || ''}|${normalize(item.text)}`));
-      const newValidationEntries = afterValidation.entries.filter(
-        item => !beforeKeys.has(`${item.fieldKey || ''}|${normalize(item.text)}`)
-      );
+    const finalButton = buttons.protectedFinal.find(button => !qaIsHighRiskFinalAction(button)) || null;
+    if (finalButton) {
+      const captchaOrConsent = anchors.some(anchor => ['captcha', 'consent'].includes(anchor.type));
+      const requiredCount = anchors.filter(anchor => anchor.type === 'required').length;
+      const strongEnough = captchaOrConsent || requiredCount >= 2;
+
+      if (strongEnough) {
+        const result = await qaClickJourneyButton(finalButton, fields, {
+          allowProtectedFinal: true,
+          safetyAnchors: anchors
+        });
+        return {
+          ...result,
+          trigger: `Clicked protected ${qaButtonText(finalButton) || 'Submit'}`,
+          safetyAnchors: anchors,
+          protectedFinal: true,
+          manualRequired: false
+        };
+      }
+
       return {
-        trigger: `Protected ${qaButtonText(finalButton) || 'Submit'} validation check`,
+        trigger: `Protected ${qaButtonText(finalButton) || 'Submit'} requires manual confirmation`,
         protectedFinal: true,
         clicked: false,
         progressed: false,
-        browserValid,
-        validationBefore: beforeValidation,
-        validationAfter: afterValidation,
-        newValidationEntries,
+        manualRequired: true,
+        validationAfter: qaValidationDigest(fields),
+        newValidationEntries: [],
         safetyAnchors: anchors
       };
     }
@@ -16404,6 +16520,7 @@
       protectedFinal: false,
       clicked: false,
       progressed: false,
+      manualRequired: buttons.other.length > 0,
       validationAfter: qaValidationDigest(fields),
       newValidationEntries: [],
       safetyAnchors: anchors
@@ -16414,55 +16531,73 @@
     const before = qaVisibleFeedback(el);
     const snapshot = qaSnapshotFieldValue(el);
     const entry = await qaAttemptUserEntry(el, testCase.value);
-    let after = qaVisibleFeedback(el);
     const exact = entry.acceptedValue === entry.attemptedValue;
     const liveFields = visibleFillableFields().filter(item => !isLikelyInternalField(item));
 
-    let triggerEvidence = null;
-    if (exact && !after.invalid) {
-      triggerEvidence = await qaTriggerValidationProbe(el, liveFields);
-      const mapped = triggerEvidence?.validationAfter?.entries?.find(item => item.fieldKey === fieldKey(el));
-      if (mapped) {
-        after = {
-          invalid: true,
-          signature: normalize(mapped.text || 'validation'),
-          text: mapped.text || 'Validation appeared after form action.'
-        };
-      } else {
-        after = qaVisibleFeedback(el);
-      }
+    // Every validation case must exercise the form's validation action. This is
+    // what reveals submit/next-time validation that blur alone cannot expose.
+    const triggerEvidence = await qaTriggerValidationProbe(el, liveFields);
+    let mapped = triggerEvidence?.validationAfter?.entries?.find(item => item.fieldKey === fieldKey(el));
+    if (mapped?.text) {
+      const message = normalize(mapped.text);
+      const focusSemantic = qaSemanticFor(el);
+      const messageSemantic = /email/.test(message) ? 'email'
+        : /mobile|phone|contact number|telephone/.test(message) ? 'mobile'
+          : /captcha|verification code|security code/.test(message) ? 'captcha'
+            : /state|province/.test(message) ? 'state'
+              : /district/.test(message) ? 'district'
+                : /city|town/.test(message) ? 'city'
+                  : /course|program|programme/.test(message) ? 'course'
+                    : /name/.test(message) ? 'name'
+                      : '';
+      if (messageSemantic && focusSemantic && messageSemantic !== focusSemantic) mapped = null;
     }
+    const after = qaVisibleFeedback(el);
+    const sameStaleFeedback = !!(
+      before.invalid &&
+      after.invalid &&
+      before.signature &&
+      before.signature === after.signature &&
+      !mapped
+    );
+    const nativeInvalid = (() => {
+      try { return !!el.validity && el.validity.valid === false; }
+      catch { return false; }
+    })();
+    const ariaInvalid = normalize(el.getAttribute?.('aria-invalid')) === 'true';
+    const freshFeedback = !!mapped || (after.invalid && !sameStaleFeedback);
+    const effectiveInvalid = nativeInvalid || ariaInvalid || freshFeedback;
+    const feedbackText = mapped?.text || (sameStaleFeedback && !nativeInvalid && !ariaInvalid ? '' : after.text || '');
 
-    const newFeedback = after.invalid && (!before.invalid || after.signature !== before.signature);
     let status = 'passed';
     let actual = '';
 
     if (testCase.expectation === 'reject') {
       if (!exact) {
         status = 'passed';
-        actual = `The control prevented or normalized the invalid entry. Accepted value: ${JSON.stringify(entry.acceptedValue)}.`;
-      } else if (newFeedback || after.invalid) {
+        actual = `The control prevented or normalized the invalid entry. Accepted value: ${JSON.stringify(entry.acceptedValue)}. The form action was still exercised.`;
+      } else if (effectiveInvalid) {
         status = 'passed';
-        actual = `The invalid value was rejected${triggerEvidence?.trigger ? ` after ${triggerEvidence.trigger}` : ''}${after.text ? `: ${after.text}` : '.'}`;
+        actual = `The invalid value was rejected after ${triggerEvidence?.trigger || 'the form action'}${feedbackText ? `: ${feedbackText}` : '.'}`;
       } else if (triggerEvidence?.progressed) {
         status = 'failed';
         actual = `The invalid value ${JSON.stringify(entry.acceptedValue)} was allowed to progress after ${triggerEvidence.trigger || 'the form action'}.`;
       } else {
         status = 'review';
-        actual = triggerEvidence?.protectedFinal
-          ? 'The value produced no confirmed validation during the protected final-action check. Smart FormSense did not execute the irreversible final submission.'
-          : 'The invalid value could be entered and no confirmed validation appeared after the available safe trigger.';
+        actual = triggerEvidence?.manualRequired
+          ? 'The value still needs one manual confirmation because no safely protected automatic final-action click was available.'
+          : `The invalid value produced no confirmed validation after ${triggerEvidence?.trigger || 'the available form action'}.`;
       }
-    } else if (exact && !after.invalid && !triggerEvidence?.progressed) {
+    } else if (exact && !effectiveInvalid && !triggerEvidence?.progressed) {
       status = 'passed';
-      actual = `The valid value was accepted without a validation error${triggerEvidence?.trigger ? ` during ${triggerEvidence.trigger}` : ''}.`;
+      actual = `The valid value was accepted without a current validation error after ${triggerEvidence?.trigger || 'the form action'}.${sameStaleFeedback ? ' A stale pre-existing validation message was ignored because it did not change and the field was currently valid.' : ''}`;
     } else if (triggerEvidence?.progressed) {
       status = 'passed';
       actual = `The valid value was accepted and the form progressed after ${triggerEvidence.trigger || 'the form action'}.`;
     } else {
       status = 'failed';
       actual = exact
-        ? `The valid value remained but validation feedback was still present${after.text ? `: ${after.text}` : '.'}`
+        ? `The valid value remained but current validation feedback was still present${feedbackText ? `: ${feedbackText}` : '.'}`
         : `The valid value could not be entered as expected. Accepted value: ${JSON.stringify(entry.acceptedValue)}.`;
     }
 
@@ -16477,13 +16612,17 @@
         method: entry.method,
         attemptedValue: entry.attemptedValue,
         acceptedValue: entry.acceptedValue,
-        feedback: after.text || '',
+        feedback: feedbackText,
         trigger: triggerEvidence?.trigger || 'Field blur/change validation',
         protectedFinal: !!triggerEvidence?.protectedFinal,
-        clicked: !!triggerEvidence?.clicked || !!triggerEvidence?.buttonText,
+        clicked: !!triggerEvidence?.clicked,
+        submitAttempted: !!triggerEvidence?.submitAttempted,
+        submitPrevented: !!triggerEvidence?.submitPrevented,
         progressed: !!triggerEvidence?.progressed,
+        manualRequired: !!triggerEvidence?.manualRequired,
         safetyAnchors: triggerEvidence?.safetyAnchors || [],
         validationEntries: triggerEvidence?.newValidationEntries || [],
+        staleFeedbackIgnored: !!sameStaleFeedback && !nativeInvalid && !ariaInvalid,
         restored: !!el?.isConnected
       }
     };
@@ -16496,9 +16635,7 @@
     const type = normalize(el.type);
 
     if (type === 'radio') {
-      for (const member of radioGroupMembers(el)) {
-        member.checked = false;
-      }
+      for (const member of radioGroupMembers(el)) member.checked = false;
       if (radioGroupMembers(el)[0]) qaDispatchInteraction(radioGroupMembers(el)[0]);
     } else if (type === 'checkbox') {
       el.checked = false;
@@ -16508,11 +16645,8 @@
         !option.disabled &&
         (!String(option.value || '').trim() || /^(?:select|choose|please select|--)/i.test(String(option.textContent || '').trim()))
       );
-      if (placeholder) {
-        el.value = placeholder.value;
-      } else {
-        el.selectedIndex = -1;
-      }
+      if (placeholder) el.value = placeholder.value;
+      else el.selectedIndex = -1;
       qaDispatchInteraction(el);
     } else if (!el.readOnly) {
       qaSetNativeLikeValue(el, '');
@@ -16523,55 +16657,47 @@
         actual: /datepicker/i.test(String(el.className || ''))
           ? 'Field is controlled by a date picker and cannot be meaningfully blank-tested through direct typing.'
           : 'Field is read-only, so blank validation needs journey-level confirmation.',
-        feedback: ''
+        feedback: '',
+        evidence: { trigger: 'No automatic trigger available', clicked: false }
       };
     }
 
-    await sleep(110);
+    await sleep(90);
+    const liveFields = visibleFillableFields().filter(item => !isLikelyInternalField(item));
+    const triggerEvidence = await qaTriggerValidationProbe(el, liveFields);
     const after = qaVisibleFeedback(el);
+    const mapped = triggerEvidence?.validationAfter?.entries?.find(item => item.fieldKey === fieldKey(el));
     const nativeMissing = !!el.validity?.valueMissing;
     const feedbackAppeared = after.invalid && (!before.invalid || after.signature !== before.signature);
 
-    let status = nativeMissing || feedbackAppeared ? 'passed' : 'review';
+    let status = nativeMissing || feedbackAppeared || !!mapped ? 'passed' : 'review';
     let actual = status === 'passed'
-      ? `Empty required value produced validation feedback${after.text ? `: ${after.text}` : '.'}`
-      : 'No field-level validation appeared after leaving the required field empty.';
-    let triggerEvidence = null;
+      ? `Empty required value was blocked after ${triggerEvidence?.trigger || 'the form action'}${mapped?.text || after.text ? `: ${mapped?.text || after.text}` : '.'}`
+      : triggerEvidence?.progressed
+        ? `The form progressed even though this required field was empty after ${triggerEvidence?.trigger || 'the form action'}.`
+        : triggerEvidence?.manualRequired
+          ? 'Required-field validation still needs one manual confirmation because the final action could not be protected strongly enough for an automatic click.'
+          : `No required-field feedback was confirmed after ${triggerEvidence?.trigger || 'the form action'}.`;
 
-    if (status !== 'passed') {
-      const liveFields = visibleFillableFields().filter(item => !isLikelyInternalField(item));
-      triggerEvidence = await qaTriggerValidationProbe(el, liveFields);
-      const mapped = triggerEvidence?.validationAfter?.entries?.find(item => item.fieldKey === fieldKey(el));
-      const direct = qaVisibleFeedback(el);
-      if (mapped || direct.invalid) {
-        status = 'passed';
-        actual = `Empty required value was blocked after ${triggerEvidence?.trigger || 'the form action'}${mapped?.text || direct.text ? `: ${mapped?.text || direct.text}` : '.'}`;
-      } else if (triggerEvidence?.progressed) {
-        status = 'failed';
-        actual = `The form progressed even though this required field was empty after ${triggerEvidence?.trigger || 'the form action'}.`;
-      } else {
-        actual = triggerEvidence?.protectedFinal
-          ? 'No required-field feedback was confirmed during the protected final-action validation check. Final submission was not executed.'
-          : 'The form stayed on the step, but this required field still needs confirmation.';
-      }
-    }
-
+    if (triggerEvidence?.progressed) status = 'failed';
     if (el?.isConnected) await qaRestoreFieldValue(el, snapshot);
 
     return {
       status,
       actual,
       attemptedValue: '',
-      feedback: after.text || '',
-      evidence: triggerEvidence
-        ? {
-            trigger: triggerEvidence.trigger,
-            protectedFinal: !!triggerEvidence.protectedFinal,
-            progressed: !!triggerEvidence.progressed,
-            safetyAnchors: triggerEvidence.safetyAnchors || [],
-            validationEntries: triggerEvidence.newValidationEntries || []
-          }
-        : { trigger: 'Field-level required validation' }
+      feedback: mapped?.text || after.text || '',
+      evidence: {
+        trigger: triggerEvidence?.trigger || 'Field-level required validation',
+        protectedFinal: !!triggerEvidence?.protectedFinal,
+        clicked: !!triggerEvidence?.clicked,
+        submitAttempted: !!triggerEvidence?.submitAttempted,
+        submitPrevented: !!triggerEvidence?.submitPrevented,
+        progressed: !!triggerEvidence?.progressed,
+        manualRequired: !!triggerEvidence?.manualRequired,
+        safetyAnchors: triggerEvidence?.safetyAnchors || [],
+        validationEntries: triggerEvidence?.newValidationEntries || []
+      }
     };
   };
 
@@ -16741,8 +16867,8 @@
       ? report
       : {
           reportVersion: 7,
-          product: 'Smart FormSense',
-          productVersion: '17.15.0',
+          product: 'Auto Form Filler and Auto QA Testing',
+          productVersion: '17.16.0',
           generatedAt: new Date().toISOString(),
           auditType: 'Black-box Functional Form QA',
           page: {
@@ -16779,7 +16905,7 @@
     const cleanReason = String(reason || '').slice(0, 500);
     return {
       ...base,
-      productVersion: '17.15.0',
+      productVersion: '17.16.0',
       reportVersion: Math.max(5, Number(base.reportVersion || 0)),
       runState,
       incomplete: runState !== 'completed',
@@ -16929,8 +17055,8 @@
 
       return {
         reportVersion: 7,
-        product: 'Smart FormSense',
-        productVersion: '17.15.0',
+        product: 'Auto Form Filler and Auto QA Testing',
+        productVersion: '17.16.0',
         generatedAt,
         completedAt: ['completed', 'stopped', 'failed'].includes(runState) ? new Date().toISOString() : null,
         auditType: 'Black-box Functional Form QA',
@@ -16962,10 +17088,11 @@
         testCases: [...testCases],
         notes: [
           'Field totals represent logical user-facing fields discovered during this QA run; radio options in the same group count as one field.',
-          'Smart FormSense rescans the full active form after field checks, dependencies and journey actions so newly loaded controls can be tested.',
+          'Auto Form Filler and Auto QA Testing rescans the full active form after field checks, dependencies and journey actions so newly loaded controls can be tested.',
           'Dependent dropdowns are allowed up to 8 seconds to load and stabilize before they are marked for review.',
-          'Safe Continue/Next/Save & Next actions may be clicked automatically. Final Submit/payment/application-generation actions remain user-controlled.',
-          'When Smart FormSense cannot safely continue automatically, it asks the user to click the form action and watches for progression or validation.',
+          'Each field validation exercises the form action when it can be protected safely. High-risk payment/finalize actions are never auto-clicked.',
+          'Ordinary Submit actions may be clicked in protected validation mode when independent blockers are present; the final submission remains blocked.',
+          'Manual action is requested only when an automatic validation click cannot be protected strongly enough.',
           'File uploads, some date widgets and conditional paths that never become active can still require manual QA.',
           incomplete ? 'This report is partial. Completed checks are preserved even when QA is stopped or interrupted.' : ''
         ].filter(Boolean)
@@ -17076,6 +17203,7 @@
         if (!el?.isConnected) return;
         const requiredSignals = qaRequiredSignals(el);
         const required = !!(requiredSignals.visible || requiredSignals.configured || isRequired(el));
+        const semantic = qaSemanticFor(el);
 
         if (type === 'file') {
           addCase({
@@ -17170,7 +17298,13 @@
           });
         }
 
-        const semantic = qaSemanticFor(el);
+        if (semantic === 'captcha') {
+          // CAPTCHA stays user-controlled. Only its blank/required behaviour may
+          // participate in protected validation; Auto Form Filler and Auto QA Testing never types or solves it.
+          tested.add(key);
+          return;
+        }
+
         if (semantic === 'marks_metric') {
           addCase({
             el,
@@ -17223,7 +17357,7 @@
             name: 'Basic input interaction',
             status: accepted ? 'passed' : 'review',
             expected: 'The field accepts normal applicant input and can return to its original value.',
-            actual: accepted ? 'Normal input could be entered and the original value was restored.' : 'Smart FormSense could not confirm normal input behaviour.',
+            actual: accepted ? 'Normal input could be entered and the original value was restored.' : 'Auto Form Filler and Auto QA Testing could not confirm normal input behaviour.',
             evidence: { method: result.method, attemptedValue: result.attemptedValue, acceptedValue: result.acceptedValue, restored: true }
           });
         } else if (testCases.length === beforeCount) {
@@ -17243,7 +17377,7 @@
           name: 'Field changed while being checked',
           status: 'review',
           expected: 'The field remains available long enough to complete its check.',
-          actual: `${label || 'A field'} changed or reloaded while Smart FormSense was checking it.`,
+          actual: `${label || 'A field'} changed or reloaded while Auto Form Filler and Auto QA Testing was checking it.`,
           guidance: 'Check this field once manually after the form finishes loading.',
           evidence: { error: String(error?.message || error || 'unknown error').slice(0, 200) }
         });
@@ -17445,6 +17579,7 @@
         const report = await buildQaFunctionalReport();
         state.qaReport = report;
         state.qaReportAgentId = null;
+        state.qaFieldDiagnostics = [];
         state.panel?.setQaReport?.(report);
         state.panel?.setStatus(
           'QA Audit completed, but no meaningful active form was detected.'
@@ -17455,6 +17590,7 @@
 
       state.lastRemoteAgentId = null;
       state.qaReportAgentId = null;
+      state.qaFieldDiagnostics = [];
 
       const report = await buildQaFunctionalReport();
       state.qaReport = report;
@@ -17606,14 +17742,14 @@
 
       if (agent?.source) {
         const result = await sendRemoteCommand(agent, 'undo', { source });
-        state.panel?.notify?.('↶ Undo completed', 'Embedded Smart FormSense changes restored', 'success');
+        state.panel?.notify?.('↶ Undo completed', 'Embedded Auto Form Filler and Auto QA Testing changes restored', 'success');
         return result;
       }
 
       state.running = true;
       state.panel?.setBusy(true);
       const restored = undo();
-      state.panel?.notify?.('↶ Undo completed', `${Number(restored || 0)} Smart FormSense change(s) restored`, 'success');
+      state.panel?.notify?.('↶ Undo completed', `${Number(restored || 0)} Auto Form Filler and Auto QA Testing change(s) restored`, 'success');
     } catch (error) {
       state.panel?.setStatus(`Undo stopped safely: ${error?.message || 'unknown error'}`);
     } finally {
@@ -17918,7 +18054,7 @@
             .slice(0, 60);
 
           downloadTextFile(
-            `Smart_FormSense_QA_Debug_${host}_${stamp}.json`,
+            `Auto_Form_Filler_Auto_QA_Testing_QA_Debug_${host}_${stamp}.json`,
             JSON.stringify(report, null, 2),
             'application/json;charset=utf-8'
           );
@@ -18072,6 +18208,7 @@
             if (data.qaReport) {
               state.qaReport = data.qaReport;
               state.qaReportAgentId = data.agentId || null;
+              state.qaFieldDiagnostics = Array.isArray(data.qaFieldDiagnostics) ? data.qaFieldDiagnostics : [];
               state.panel?.setQaReport?.(
                 data.qaReport
               );
@@ -18460,6 +18597,7 @@
 
         try {
           let qaReport = null;
+          let qaFieldDiagnostics = null;
 
           if (
             agent.action ===
@@ -18485,6 +18623,7 @@
           ) {
             qaReport = await buildQaFunctionalReport();
             state.qaReport = qaReport;
+            try { qaFieldDiagnostics = buildQaDebugReport().qaFieldDiagnostics || []; } catch { qaFieldDiagnostics = []; }
           } else if (
             agent.action ===
             'undo'
@@ -18501,6 +18640,7 @@
               counters:
                 counters(),
               qaReport,
+              qaFieldDiagnostics,
               status:
                 agent.action === 'qa-audit' && qaReport
                   ? `Embedded Functional QA completed • ${qaReport.fieldsChecked}/${qaReport.fieldsAudited} fields covered • ${qaReport.counts.critical} blocker(s) • ${qaReport.counts.warning} failed`
@@ -18527,6 +18667,7 @@
               counters:
                 counters(),
               qaReport: partialQa,
+              qaFieldDiagnostics: agent.action === 'qa-audit' ? (qaFieldDiagnostics || []) : null,
               status:
                 partialQa
                   ? `Embedded Functional QA interrupted safely • Partial report available`
@@ -18600,6 +18741,7 @@
 
     if (existing) {
       existing.style.display = 'block';
+      state.panel?.resetToDefaultOpen?.();
       return;
     }
 
@@ -18613,17 +18755,6 @@
       zIndex: '2147483647'
     });
 
-    if (state.settings?.general?.rememberPosition) {
-      try {
-        const saved = GM_getValue(`${PANEL_POSITION_KEY_PREFIX}${location.hostname}`, null);
-        if (saved && Number.isFinite(Number(saved.left)) && Number.isFinite(Number(saved.top))) {
-          host.style.right = 'auto';
-          host.style.bottom = 'auto';
-          host.style.left = `${clamp(Number(saved.left), 6, Math.max(6, window.innerWidth - 190))}px`;
-          host.style.top = `${clamp(Number(saved.top), 6, Math.max(6, window.innerHeight - 50))}px`;
-        }
-      } catch {}
-    }
 
     const shadow = host.attachShadow({ mode: 'open' });
 
@@ -19131,7 +19262,7 @@
       <div class="panel" id="panel">
         <div class="hero">
           <div class="top">
-            <div><div class="title">✦ Smart FormSense</div><div class="tagline">Intelligent Form Filling & QA Testing</div></div>
+            <div><div class="title">✦ Auto Form Filler and Auto QA Testing</div><div class="tagline">Intelligent Form Filling & QA Testing</div></div>
             <div class="windowBtns">
               <button class="windowBtn" id="settingsBtn" title="Settings">⚙</button>
               <button class="windowBtn" id="minimize" title="Minimize">−</button>
@@ -19144,10 +19275,10 @@
             <span id="pId"></span>
             <div class="profileBottom">
               <span id="pEmail"></span>
-              <div class="zoomControls" aria-label="Smart FormSense panel zoom">
-                <button class="zoomBtn" id="zoomDown" type="button" title="Zoom out Smart FormSense">−</button>
-                <button class="zoomBtn zoomReset" id="zoomReset" type="button" title="Reset Smart FormSense zoom">100%</button>
-                <button class="zoomBtn" id="zoomUp" type="button" title="Zoom in Smart FormSense">+</button>
+              <div class="zoomControls" aria-label="Auto Form Filler and Auto QA Testing panel zoom">
+                <button class="zoomBtn" id="zoomDown" type="button" title="Zoom out Auto Form Filler and Auto QA Testing">−</button>
+                <button class="zoomBtn zoomReset" id="zoomReset" type="button" title="Reset Auto Form Filler and Auto QA Testing zoom">100%</button>
+                <button class="zoomBtn" id="zoomUp" type="button" title="Zoom in Auto Form Filler and Auto QA Testing">+</button>
               </div>
             </div>
           </div>
@@ -19275,7 +19406,7 @@
       <div class="mini" id="mini" title="Click to restore">
         <div class="miniIcon">✦</div>
         <div class="miniText">
-          <strong>Smart FormSense</strong>
+          <strong>Auto Form Filler and Auto QA Testing</strong>
           <span id="miniStatus">Ready</span>
         </div>
         <div class="miniCount" id="miniCount">0</div>
@@ -19301,9 +19432,9 @@
       </div>
 
       <div class="settingsBack" id="settingsBack">
-        <div class="settingsModal" role="dialog" aria-modal="true" aria-label="Smart FormSense Settings">
+        <div class="settingsModal" role="dialog" aria-modal="true" aria-label="Auto Form Filler and Auto QA Testing Settings">
           <div class="settingsHead">
-            <div><h2>⚙ Smart FormSense Settings</h2><p>Personalize how Smart FormSense works for you.</p></div>
+            <div><h2>⚙ Auto Form Filler and Auto QA Testing Settings</h2><p>Personalize how Auto Form Filler and Auto QA Testing works for you.</p></div>
             <button class="settingsClose" id="settingsClose" title="Close Settings">×</button>
           </div>
           <div class="settingsLayout">
@@ -19316,16 +19447,20 @@
             </nav>
             <main class="settingsContent">
               <section class="settingsSection active" data-settings-section="general">
-                <h3>General</h3><div class="settingsIntro">Control how the Smart FormSense panel behaves.</div>
+                <h3>General</h3><div class="settingsIntro">Control how the Auto Form Filler and Auto QA Testing panel behaves.</div>
                 <div class="settingCard"><div class="settingRow"><div class="settingText"><b>Show panel automatically on page load</b><span>Default is off.</span></div><label class="switch"><input id="settingAutoShow" type="checkbox"><span class="slider"></span></label></div></div>
                 <div class="settingCard"><div class="settingRow"><div class="settingText"><b>Start panel minimized</b><span>Used only when automatic panel display is enabled.</span></div><label class="switch"><input id="settingStartMinimized" type="checkbox"><span class="slider"></span></label></div></div>
-                <div class="settingCard"><div class="settingRow"><div class="settingText"><b>Remember panel position</b><span>Keep the panel in the same position on this website.</span></div><label class="switch"><input id="settingRememberPosition" type="checkbox"><span class="slider"></span></label></div></div>
-                <div class="settingCard"><div class="settingRow"><div class="settingText"><b>Remember last workspace</b><span>Reopen Smart FormSense where you left off.</span></div><label class="switch"><input id="settingRememberWorkspace" type="checkbox"><span class="slider"></span></label></div></div>
+                <div class="settingCard"><div class="settingRow"><div class="settingText"><b>Remember last workspace</b><span>Reopen Auto Form Filler and Auto QA Testing where you left off.</span></div><label class="switch"><input id="settingRememberWorkspace" type="checkbox"><span class="slider"></span></label></div></div>
                 <div class="settingCard"><div class="settingText"><b>Default workspace</b><span>Used whenever Remember last workspace is off.</span></div><div class="radioGroup">
                   <label class="radioChoice"><input type="radio" name="settingDefaultWorkspace" value="fill"><span><strong>Form Filling</strong></span></label>
                   <label class="radioChoice"><input type="radio" name="settingDefaultWorkspace" value="qa"><span><strong>Functional QA</strong></span></label>
                 </div></div>
-                <div class="settingCard"><div class="settingRow"><div class="settingText"><b>Show completion notifications</b><span>Show a brief message when Smart FormSense completes an action.</span></div><label class="switch"><input id="settingCompletionNotifications" type="checkbox"><span class="slider"></span></label></div></div>
+                <div class="settingCard"><div class="settingRow"><div class="settingText"><b>Show completion notifications</b><span>Show a brief message when Auto Form Filler and Auto QA Testing completes an action.</span></div><label class="switch"><input id="settingCompletionNotifications" type="checkbox"><span class="slider"></span></label></div></div>
+                <div class="settingCard"><div class="settingText"><b>Notification timer</b><span>Choose how long completion notifications stay visible.</span></div><div class="radioGroup">
+                  <label class="radioChoice"><input type="radio" name="settingNotificationDuration" value="short"><span><strong>Short</strong><span>About 2 seconds</span></span></label>
+                  <label class="radioChoice"><input type="radio" name="settingNotificationDuration" value="normal"><span><strong>Normal</strong><span>About 4 seconds</span></span></label>
+                  <label class="radioChoice"><input type="radio" name="settingNotificationDuration" value="long"><span><strong>Long</strong><span>About 7 seconds</span></span></label>
+                </div></div>
                 <div class="settingCard"><div class="settingRow"><div class="settingText"><b>Show shortcut hints on hover</b><span>Show the configured shortcut only when you hover an action button.</span></div><label class="switch"><input id="settingShortcutHints" type="checkbox"><span class="slider"></span></label></div></div>
                 <button class="settingsAction dangerLite" id="resetAllSettings">Reset all settings</button>
               </section>
@@ -19337,7 +19472,6 @@
                   <label class="radioChoice"><input type="radio" name="settingFillBehavior" value="minimum"><span><strong>Minimum Required Fields</strong><span>Start the required-fields mode immediately after your Fill action.</span></span></label>
                   <label class="radioChoice"><input type="radio" name="settingFillBehavior" value="all"><span><strong>Fill All Fields</strong><span>Start full Fill immediately after your Fill action.</span></span></label>
                 </div></div>
-                <div class="settingCard"><div class="settingRow"><div class="settingText"><b>Automatically handle dependent fields</b><span>Wait for and fill State/District and other dynamically loaded dependencies during Fill.</span></div><label class="switch"><input id="settingAutoDependencies" type="checkbox"><span class="slider"></span></label></div></div>
               </section>
 
               <section class="settingsSection" data-settings-section="qa">
@@ -19480,16 +19614,17 @@
       const setChecked = (id, value) => { const el = $(id); if (el) el.checked = !!value; };
       setChecked('settingAutoShow', s.general.autoShow);
       setChecked('settingStartMinimized', s.general.startMinimized);
-      setChecked('settingRememberPosition', s.general.rememberPosition);
       setChecked('settingRememberWorkspace', s.general.rememberWorkspace);
       setChecked('settingShortcutHints', s.general.showShortcutHints);
       setChecked('settingCompletionNotifications', s.general.completionNotifications);
-      setChecked('settingAutoDependencies', s.fill.autoDependencies);
       setChecked('settingAutoOpenReport', s.qa.autoOpenReport);
       setChecked('settingAutoDebugExport', s.reports.autoDebugExport);
 
       shadow.querySelectorAll('input[name="settingDefaultWorkspace"]').forEach(input => {
         input.checked = input.value === (s.general.defaultWorkspace || 'fill');
+      });
+      shadow.querySelectorAll('input[name="settingNotificationDuration"]').forEach(input => {
+        input.checked = input.value === (s.general.notificationDuration || 'normal');
       });
       shadow.querySelectorAll('input[name="settingFillBehavior"]').forEach(input => {
         input.checked = input.value === s.fill.behavior;
@@ -19530,17 +19665,21 @@
 
     bindSettingToggle('settingAutoShow', 'general', 'autoShow');
     bindSettingToggle('settingStartMinimized', 'general', 'startMinimized');
-    bindSettingToggle('settingRememberPosition', 'general', 'rememberPosition');
     bindSettingToggle('settingRememberWorkspace', 'general', 'rememberWorkspace');
     bindSettingToggle('settingShortcutHints', 'general', 'showShortcutHints');
     bindSettingToggle('settingCompletionNotifications', 'general', 'completionNotifications');
-    bindSettingToggle('settingAutoDependencies', 'fill', 'autoDependencies');
     bindSettingToggle('settingAutoOpenReport', 'qa', 'autoOpenReport');
     bindSettingToggle('settingAutoDebugExport', 'reports', 'autoDebugExport');
 
     shadow.querySelectorAll('input[name="settingDefaultWorkspace"]').forEach(input => {
       input.addEventListener('change', () => {
         if (input.checked) updateSetting('general', 'defaultWorkspace', input.value === 'qa' ? 'qa' : 'fill');
+      });
+    });
+
+    shadow.querySelectorAll('input[name="settingNotificationDuration"]').forEach(input => {
+      input.addEventListener('change', () => {
+        if (input.checked) updateSetting('general', 'notificationDuration', ['short', 'long'].includes(input.value) ? input.value : 'normal');
       });
     });
 
@@ -19595,7 +19734,6 @@
 
     $('resetAllSettings')?.addEventListener('click', () => {
       resetAllSettings();
-      try { GM_setValue(`${PANEL_POSITION_KEY_PREFIX}${location.hostname}`, null); } catch {}
       host.style.left = 'auto';
       host.style.top = 'auto';
       host.style.right = '8px';
@@ -19650,7 +19788,17 @@
       setTimeout(fitPanelToViewport, 0);
     };
 
+    const resetHostPosition = () => {
+      host.style.left = 'auto';
+      host.style.top = 'auto';
+      host.style.right = '8px';
+      host.style.bottom = '8px';
+    };
+
     const minimize = () => {
+      // Minimized view always starts at its default corner. The user can then
+      // drag the mini pill; restoring keeps that mini pill's current position.
+      resetHostPosition();
       refs.panel.style.display = 'none';
       refs.mini.style.display = 'flex';
     };
@@ -19659,6 +19807,15 @@
       refs.mini.style.display = 'none';
       refs.panel.style.display = 'block';
       fitPanelToViewport();
+      requestAnimationFrame(() => {
+        if (host.style.left && host.style.left !== 'auto') {
+          const rect = refs.panel.getBoundingClientRect();
+          const left = clamp(parseFloat(host.style.left) || 6, 6, Math.max(6, window.innerWidth - Math.min(rect.width, window.innerWidth - 6)));
+          const top = clamp(parseFloat(host.style.top) || 6, 6, Math.max(6, window.innerHeight - Math.min(rect.height, window.innerHeight - 6)));
+          host.style.left = `${left}px`;
+          host.style.top = `${top}px`;
+        }
+      });
     };
 
     state.panel = {
@@ -19807,7 +19964,7 @@
         const toast = document.createElement('div');
         toast.className = `toast ${['success', 'warning', 'error'].includes(tone) ? tone : 'success'}`;
         const heading = document.createElement('b');
-        heading.textContent = String(title || 'Smart FormSense');
+        heading.textContent = String(title || 'Auto Form Filler and Auto QA Testing');
         toast.appendChild(heading);
         if (detail) {
           const message = document.createElement('span');
@@ -19820,7 +19977,7 @@
           toast.style.transform = 'translateY(4px)';
           toast.style.transition = 'opacity .18s ease,transform .18s ease';
           setTimeout(() => toast.remove(), 220);
-        }, 3600);
+        }, ({ short: 2000, normal: 4000, long: 7000 }[state.settings?.general?.notificationDuration] || 4000));
       },
 
       setCounters(c) {
@@ -19913,9 +20070,16 @@
       showWorkspace,
       minimize,
       restore,
+      resetToDefaultOpen() {
+        resetHostPosition();
+        refs.mini.style.display = 'none';
+        refs.panel.style.display = 'block';
+        fitPanelToViewport();
+      },
       toggle() {
         if (host.style.display === 'none') {
           host.style.display = 'block';
+          resetHostPosition();
           restore();
         } else if (refs.panel.style.display === 'none') {
           restore();
@@ -20032,6 +20196,9 @@
     refs.mini.onclick = restore;
 
     $('close').onclick = () => {
+      resetHostPosition();
+      refs.mini.style.display = 'none';
+      refs.panel.style.display = 'block';
       host.style.display = 'none';
     };
 
@@ -20108,12 +20275,6 @@
       panelDrag = null;
       panelDragHandle.classList.remove('dragging');
       try { panelDragHandle.releasePointerCapture?.(e.pointerId); } catch {}
-      if (moved && state.settings?.general?.rememberPosition) {
-        try {
-          const rect = host.getBoundingClientRect();
-          GM_setValue(`${PANEL_POSITION_KEY_PREFIX}${location.hostname}`, { left: rect.left, top: rect.top });
-        } catch {}
-      }
     });
 
     panelDragHandle?.addEventListener('pointercancel', () => {
@@ -20159,15 +20320,6 @@
         refs.mini.releasePointerCapture?.(e.pointerId);
       } catch {}
 
-      if (moved && state.settings?.general?.rememberPosition) {
-        try {
-          const rect = host.getBoundingClientRect();
-          GM_setValue(`${PANEL_POSITION_KEY_PREFIX}${location.hostname}`, {
-            left: rect.left,
-            top: rect.top
-          });
-        } catch {}
-      }
 
       if (!moved) {
         restore();
@@ -20264,7 +20416,7 @@
     installTopShortcutEngine();
 
     GM_registerMenuCommand(
-      'Activate Smart FormSense',
+      'Activate Auto Form Filler and Auto QA Testing',
       mountPanel
     );
 
