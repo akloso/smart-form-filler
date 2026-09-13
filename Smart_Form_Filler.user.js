@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Smart FormSense
 // @namespace    smart-form-filler
-// @version      17.18.1
+// @version      17.18.2
 // @description  Automatic form filling and functional QA testing for authorized web-form validation, safe progression, embedded forms, and synthetic test data.
 // @author       Akash Singh
 // @match        *://*/*
@@ -53,7 +53,7 @@
   const SETTINGS_VERSION = 4;
   const ACTION_DEFAULT_TTL_MS = 5 * 60 * 1000;
   const PRODUCT_NAME = 'Smart FormSense';
-  const SCRIPT_VERSION = '17.18.1';
+  const SCRIPT_VERSION = '17.18.2';
   const FEEDBACK_ENDPOINT = 'https://formspree.io/f/xbgjvoaw';
   const UPDATE_RAW_URL = 'https://raw.githubusercontent.com/akloso/smart-form-filler/main/Smart_Form_Filler.user.js';
   const UPDATE_CHECK_KEY = 'STFF_UPDATE_CHECK_V1';
@@ -216,7 +216,7 @@
     );
 
     console.error(
-      `Smart FormSense V17.18.1 [${stage}]`,
+      `Smart FormSense V17.18.2 [${stage}]`,
       error
     );
 
@@ -12486,7 +12486,7 @@
     const report = {
       reportVersion: 1,
       generatedBy:
-        'Smart FormSense V17.18.1',
+        'Smart FormSense V17.18.2',
       generatedAt:
         new Date().toISOString(),
       mode:
@@ -12651,7 +12651,7 @@
       return report;
     } catch (error) {
       console.error(
-        'Smart FormSense V17.18.1 debug export:',
+        'Smart FormSense V17.18.2 debug export:',
         error
       );
 
@@ -13738,7 +13738,7 @@
       product:
         'Smart FormSense',
       productVersion:
-        '17.18.1',
+        '17.18.2',
       generatedAt,
       auditType:
         'Non-destructive Form Readiness Audit',
@@ -14085,7 +14085,7 @@
   <div class="hero">
     <div class="brand">✦ SMART FORMSENSE QA</div>
     <h1>${esc(qa.page?.title || 'Form')}</h1>
-    <div class="meta">${esc(qa.page?.hostname || location.hostname || '')}<br>${esc(generated)} • v${esc(qa.productVersion || '17.18.1')}</div>
+    <div class="meta">${esc(qa.page?.hostname || location.hostname || '')}<br>${esc(generated)} • v${esc(qa.productVersion || '17.18.2')}</div>
     <div class="status ${statusClass}">${esc(status)}</div>
     <div class="overview">${esc(overview)}</div>
 
@@ -14304,7 +14304,7 @@
       product:
         'Smart FormSense',
       productVersion:
-        '17.18.1',
+        '17.18.2',
       generatedAt:
         new Date().toISOString(),
       purpose:
@@ -14399,7 +14399,7 @@
       return report;
     } catch (error) {
       console.error(
-        'Smart FormSense V17.18.1 QA debug export:',
+        'Smart FormSense V17.18.2 QA debug export:',
         error
       );
 
@@ -16886,7 +16886,7 @@
       : {
           reportVersion: 7,
           product: 'Smart FormSense',
-          productVersion: '17.18.1',
+          productVersion: '17.18.2',
           generatedAt: new Date().toISOString(),
           auditType: 'Black-box Functional Form QA',
           page: {
@@ -16923,7 +16923,7 @@
     const cleanReason = String(reason || '').slice(0, 500);
     return {
       ...base,
-      productVersion: '17.18.1',
+      productVersion: '17.18.2',
       reportVersion: Math.max(5, Number(base.reportVersion || 0)),
       runState,
       incomplete: runState !== 'completed',
@@ -17074,7 +17074,7 @@
       return {
         reportVersion: 7,
         product: 'Smart FormSense',
-        productVersion: '17.18.1',
+        productVersion: '17.18.2',
         generatedAt,
         completedAt: ['completed', 'stopped', 'failed'].includes(runState) ? new Date().toISOString() : null,
         auditType: 'Black-box Functional Form QA',
@@ -19110,6 +19110,9 @@
         .feedbackSend{width:100%;margin-top:12px;border:0;border-radius:10px;padding:9px 10px;background:linear-gradient(135deg,#5b4bff,#8b5cf6,#d946ef);color:#fff;font-weight:850;cursor:pointer}.feedbackSend:disabled{opacity:.65}.feedbackMessage{min-height:18px;margin-top:7px;font-size:9px;color:#6b7280}.feedbackMessage.error{color:#dc2626}
         .feedbackSuccessToast{pointer-events:auto;position:relative;padding-right:42px!important}.feedbackSuccessClose{position:absolute;right:8px;top:8px;width:26px;height:26px;border:1px solid #d9dce4;border-radius:8px;background:#f8fafc;color:#374151;cursor:pointer;display:grid;place-items:center;transition:.15s ease}.feedbackSuccessClose:hover{background:#eef2ff;color:#312e81;border-color:#c7d2fe;transform:scale(1.04)}.feedbackSuccessClose .uiIcon{width:13px;height:13px}
         .updateStatus{font-size:8.5px;color:#756e84;line-height:1.45;margin-top:6px}.updateStatus strong{color:#443d56}.updateActions{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}.updateNow{display:none}.updateNow.visible{display:inline-block;background:#fff1f2;border-color:#fecdd3;color:#dc2626;font-weight:900;box-shadow:0 0 14px rgba(239,68,68,.18)}
+        .updateReloadBack{display:none;position:fixed;inset:0;width:100vw;height:100vh;background:rgba(19,15,40,.5);backdrop-filter:blur(5px);align-items:center;justify-content:center;padding:18px;z-index:55}
+        .updateReloadModal{width:min(390px,calc(100vw - 24px));background:#fff;border:1px solid #e7e2f6;border-radius:18px;box-shadow:0 30px 90px rgba(17,12,45,.34);color:#26213a;padding:18px;text-align:center}
+        .updateReloadIcon{width:42px;height:42px;margin:0 auto 10px;border-radius:50%;display:grid;place-items:center;background:#ecfdf5;color:#15803d;border:1px solid #bbf7d0;font-size:22px;font-weight:900}.updateReloadModal h3{margin:0;font-size:15px;color:#26213a}.updateReloadModal p{margin:8px auto 0;max-width:310px;font-size:10px;line-height:1.5;color:#746d83}.updateReloadActions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:16px}.updateReloadPrimary,.updateReloadSecondary{min-height:38px;border-radius:10px;padding:8px 10px;font-size:10px;font-weight:850;cursor:pointer}.updateReloadPrimary{border:0;background:linear-gradient(135deg,#5b4bff,#8b5cf6,#d946ef);color:#fff;box-shadow:0 8px 20px rgba(91,75,255,.2)}.updateReloadSecondary{border:1px solid #e2deeb;background:#fff;color:#625b70}.updateReloadPrimary:hover{filter:brightness(1.05)}.updateReloadSecondary:hover{background:#f8f7fb;border-color:#d3cdea}
         .hero{touch-action:none;cursor:grab}
         .hero.dragging{cursor:grabbing}
         .hero button,.hero a{cursor:pointer}
@@ -19697,7 +19700,7 @@
           </details>
 
           <div class="creator">
-            Created with love ❤️ <strong>Akash Singh</strong> · <span id="creatorEmail"></span> · <button class="versionTap" id="versionTap" type="button">v17.18.1</button>
+            Created with love ❤️ <strong>Akash Singh</strong> · <span id="creatorEmail"></span> · <button class="versionTap" id="versionTap" type="button">v17.18.2</button>
           </div>
         </div>
       </div>
@@ -19758,6 +19761,18 @@
           <input id="feedbackEmail" type="email" maxlength="254" placeholder="you@example.com">
           <button type="button" class="feedbackSend" id="feedbackSend">Send Feedback</button>
           <div class="feedbackMessage" id="feedbackMessage"></div>
+        </div>
+      </div>
+
+      <div class="updateReloadBack" id="updateReloadBack">
+        <div class="updateReloadModal" role="dialog" aria-modal="true" aria-labelledby="updateReloadTitle">
+          <div class="updateReloadIcon" aria-hidden="true">✓</div>
+          <h3 id="updateReloadTitle">Update installed — reload required</h3>
+          <p id="updateReloadText">Your current page will continue using this Smart FormSense version until reloaded.</p>
+          <div class="updateReloadActions">
+            <button type="button" class="updateReloadPrimary" id="reloadApplyBtn">Reload &amp; Apply</button>
+            <button type="button" class="updateReloadSecondary" id="reloadLaterBtn">Later</button>
+          </div>
         </div>
       </div>
 
@@ -19825,7 +19840,7 @@
                 <div class="settingCard"><div class="settingRow"><div class="settingText"><b>Automatically check for updates</b><span>Checks at most once every 12 hours.</span></div><label class="switch"><input id="settingAutoCheckUpdates" type="checkbox"><span class="slider"></span></label></div></div>
                 <div class="settingCard">
                   <div class="settingText"><b>Version status</b><span id="updateStatusText">Checking update status…</span></div>
-                  <div class="updateStatus">Current: <strong id="currentVersionText">v17.18.1</strong> · Latest: <strong id="latestVersionText">—</strong></div>
+                  <div class="updateStatus">Current: <strong id="currentVersionText">v17.18.2</strong> · Latest: <strong id="latestVersionText">—</strong></div>
                   <div class="updateActions"><button class="settingsAction" id="checkUpdatesBtn" type="button">Check for updates</button><button class="settingsAction updateNow" id="updateNowSettings" type="button">Update Smart FormSense</button></div>
                 </div>
               </section>
@@ -19904,6 +19919,10 @@
       latestVersionText: $('latestVersionText'),
       checkUpdatesBtn: $('checkUpdatesBtn'),
       updateNowSettings: $('updateNowSettings'),
+      updateReloadBack: $('updateReloadBack'),
+      updateReloadText: $('updateReloadText'),
+      reloadApplyBtn: $('reloadApplyBtn'),
+      reloadLaterBtn: $('reloadLaterBtn'),
       settingsBtn: $('settingsBtn'),
       settingsBack: $('settingsBack'),
       settingsClose: $('settingsClose'),
@@ -19924,6 +19943,9 @@
     let developerTapCount = 0;
     let developerTapReset = null;
     let developerExpiryTimer = null;
+    let updateInstallAwaitingReturn = false;
+    let updateInstallOpenedAt = 0;
+    let updateReloadPending = false;
 
     const positionToastStack = () => {
       if (!refs.toastStack || host.style.display === 'none') return;
@@ -19984,6 +20006,45 @@
         refs.updateBtn.title = available ? `Update available — v${latest}. Click to update.` : 'Smart FormSense is up to date';
       }
       renderUpdateStatus();
+    };
+
+    const closeUpdateReloadPrompt = () => {
+      if (refs.updateReloadBack) refs.updateReloadBack.style.display = 'none';
+    };
+
+    const showUpdateReloadPrompt = () => {
+      updateReloadPending = true;
+      if (refs.updateReloadText) {
+        refs.updateReloadText.textContent = `Your current page will continue using v${SCRIPT_VERSION} until reloaded.`;
+      }
+      if (refs.updateReloadBack) refs.updateReloadBack.style.display = 'flex';
+      setTimeout(() => refs.reloadApplyBtn?.focus?.(), 0);
+    };
+
+    const maybeShowUpdateReloadAfterReturn = () => {
+      if (!updateInstallAwaitingReturn || document.hidden) return;
+      const elapsed = Date.now() - updateInstallOpenedAt;
+      if (elapsed < 700) {
+        setTimeout(maybeShowUpdateReloadAfterReturn, 750 - elapsed);
+        return;
+      }
+      updateInstallAwaitingReturn = false;
+      showUpdateReloadPrompt();
+    };
+
+    const beginUpdateInstallFlow = event => {
+      try { event?.preventDefault?.(); } catch {}
+      try { event?.stopPropagation?.(); } catch {}
+      if (updateReloadPending) {
+        showUpdateReloadPrompt();
+        return;
+      }
+      if (!openUserscriptUpdate()) {
+        state.panel?.notify?.('Update could not be opened', 'Open Settings → Updates and try again.', 'error');
+        return;
+      }
+      updateInstallAwaitingReturn = true;
+      updateInstallOpenedAt = Date.now();
     };
 
     const resetFeedbackForm = () => {
@@ -20709,8 +20770,20 @@
     });
     refs.feedbackSend?.addEventListener('click', sendFeedback);
 
-    refs.updateBtn?.addEventListener('click', event => { event.stopPropagation(); openUserscriptUpdate(); });
-    refs.updateNowSettings?.addEventListener('click', openUserscriptUpdate);
+    refs.updateBtn?.addEventListener('click', beginUpdateInstallFlow);
+    refs.updateNowSettings?.addEventListener('click', beginUpdateInstallFlow);
+    refs.reloadApplyBtn?.addEventListener('click', () => {
+      location.reload();
+    });
+    refs.reloadLaterBtn?.addEventListener('click', closeUpdateReloadPrompt);
+    document.addEventListener('visibilitychange', () => {
+      if (!document.hidden && updateInstallAwaitingReturn) {
+        setTimeout(maybeShowUpdateReloadAfterReturn, 120);
+      }
+    });
+    window.addEventListener('focus', () => {
+      if (updateInstallAwaitingReturn) setTimeout(maybeShowUpdateReloadAfterReturn, 120);
+    }, true);
     refs.checkUpdatesBtn?.addEventListener('click', async () => {
       refs.checkUpdatesBtn.disabled = true;
       if (refs.updateStatusText) refs.updateStatusText.textContent = 'Checking for updates…';
