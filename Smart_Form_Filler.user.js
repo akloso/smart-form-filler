@@ -1,7 +1,7 @@
 // ==UserScript==
-// @name         Auto Form Filler and Auto QA Testing
+// @name         Smart FormSense
 // @namespace    smart-form-filler
-// @version      17.16.0
+// @version      17.17.0
 // @description  Automatic form filling and functional QA testing for authorized web-form validation, safe progression, embedded forms, and synthetic test data.
 // @author       Akash Singh
 // @match        *://*/*
@@ -11,6 +11,11 @@
 // @grant        GM_registerMenuCommand
 // @grant        GM_openInTab
 // @grant        GM_download
+// @grant        GM_xmlhttpRequest
+// @connect      formspree.io
+// @connect      raw.githubusercontent.com
+// @updateURL    https://raw.githubusercontent.com/akloso/smart-form-filler/main/Smart_Form_Filler.user.js
+// @downloadURL  https://raw.githubusercontent.com/akloso/smart-form-filler/main/Smart_Form_Filler.user.js
 // ==/UserScript==
 
 (() => {
@@ -45,8 +50,16 @@
   const STABLE_QUIET_MS = 280;
 
   const SETTINGS_KEY = 'STFF_V17_14_SETTINGS';
-  const SETTINGS_VERSION = 3;
+  const SETTINGS_VERSION = 4;
   const ACTION_DEFAULT_TTL_MS = 5 * 60 * 1000;
+  const PRODUCT_NAME = 'Smart FormSense';
+  const SCRIPT_VERSION = '17.17.0';
+  const FEEDBACK_ENDPOINT = 'https://formspree.io/f/xbgjvoaw';
+  const UPDATE_RAW_URL = 'https://raw.githubusercontent.com/akloso/smart-form-filler/main/Smart_Form_Filler.user.js';
+  const UPDATE_CHECK_KEY = 'STFF_UPDATE_CHECK_V1';
+  const DEV_MODE_UNTIL_KEY = 'STFF_DEVELOPER_MODE_UNTIL';
+  const UPDATE_CHECK_INTERVAL_MS = 12 * 60 * 60 * 1000;
+  const DEVELOPER_MODE_MS = 60 * 60 * 1000;
 
   const BRIDGE_MARKER = '__STFF_V17_7_BRIDGE__';
   const FRAME_DISCOVERY_SOFT_MS = 500;
@@ -117,7 +130,8 @@
     qaProgressPercent: 0,
     qaFieldDiagnostics: [],
     panelScale: 100,
-    statusRefreshTimer: null
+    statusRefreshTimer: null,
+    updateInfo: null
   };
 
   const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
@@ -202,7 +216,7 @@
     );
 
     console.error(
-      `Auto Form Filler and Auto QA Testing V17.16.0 [${stage}]`,
+      `Smart FormSense V17.17.0 [${stage}]`,
       error
     );
 
@@ -261,8 +275,7 @@
     undo: 'PRIMARY+ALT+Z',
     newApplicant: 'PRIMARY+ALT+N',
     qa: 'PRIMARY+ALT+Q',
-    report: 'PRIMARY+ALT+R',
-    debug: 'PRIMARY+ALT+D'
+    report: 'PRIMARY+ALT+R'
   });
 
   const DEFAULT_SETTINGS = Object.freeze({
@@ -274,6 +287,7 @@
       showShortcutHints: false,
       completionNotifications: true,
       notificationDuration: 'normal',
+      autoCheckUpdates: true,
       defaultWorkspace: 'fill',
       lastWorkspace: 'fill'
     },
@@ -326,11 +340,16 @@
     if (storedVersion < 3) {
       next.general.notificationDuration = 'normal';
     }
+    if (storedVersion < 4) {
+      next.general.autoCheckUpdates = true;
+    }
 
     // Panel position and dependency handling are core behaviour in v17.16+,
     // not user preferences. Ignore legacy persisted values for those keys.
     delete next.general.rememberPosition;
     delete next.fill.autoDependencies;
+    next.reports.autoDebugExport = false;
+    if (typeof next.general.autoCheckUpdates !== 'boolean') next.general.autoCheckUpdates = true;
 
     if (!['fill', 'qa'].includes(next.general.defaultWorkspace)) {
       next.general.defaultWorkspace = 'fill';
@@ -446,8 +465,7 @@
     undo: 'Undo',
     newApplicant: 'New Applicant',
     qa: 'Run Functional QA',
-    report: 'Open QA Report',
-    debug: 'Export Debug'
+    report: 'Open QA Report'
   }[action] || action);
 
   const canonicalActionKind = kind => {
@@ -12468,7 +12486,7 @@
     const report = {
       reportVersion: 1,
       generatedBy:
-        'Auto Form Filler and Auto QA Testing V17.16.0',
+        'Smart FormSense V17.17.0',
       generatedAt:
         new Date().toISOString(),
       mode:
@@ -12633,7 +12651,7 @@
       return report;
     } catch (error) {
       console.error(
-        'Auto Form Filler and Auto QA Testing V17.16.0 debug export:',
+        'Smart FormSense V17.17.0 debug export:',
         error
       );
 
@@ -12647,7 +12665,7 @@
 
 
   // ==========================================================
-  // Auto Form Filler and Auto QA Testing QA audit
+  // Smart FormSense QA audit
   // ==========================================================
   const qaRequiredSignals = el => {
     if (!el) {
@@ -13025,7 +13043,7 @@
         title:
           'No meaningful active form detected',
         message:
-          'Auto Form Filler and Auto QA Testing could not find a meaningful visible form in this execution context.',
+          'Smart FormSense could not find a meaningful visible form in this execution context.',
         expected:
           'A meaningful operational form with fillable controls',
         actual:
@@ -13156,7 +13174,7 @@
           title:
             'Required rule should be functionally confirmed',
           message:
-            `${label} is visibly marked as required, but Auto Form Filler and Auto QA Testing could not confirm the rule from native, ARIA, or common validator attributes. The form may still enforce it through JavaScript.`,
+            `${label} is visibly marked as required, but Smart FormSense could not confirm the rule from native, ARIA, or common validator attributes. The form may still enforce it through JavaScript.`,
           el,
           expected:
             'A visible required indicator with an enforceable required rule',
@@ -13177,7 +13195,7 @@
           title:
             'Required field is not visibly marked',
           message:
-            `${label} appears to be technically required but Auto Form Filler and Auto QA Testing could not find a visible required/mandatory indicator.`,
+            `${label} appears to be technically required but Smart FormSense could not find a visible required/mandatory indicator.`,
           el,
           expected:
             'Required field clearly indicated to the user',
@@ -13718,9 +13736,9 @@
     return {
       reportVersion: 3,
       product:
-        'Auto Form Filler and Auto QA Testing',
+        'Smart FormSense',
       productVersion:
-        '17.16.0',
+        '17.17.0',
       generatedAt,
       auditType:
         'Non-destructive Form Readiness Audit',
@@ -13992,7 +14010,7 @@
       : '';
 
     const checkedHtml = checkedThings.length
-      ? `<section class="sectionBlock"><div class="sectionHead"><div><span class="eyebrow blueEye">QA COVERAGE</span><h2>What Auto Form Filler and Auto QA Testing checked</h2></div><span class="countBadge blueBadge">${checkedThings.length}</span></div><div class="checkedGrid">${checkedThings.map(item => `<div class="checkedCard"><span class="checkDot">•</span><span>${esc(item)}</span></div>`).join('')}</div></section>`
+      ? `<section class="sectionBlock"><div class="sectionHead"><div><span class="eyebrow blueEye">QA COVERAGE</span><h2>What Smart FormSense checked</h2></div><span class="countBadge blueBadge">${checkedThings.length}</span></div><div class="checkedGrid">${checkedThings.map(item => `<div class="checkedCard"><span class="checkDot">•</span><span>${esc(item)}</span></div>`).join('')}</div></section>`
       : '';
 
     const detailCases = (qa.testCases || []).filter(item =>
@@ -14022,7 +14040,7 @@
     };
 
     const detailedHtml = detailGroups.size
-      ? `<section class="sectionBlock"><div class="sectionHead"><div><span class="eyebrow blueEye">DETAILED VALIDATION</span><h2>Exactly what was tested</h2></div><span class="countBadge blueBadge">${detailCases.length}</span></div><div class="detailIntro">Related checks are grouped by field. Each validation shows the exact value Auto Form Filler and Auto QA Testing used, the trigger, and what the website actually did.</div>${[...detailGroups.values()].map(group => {
+      ? `<section class="sectionBlock"><div class="sectionHead"><div><span class="eyebrow blueEye">DETAILED VALIDATION</span><h2>Exactly what was tested</h2></div><span class="countBadge blueBadge">${detailCases.length}</span></div><div class="detailIntro">Related checks are grouped by field. Each validation shows the exact value Smart FormSense used, the trigger, and what the website actually did.</div>${[...detailGroups.values()].map(group => {
           const passedCount = group.rows.filter(row => row.status === 'passed').length;
           const failedCount = group.rows.filter(row => ['failed', 'blocker'].includes(row.status)).length;
           const groupClass = failedCount ? 'detailGroupFail' : passedCount === group.rows.length ? 'detailGroupPass' : 'detailGroupReview';
@@ -14056,7 +14074,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Auto Form Filler and Auto QA Testing QA Report</title>
+<title>Smart FormSense QA Report</title>
 <style>
 *{box-sizing:border-box}body{margin:0;background:#f5f7fb;color:#202435;font-family:Inter,Segoe UI,Arial,sans-serif}.wrap{max-width:900px;margin:auto;padding:22px 18px 48px}.reportActions{position:sticky;top:10px;z-index:20;display:flex;justify-content:flex-end;margin-bottom:10px}.pdfBtn{border:0;border-radius:11px;padding:10px 15px;background:#4f46e5;color:#fff;font-size:11px;font-weight:900;cursor:pointer;box-shadow:0 8px 22px rgba(79,70,229,.22)}.pdfBtn:hover{background:#4338ca}.hero{background:linear-gradient(135deg,#ffffff 0%,#f7f5ff 58%,#eef7ff 100%);border:1px solid #e5e7f2;border-radius:22px;padding:24px;box-shadow:0 14px 36px rgba(61,50,123,.07)}.brand{font-size:12px;font-weight:900;letter-spacing:.08em;color:#6657e8}.hero h1{font-size:24px;margin:6px 0 4px}.meta{font-size:11px;color:#777d8e;line-height:1.55}.status{display:inline-flex;align-items:center;margin-top:14px;padding:7px 11px;border-radius:999px;font-size:11px;font-weight:900}.goodStatus{background:#dcfce7;color:#166534}.reviewStatus{background:#fef3c7;color:#92400e}.issueStatus{background:#fee2e2;color:#991b1b}.partialStatus{background:#e0e7ff;color:#3730a3}.overview{margin-top:12px;font-size:13px;line-height:1.6;color:#4d5568}.summary{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:18px}.metric{border-radius:14px;padding:13px 10px;border:1px solid}.metric b{display:block;font-size:20px;line-height:1.1}.metric span{display:block;font-size:9px;font-weight:850;letter-spacing:.04em;margin-top:5px}.coverageMetric{background:#eff6ff;border-color:#bfdbfe;color:#1d4ed8}.issueMetric{background:#fff1f2;border-color:#fecdd3;color:#be123c}.reviewMetric{background:#fffbeb;border-color:#fde68a;color:#a16207}.passMetric{background:#f0fdf4;border-color:#bbf7d0;color:#15803d}.coverageBar{height:7px;background:#dbeafe;border-radius:999px;overflow:hidden;margin-top:8px}.coverageFill{height:100%;background:linear-gradient(90deg,#4f46e5,#06b6d4);border-radius:999px}.journeyGrid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:12px}.journeyCard{background:#fff;border:1px solid #e6e8ef;border-radius:13px;padding:11px 12px}.journeyCard span{font-size:9px;color:#7b8190;font-weight:800}.journeyCard b{display:block;margin-top:4px;font-size:11px}.good{color:#15803d}.bad{color:#b91c1c}.reviewTone{color:#a16207}.partial{margin-top:14px;background:#fff7ed;border:1px solid #fed7aa;border-radius:13px;padding:11px 13px;font-size:11px;color:#9a3412}.sectionBlock{margin-top:28px}.sectionHead{display:flex;align-items:end;justify-content:space-between;margin-bottom:10px}.sectionHead h2{font-size:17px;margin:3px 0 0}.eyebrow{font-size:9px;font-weight:900;letter-spacing:.12em}.redEye{color:#dc2626}.amberEye{color:#d97706}.blueEye{color:#2563eb}.countBadge{min-width:28px;height:28px;border-radius:999px;display:grid;place-items:center;font-size:11px;font-weight:900}.redBadge{background:#fee2e2;color:#b91c1c}.amberBadge{background:#fef3c7;color:#92400e}.blueBadge{background:#dbeafe;color:#1d4ed8}.item{display:flex;gap:12px;background:#fff;border:1px solid #e5e7ed;border-radius:15px;padding:14px;margin:9px 0;box-shadow:0 5px 16px rgba(30,41,59,.035)}.item.issue{border-color:#fecaca;background:linear-gradient(135deg,#fff,#fff7f7)}.iconBox{width:28px;height:28px;border-radius:9px;display:grid;place-items:center;font-weight:950;flex:0 0 auto}.issueIcon{background:#fee2e2;color:#b91c1c}.itemBody{min-width:0;flex:1}.itemTitle{font-size:14px;font-weight:900}.fields,.what,.action{margin-top:6px;font-size:11px;line-height:1.58;color:#606778}.fields b,.action b{color:#343949}.action{background:#fff;border:1px solid #fee2e2;border-radius:9px;padding:9px 10px}.checkedGrid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}.checkedCard{display:flex;align-items:center;gap:8px;background:#fff;border:1px solid #dbeafe;border-radius:12px;padding:10px 11px;color:#334155;font-size:11px;font-weight:700}.checkDot{width:20px;height:20px;border-radius:7px;display:grid;place-items:center;background:#dbeafe;color:#1d4ed8;font-size:13px;font-weight:950;flex:0 0 auto}.fieldChips{display:flex;flex-wrap:wrap;gap:7px;background:#fff;border:1px solid #fde68a;border-radius:14px;padding:12px}.fieldChips span{background:#fffbeb;border:1px solid #fde68a;color:#92400e;border-radius:999px;padding:6px 9px;font-size:10px;font-weight:750}.detailIntro{font-size:11px;color:#697184;line-height:1.55;margin:-2px 0 10px}.detailGroup{background:#fff;border:1px solid #e5e7ed;border-radius:14px;margin:9px 0;overflow:hidden}.detailGroup summary{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 13px;cursor:pointer;font-size:12px;font-weight:900}.detailGroup summary b{font-size:10px;color:#6b7280}.detailGroupPass{border-left:4px solid #22c55e}.detailGroupFail{border-left:4px solid #ef4444}.detailGroupReview{border-left:4px solid #f59e0b}.detailRows{border-top:1px solid #eef0f4}.detailRow{padding:11px 13px;border-top:1px solid #f0f1f5}.detailRow:first-child{border-top:0}.detailRowHead{display:flex;align-items:center;gap:7px}.detailRowHead strong{font-size:11px;flex:1}.detailIcon{width:20px;height:20px;border-radius:7px;display:grid;place-items:center;font-weight:950}.detailLabel{font-size:8px;font-weight:900;text-transform:uppercase;border-radius:999px;padding:3px 6px}.detailPass .detailIcon,.detailPass .detailLabel{background:#dcfce7;color:#166534}.detailFail .detailIcon,.detailFail .detailLabel{background:#fee2e2;color:#991b1b}.detailReview .detailIcon,.detailReview .detailLabel{background:#fef3c7;color:#92400e}.detailValue,.detailLine{font-size:10px;line-height:1.5;color:#606778;margin-top:5px}.detailValue code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;background:#f6f7fb;color:#312e81;border-radius:6px;padding:2px 5px;word-break:break-all}.detailLine b,.detailValue b{color:#343949}.missedChips{border-color:#fecaca}.missedChips span{background:#fff1f2;border-color:#fecaca;color:#991b1b}.passed{margin-top:26px;background:linear-gradient(135deg,#ecfdf5,#f0fdf4);border:1px solid #bbf7d0;border-radius:15px;padding:14px;color:#166534;font-size:12px;font-weight:750}.note{margin-top:18px;background:#fff;border:1px solid #e7e9ef;border-radius:13px;padding:12px;font-size:10px;line-height:1.6;color:#858b99}.footer{text-align:center;margin-top:24px;font-size:10px;color:#979baa}@media(max-width:680px){.summary{grid-template-columns:repeat(2,1fr)}.journeyGrid,.checkedGrid{grid-template-columns:1fr}.hero{padding:18px}}@media print{body{background:#fff;font-size:10px}.wrap{padding:0 3mm;max-width:none}.reportActions{display:none!important}.hero,.item{box-shadow:none}.hero{padding:14px;border-radius:14px}.hero h1{font-size:20px}.summary,.journeyGrid{gap:6px}.metric,.journeyCard{padding:8px}.sectionBlock{margin-top:16px;break-inside:avoid}.sectionHead{margin-bottom:6px}.checkedGrid{gap:5px}.checkedCard{padding:7px 9px}.passed{margin-top:14px;padding:10px}.note{margin-top:10px;padding:9px}.footer{margin-top:10px}}
 </style>
@@ -14067,7 +14085,7 @@
   <div class="hero">
     <div class="brand">✦ SMART FORMSENSE QA</div>
     <h1>${esc(qa.page?.title || 'Form')}</h1>
-    <div class="meta">${esc(qa.page?.hostname || location.hostname || '')}<br>${esc(generated)} • v${esc(qa.productVersion || '17.16.0')}</div>
+    <div class="meta">${esc(qa.page?.hostname || location.hostname || '')}<br>${esc(generated)} • v${esc(qa.productVersion || '17.17.0')}</div>
     <div class="status ${statusClass}">${esc(status)}</div>
     <div class="overview">${esc(overview)}</div>
 
@@ -14093,8 +14111,8 @@
   ${uncoveredHtml}
 
   <div class="passed">✓ ${passed} automated checks were confirmed OK. Field coverage: ${fieldCoverage}%. Validation coverage: ${validationCoverage}%.</div>
-  <div class="note">Field names are shown only when Auto Form Filler and Auto QA Testing genuinely missed them or when a confirmed issue needs attention. Pending checks stay summarized. Exact test values and technical evidence remain in <b>Export Debug</b>.</div>
-  <div class="footer">Created with love ❤️ Akash Singh • Auto Form Filler and Auto QA Testing</div>
+  <div class="note">Field names are shown only when Smart FormSense genuinely missed them or when a confirmed issue needs attention. Pending checks stay summarized. Exact test values and technical evidence remain in <b>Export Debug</b>.</div>
+  <div class="footer">Created with love ❤️ Akash Singh • Smart FormSense</div>
 </div>
 <script>try{document.getElementById("qaDownloadPdf")?.addEventListener("click",function(e){e.preventDefault();window.print();});}catch(e){}</script>
 </body>
@@ -14284,9 +14302,9 @@
     return {
       reportVersion: 2,
       product:
-        'Auto Form Filler and Auto QA Testing',
+        'Smart FormSense',
       productVersion:
-        '17.16.0',
+        '17.17.0',
       generatedAt:
         new Date().toISOString(),
       purpose:
@@ -14333,7 +14351,7 @@
           Number(state.qaProgressPercent || 0)
       },
       notes: [
-        'This file is intentionally technical and is meant to be shared for troubleshooting Auto Form Filler and Auto QA Testing QA detection.',
+        'This file is intentionally technical and is meant to be shared for troubleshooting Smart FormSense QA detection.',
         'It can contain page/form metadata and synthetic test values. Review it before sharing outside the QA/development team.',
         'Preserved user-entered values remain subject to the redaction rules used by the standard debug exporter.'
       ]
@@ -14381,7 +14399,7 @@
       return report;
     } catch (error) {
       console.error(
-        'Auto Form Filler and Auto QA Testing V17.16.0 QA debug export:',
+        'Smart FormSense V17.17.0 QA debug export:',
         error
       );
 
@@ -14883,7 +14901,7 @@
       const authorization = serializedActiveAuthorization();
 
       if (!authorization || authorization.kind !== canonicalActionKind(action)) {
-        return Promise.reject(new Error('No authorized Auto Form Filler and Auto QA Testing action is active'));
+        return Promise.reject(new Error('No authorized Smart FormSense action is active'));
       }
 
       const requestId =
@@ -15019,7 +15037,7 @@
     fill: '✓ Form filling completed',
     validate: '✓ Validation completed',
     recheck: '✓ Recheck completed'
-  }[action] || '✓ Auto Form Filler and Auto QA Testing completed');
+  }[action] || '✓ Smart FormSense completed');
 
   const autoScrollAfterValidate = (result = null) => {
     const c = result?.counters || refreshCurrentStatus();
@@ -15080,8 +15098,8 @@
         state.activeRemoteRequestId = null;
         state.activeRemoteAction = null;
         state.panel?.setBusy(false);
-        state.panel?.setStatus(`Auto Form Filler and Auto QA Testing action failed safely: ${error?.message || 'unknown error'}`);
-        state.panel?.notify?.('⚠ Auto Form Filler and Auto QA Testing action stopped', error?.message || 'Unknown error', 'error');
+        state.panel?.setStatus(`Smart FormSense action failed safely: ${error?.message || 'unknown error'}`);
+        state.panel?.notify?.('⚠ Smart FormSense action stopped', error?.message || 'Unknown error', 'error');
         setProgress(100, `Action stopped safely: ${error?.message || 'unknown error'}`);
       } finally {
         scheduleCurrentStatusRefresh(40);
@@ -15094,7 +15112,7 @@
 
 
   // ==========================================================
-  // Auto Form Filler and Auto QA Testing Functional QA engine (black-box, reversible)
+  // Smart FormSense Functional QA engine (black-box, reversible)
   // ==========================================================
   const qaDispatchInteraction = (el, includeBlur = true) => {
     if (!el || !requireActionPermission('form-events', el, 'qaDispatchInteraction')) return false;
@@ -15760,7 +15778,7 @@
     };
 
     try { document.addEventListener('click', onClick, true); } catch {}
-    state.panel?.setStatus?.('Manual step needed: click the form Continue / Save & Next / Submit button. Auto Form Filler and Auto QA Testing will watch the result.');
+    state.panel?.setStatus?.('Manual step needed: click the form Continue / Save & Next / Submit button. Smart FormSense will watch the result.');
     state.panel?.setQaProgress?.(94, 'Manual step: click Continue / Submit on the form');
 
     const started = Date.now();
@@ -16075,7 +16093,7 @@
       rows.push({
         status: 'review',
         name: 'Safe progression disabled in Settings',
-        actual: `A safe ${qaButtonText(button) || 'Next / Continue'} action was detected, but Auto Form Filler and Auto QA Testing is configured not to progress automatically.`
+        actual: `A safe ${qaButtonText(button) || 'Next / Continue'} action was detected, but Smart FormSense is configured not to progress automatically.`
       });
       return rows;
     }
@@ -16083,7 +16101,7 @@
     if (button && progression === 'ask') {
       let approved = false;
       try {
-        approved = window.confirm(`Auto Form Filler and Auto QA Testing QA found a safe “${qaButtonText(button) || 'Next / Continue'}” action. Run this progression check now?`);
+        approved = window.confirm(`Smart FormSense QA found a safe “${qaButtonText(button) || 'Next / Continue'}” action. Run this progression check now?`);
       } catch {}
       if (!approved) {
         rows.push({
@@ -16112,7 +16130,7 @@
             status: auto.clicked && !auto.progressed ? 'passed' : 'review',
             name: 'Protected final validation action',
             actual: auto.clicked
-              ? `Auto Form Filler and Auto QA Testing clicked ${qaButtonText(finalButton) || 'Submit'} in protected validation mode. Final submission remained blocked${fresh.length ? ` and ${fresh.length} fresh validation message(s) appeared` : ''}.`
+              ? `Smart FormSense clicked ${qaButtonText(finalButton) || 'Submit'} in protected validation mode. Final submission remained blocked${fresh.length ? ` and ${fresh.length} fresh validation message(s) appeared` : ''}.`
               : 'The final validation action could not be exercised automatically.',
             evidence: {
               method: 'protected-final-validation',
@@ -16138,7 +16156,7 @@
             status: manual.progressed || newEntries.length > 0 ? 'passed' : 'review',
             name: 'Manual Continue / Submit check',
             actual: manual.progressed
-              ? `Your ${manual.clickedText || 'form action'} click moved the form forward and Auto Form Filler and Auto QA Testing detected the new step.`
+              ? `Your ${manual.clickedText || 'form action'} click moved the form forward and Smart FormSense detected the new step.`
               : newEntries.length > 0
                 ? `Your ${manual.clickedText || 'form action'} click triggered validation on ${newEntries.length} field(s).`
                 : 'A form action was clicked, but progression or fresh validation could not be confirmed.',
@@ -16157,8 +16175,8 @@
             status: 'review',
             name: 'Continue / Submit needs a manual click',
             actual: buttons.protectedFinal.length
-              ? 'The available progression action looks like a final Submit or transaction action, so Auto Form Filler and Auto QA Testing left the click to the user.'
-              : 'Auto Form Filler and Auto QA Testing could not identify a safe progression button automatically.',
+              ? 'The available progression action looks like a final Submit or transaction action, so Smart FormSense left the click to the user.'
+              : 'Smart FormSense could not identify a safe progression button automatically.',
             evidence: { method: 'manual-assisted-journey', waitedMs: manual.waitedMs }
           });
         }
@@ -16238,7 +16256,7 @@
             el,
             status: 'review',
             name: 'Required field still needs confirmation',
-            actual: 'The form was blocked, but Auto Form Filler and Auto QA Testing could not map a validation message to this required field on this attempt.'
+            actual: 'The form was blocked, but Smart FormSense could not map a validation message to this required field on this attempt.'
           });
         }
       } else if (click.validationAfter.count > 0) {
@@ -16867,8 +16885,8 @@
       ? report
       : {
           reportVersion: 7,
-          product: 'Auto Form Filler and Auto QA Testing',
-          productVersion: '17.16.0',
+          product: 'Smart FormSense',
+          productVersion: '17.17.0',
           generatedAt: new Date().toISOString(),
           auditType: 'Black-box Functional Form QA',
           page: {
@@ -16905,7 +16923,7 @@
     const cleanReason = String(reason || '').slice(0, 500);
     return {
       ...base,
-      productVersion: '17.16.0',
+      productVersion: '17.17.0',
       reportVersion: Math.max(5, Number(base.reportVersion || 0)),
       runState,
       incomplete: runState !== 'completed',
@@ -17055,8 +17073,8 @@
 
       return {
         reportVersion: 7,
-        product: 'Auto Form Filler and Auto QA Testing',
-        productVersion: '17.16.0',
+        product: 'Smart FormSense',
+        productVersion: '17.17.0',
         generatedAt,
         completedAt: ['completed', 'stopped', 'failed'].includes(runState) ? new Date().toISOString() : null,
         auditType: 'Black-box Functional Form QA',
@@ -17088,7 +17106,7 @@
         testCases: [...testCases],
         notes: [
           'Field totals represent logical user-facing fields discovered during this QA run; radio options in the same group count as one field.',
-          'Auto Form Filler and Auto QA Testing rescans the full active form after field checks, dependencies and journey actions so newly loaded controls can be tested.',
+          'Smart FormSense rescans the full active form after field checks, dependencies and journey actions so newly loaded controls can be tested.',
           'Dependent dropdowns are allowed up to 8 seconds to load and stabilize before they are marked for review.',
           'Each field validation exercises the form action when it can be protected safely. High-risk payment/finalize actions are never auto-clicked.',
           'Ordinary Submit actions may be clicked in protected validation mode when independent blockers are present; the final submission remains blocked.',
@@ -17300,7 +17318,7 @@
 
         if (semantic === 'captcha') {
           // CAPTCHA stays user-controlled. Only its blank/required behaviour may
-          // participate in protected validation; Auto Form Filler and Auto QA Testing never types or solves it.
+          // participate in protected validation; Smart FormSense never types or solves it.
           tested.add(key);
           return;
         }
@@ -17357,7 +17375,7 @@
             name: 'Basic input interaction',
             status: accepted ? 'passed' : 'review',
             expected: 'The field accepts normal applicant input and can return to its original value.',
-            actual: accepted ? 'Normal input could be entered and the original value was restored.' : 'Auto Form Filler and Auto QA Testing could not confirm normal input behaviour.',
+            actual: accepted ? 'Normal input could be entered and the original value was restored.' : 'Smart FormSense could not confirm normal input behaviour.',
             evidence: { method: result.method, attemptedValue: result.attemptedValue, acceptedValue: result.acceptedValue, restored: true }
           });
         } else if (testCases.length === beforeCount) {
@@ -17377,7 +17395,7 @@
           name: 'Field changed while being checked',
           status: 'review',
           expected: 'The field remains available long enough to complete its check.',
-          actual: `${label || 'A field'} changed or reloaded while Auto Form Filler and Auto QA Testing was checking it.`,
+          actual: `${label || 'A field'} changed or reloaded while Smart FormSense was checking it.`,
           guidance: 'Check this field once manually after the form finishes loading.',
           evidence: { error: String(error?.message || error || 'unknown error').slice(0, 200) }
         });
@@ -17541,9 +17559,7 @@
       if (state.settings?.qa?.autoOpenReport) {
         try { exportQaReport(report); } catch {}
       }
-      if (state.settings?.reports?.autoDebugExport) {
-        try { smartQaDebugExport(); } catch {}
-      }
+      // Manual debug export is developer-only; feedback attaches compact diagnostics automatically.
     };
 
     try {
@@ -17742,14 +17758,14 @@
 
       if (agent?.source) {
         const result = await sendRemoteCommand(agent, 'undo', { source });
-        state.panel?.notify?.('↶ Undo completed', 'Embedded Auto Form Filler and Auto QA Testing changes restored', 'success');
+        state.panel?.notify?.('↶ Undo completed', 'Embedded Smart FormSense changes restored', 'success');
         return result;
       }
 
       state.running = true;
       state.panel?.setBusy(true);
       const restored = undo();
-      state.panel?.notify?.('↶ Undo completed', `${Number(restored || 0)} Auto Form Filler and Auto QA Testing change(s) restored`, 'success');
+      state.panel?.notify?.('↶ Undo completed', `${Number(restored || 0)} Smart FormSense change(s) restored`, 'success');
     } catch (error) {
       state.panel?.setStatus(`Undo stopped safely: ${error?.message || 'unknown error'}`);
     } finally {
@@ -17824,6 +17840,242 @@
 
     state.qaDebugAwaiting = false;
     exportQaDebugReport();
+  };
+
+  const developerModeActive = () => {
+    try {
+      const until = Number(GM_getValue(DEV_MODE_UNTIL_KEY, 0) || 0);
+      if (until > Date.now()) return true;
+      if (until) GM_setValue(DEV_MODE_UNTIL_KEY, 0);
+    } catch {}
+    return false;
+  };
+
+  const enableDeveloperMode = () => {
+    const until = Date.now() + DEVELOPER_MODE_MS;
+    try { GM_setValue(DEV_MODE_UNTIL_KEY, until); } catch {}
+    return until;
+  };
+
+  const compareVersions = (a, b) => {
+    const pa = String(a || '').split('.').map(v => Number.parseInt(v, 10) || 0);
+    const pb = String(b || '').split('.').map(v => Number.parseInt(v, 10) || 0);
+    const len = Math.max(pa.length, pb.length);
+    for (let i = 0; i < len; i++) {
+      const diff = (pa[i] || 0) - (pb[i] || 0);
+      if (diff) return diff > 0 ? 1 : -1;
+    }
+    return 0;
+  };
+
+  const readUpdateCache = () => {
+    try {
+      const cached = GM_getValue(UPDATE_CHECK_KEY, null);
+      return cached && typeof cached === 'object' ? cached : null;
+    } catch { return null; }
+  };
+
+  const writeUpdateCache = info => {
+    try { GM_setValue(UPDATE_CHECK_KEY, info); } catch {}
+    return info;
+  };
+
+  const gmTextRequest = (url, options = {}) => new Promise((resolve, reject) => {
+    try {
+      GM_xmlhttpRequest({
+        method: options.method || 'GET',
+        url,
+        headers: options.headers || {},
+        data: options.data,
+        timeout: options.timeout || 15000,
+        onload: response => resolve(response),
+        onerror: () => reject(new Error('Network request failed')),
+        ontimeout: () => reject(new Error('Network request timed out'))
+      });
+    } catch (error) { reject(error); }
+  });
+
+  const latestVersionFromScript = text => {
+    const match = String(text || '').match(/^\/\/\s*@version\s+([^\s]+)\s*$/m);
+    return match ? String(match[1]).trim() : '';
+  };
+
+  const updateAvailableFrom = latest => !!latest && compareVersions(latest, SCRIPT_VERSION) > 0;
+
+  const checkForUpdates = async ({ force = false, silent = true } = {}) => {
+    state.settings = loadSettings();
+    const cached = readUpdateCache();
+    const now = Date.now();
+    if (!force) {
+      if (!state.settings?.general?.autoCheckUpdates) {
+        state.updateInfo = cached;
+        state.panel?.updateUpdateIndicator?.(cached);
+        return cached;
+      }
+      if (cached && now - Number(cached.checkedAt || 0) < UPDATE_CHECK_INTERVAL_MS) {
+        state.updateInfo = cached;
+        state.panel?.updateUpdateIndicator?.(cached);
+        return cached;
+      }
+    }
+
+    try {
+      const response = await gmTextRequest(`${UPDATE_RAW_URL}?t=${now}`, { timeout: 12000 });
+      if (Number(response.status || 0) < 200 || Number(response.status || 0) >= 300) {
+        throw new Error(`Update server returned ${response.status || 'an error'}`);
+      }
+      const latestVersion = latestVersionFromScript(response.responseText || '');
+      if (!latestVersion) throw new Error('Latest version could not be read');
+      const info = writeUpdateCache({
+        checkedAt: now,
+        latestVersion,
+        available: updateAvailableFrom(latestVersion),
+        error: ''
+      });
+      state.updateInfo = info;
+      state.panel?.updateUpdateIndicator?.(info);
+      return info;
+    } catch (error) {
+      const info = {
+        ...(cached || {}),
+        checkedAt: now,
+        latestVersion: cached?.latestVersion || '',
+        available: updateAvailableFrom(cached?.latestVersion || ''),
+        error: String(error?.message || error || 'Update check failed')
+      };
+      state.updateInfo = info;
+      state.panel?.updateUpdateIndicator?.(info);
+      if (!silent) throw error;
+      return info;
+    }
+  };
+
+  const openUserscriptUpdate = () => {
+    try {
+      GM_openInTab(`${UPDATE_RAW_URL}?install=${Date.now()}`, { active: true, insert: true, setParent: true });
+      return true;
+    } catch {
+      try { window.open(UPDATE_RAW_URL, '_blank', 'noopener'); return true; } catch {}
+    }
+    return false;
+  };
+
+  const compactFeedbackDiagnostics = () => {
+    try {
+      let technical = null;
+      try { technical = buildDebugReport(); } catch {}
+      const qa = state.qaReport;
+      const report = {
+        product: PRODUCT_NAME,
+        version: SCRIPT_VERSION,
+        generatedAt: new Date().toISOString(),
+        page: {
+          title: document.title,
+          hostname: location.hostname,
+          pathname: location.pathname,
+          url: location.href
+        },
+        workspace: state.workspace === 'qa' ? 'Auto QA Testing' : 'Auto Form Filler',
+        iframe: { isTop: IS_TOP, isFrame: IS_FRAME, activeEmbeddedAgent: state.lastRemoteAgentId || null },
+        counters: {
+          filled: state.stats.filled.size,
+          preserved: state.stats.preserved.size,
+          review: state.stats.review.size,
+          errors: state.stats.errors.size,
+          manual: state.stats.manual.size
+        },
+        qa: qa ? {
+          runState: qa.runState,
+          incomplete: !!qa.incomplete,
+          fieldsAudited: qa.fieldsAudited,
+          fieldsChecked: qa.fieldsChecked,
+          fieldCoverage: qa.fieldCoverage,
+          validationCoverage: qa.validationCoverage,
+          rating: qa.rating,
+          counts: qa.counts,
+          summary: qa.summary,
+          testCases: Array.isArray(qa.testCases) ? qa.testCases.slice(0, 30).map(item => ({
+            id: item.id,
+            category: item.category,
+            name: item.name,
+            status: item.status,
+            field: item.field,
+            attemptedValue: item.attemptedValue,
+            expected: item.expected,
+            actual: item.actual,
+            trigger: item.evidence?.trigger,
+            feedback: item.evidence?.feedback,
+            clicked: item.evidence?.clicked,
+            protectedFinal: item.evidence?.protectedFinal
+          })) : []
+        } : null,
+        fieldDiagnostics: Array.isArray(state.qaFieldDiagnostics) ? state.qaFieldDiagnostics.slice(0, 20) : [],
+        technical: technical ? {
+          domSummary: technical.domSummary,
+          lastRuntimeError: technical.lastRuntimeError,
+          issues: Array.isArray(technical.issues) ? technical.issues.slice(0, 20) : technical.issues,
+          recentEvents: Array.isArray(technical.recentEvents) ? technical.recentEvents.slice(-20) : []
+        } : null
+      };
+      let json = JSON.stringify(report);
+      if (json.length > 12000) {
+        json = JSON.stringify({
+          product: report.product,
+          version: report.version,
+          generatedAt: report.generatedAt,
+          page: report.page,
+          workspace: report.workspace,
+          iframe: report.iframe,
+          counters: report.counters,
+          qa: report.qa ? {
+            runState: report.qa.runState,
+            fieldsAudited: report.qa.fieldsAudited,
+            fieldsChecked: report.qa.fieldsChecked,
+            fieldCoverage: report.qa.fieldCoverage,
+            validationCoverage: report.qa.validationCoverage,
+            rating: report.qa.rating,
+            counts: report.qa.counts,
+            summary: report.qa.summary
+          } : null,
+          lastRuntimeError: report.technical?.lastRuntimeError || null
+        });
+      }
+      return json.length <= 12000 ? json : '';
+    } catch { return ''; }
+  };
+
+  const submitFeedbackToFormspree = async payload => {
+    const body = {
+      _subject: `Smart FormSense feedback • ${payload.category || 'General'}`,
+      product: PRODUCT_NAME,
+      version: SCRIPT_VERSION,
+      workspace: state.workspace === 'qa' ? 'Auto QA Testing' : 'Auto Form Filler',
+      category: payload.category || 'Other',
+      rating: payload.rating ? `${payload.rating}/5` : '',
+      message: String(payload.message || '').trim(),
+      email: String(payload.email || '').trim(),
+      page: `${location.hostname}${location.pathname}`
+    };
+    const diagnostics = compactFeedbackDiagnostics();
+    if (diagnostics) body.diagnostics = diagnostics;
+    const response = await gmTextRequest(FEEDBACK_ENDPOINT, {
+      method: 'POST',
+      timeout: 18000,
+      headers: {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json'
+      },
+      data: JSON.stringify(body)
+    });
+    if (Number(response.status || 0) < 200 || Number(response.status || 0) >= 300) {
+      let reason = 'Feedback could not be sent';
+      try {
+        const parsed = JSON.parse(response.responseText || '{}');
+        reason = parsed?.errors?.[0]?.message || parsed?.error || reason;
+      } catch {}
+      throw new Error(reason);
+    }
+    return true;
   };
 
   const matchedShortcutAction = event => {
@@ -17940,6 +18192,7 @@
     }
 
     if (action === 'debug') {
+      if (!developerModeActive()) return;
       mountPanel();
       smartDebugExport(preferredAgentId);
     }
@@ -18817,6 +19070,21 @@
           transition:.16s ease
         }
         .windowBtn:hover{background:rgba(255,255,255,.28)}
+        .updateBtn{display:none;position:relative;background:linear-gradient(135deg,#fff,#ffe4e6)!important;color:#dc2626!important;box-shadow:0 0 0 0 rgba(239,68,68,.65)}
+        .updateBtn.updateAvailable{display:grid;animation:updateBreathe 1.65s ease-in-out infinite;box-shadow:0 0 12px rgba(239,68,68,.7),0 0 24px rgba(249,115,22,.38)}
+        .updateBtn.updateAvailable:after{content:"";position:absolute;right:-2px;top:-2px;width:8px;height:8px;border-radius:50%;background:#ef4444;border:2px solid #fff;box-shadow:0 0 8px rgba(239,68,68,.9)}
+        @keyframes updateBreathe{0%,100%{transform:scale(1);filter:brightness(1)}50%{transform:scale(1.12);filter:brightness(1.16)}}
+        .developerOnly{display:none!important}.developerOnly.devVisible{display:block!important}
+        .versionTap{border:0;background:transparent;color:#8a8fa0;font:inherit;padding:0;cursor:pointer}.versionTap:hover{color:#5b4bff;text-decoration:underline}
+        .feedbackBack{display:none;position:fixed;inset:0;width:100vw;height:100vh;background:rgba(19,15,40,.48);backdrop-filter:blur(5px);align-items:center;justify-content:center;padding:18px;z-index:45}
+        .feedbackModal{width:min(430px,calc(100vw - 24px));max-height:calc(100vh - 24px);overflow:auto;background:#fff;border:1px solid #e7e2f6;border-radius:18px;box-shadow:0 30px 90px rgba(17,12,45,.32);color:#26213a;padding:15px}
+        .feedbackHead{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}.feedbackHead h3{margin:0;font-size:15px}.feedbackHead p{margin:3px 0 0;font-size:9px;color:#817a91;line-height:1.4}.feedbackClose{border:0;background:#f3f0fb;color:#655d78;width:29px;height:29px;border-radius:9px;cursor:pointer;font-size:16px}
+        .feedbackLabel{display:block;font-size:9px;font-weight:850;color:#403a55;margin:12px 0 6px}.feedbackCategories{display:grid;grid-template-columns:repeat(2,1fr);gap:6px}.feedbackCategory{border:1px solid #e6e1f1;background:#fff;border-radius:9px;padding:7px 6px;font-size:9px;font-weight:800;color:#5c556c;cursor:pointer}.feedbackCategory.selected{border-color:#8b5cf6;background:#f5f3ff;color:#5b4bff;box-shadow:0 0 0 1px #c4b5fd inset}
+        .feedbackStars{display:flex;gap:5px}.feedbackStar{border:0;background:transparent;font-size:22px;line-height:1;color:#c9c3d7;cursor:pointer;padding:1px}.feedbackStar.selected{color:#f59e0b}
+        .feedbackModal textarea,.feedbackModal input[type=email]{width:100%;box-sizing:border-box;border:1px solid #ded9eb;border-radius:9px;padding:9px;font:inherit;font-size:10px;color:#312e46;background:#fff;outline:none}.feedbackModal textarea{min-height:92px;resize:vertical}.feedbackModal textarea:focus,.feedbackModal input[type=email]:focus{border-color:#8b5cf6;box-shadow:0 0 0 3px rgba(139,92,246,.1)}
+        .feedbackSend{width:100%;margin-top:12px;border:0;border-radius:10px;padding:9px 10px;background:linear-gradient(135deg,#5b4bff,#8b5cf6,#d946ef);color:#fff;font-weight:850;cursor:pointer}.feedbackSend:disabled{opacity:.65}.feedbackMessage{min-height:18px;margin-top:7px;font-size:8.5px;color:#6b7280}.feedbackMessage.error{color:#dc2626}
+        .feedbackSuccessToast{pointer-events:auto;position:relative;padding-right:34px!important}.feedbackSuccessClose{position:absolute;right:7px;top:7px;width:20px;height:20px;border:0;border-radius:6px;background:#f3f4f6;color:#6b7280;cursor:pointer;font-size:13px;display:grid;place-items:center}
+        .updateStatus{font-size:8.5px;color:#756e84;line-height:1.45;margin-top:6px}.updateStatus strong{color:#443d56}.updateActions{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}.updateNow{display:none}.updateNow.visible{display:inline-block;background:#fff1f2;border-color:#fecdd3;color:#dc2626;font-weight:900;box-shadow:0 0 14px rgba(239,68,68,.18)}
         .hero{touch-action:none;cursor:grab}
         .hero.dragging{cursor:grabbing}
         .hero button,.hero a{cursor:pointer}
@@ -18961,7 +19229,7 @@
         .compactIssues{max-height:118px;margin-top:5px}
         .compactIssues .qaIssue{padding:6px 7px}
         .compactIssues .qaIssueMessage{font-size:7.5px;line-height:1.3}
-        .qaActions{display:grid;grid-template-columns:1fr 1fr;gap:5px;margin-top:7px}
+        .qaActions{display:grid;grid-template-columns:1fr;gap:5px;margin-top:7px}
         .qaOpenReport{background:#f5f3ff;border-color:#ddd6fe;color:#5b4bff;font-weight:850}
 
         .modeRow{
@@ -19061,7 +19329,7 @@
         }
         .utilityGrid{
           display:grid;
-          grid-template-columns:repeat(3,1fr);
+          grid-template-columns:repeat(2,1fr);
           gap:5px;
           margin-top:5px
         }
@@ -19262,8 +19530,10 @@
       <div class="panel" id="panel">
         <div class="hero">
           <div class="top">
-            <div><div class="title">✦ Auto Form Filler and Auto QA Testing</div><div class="tagline">Intelligent Form Filling & QA Testing</div></div>
+            <div><div class="title">✦ Smart FormSense</div><div class="tagline">Intelligent Form Filling & QA Testing</div></div>
             <div class="windowBtns">
+              <button class="windowBtn updateBtn" id="updateBtn" title="Update available">⬆</button>
+              <button class="windowBtn" id="feedbackBtn" title="Send Feedback">💬</button>
               <button class="windowBtn" id="settingsBtn" title="Settings">⚙</button>
               <button class="windowBtn" id="minimize" title="Minimize">−</button>
               <button class="windowBtn" id="close" title="Close">×</button>
@@ -19275,10 +19545,10 @@
             <span id="pId"></span>
             <div class="profileBottom">
               <span id="pEmail"></span>
-              <div class="zoomControls" aria-label="Auto Form Filler and Auto QA Testing panel zoom">
-                <button class="zoomBtn" id="zoomDown" type="button" title="Zoom out Auto Form Filler and Auto QA Testing">−</button>
-                <button class="zoomBtn zoomReset" id="zoomReset" type="button" title="Reset Auto Form Filler and Auto QA Testing zoom">100%</button>
-                <button class="zoomBtn" id="zoomUp" type="button" title="Zoom in Auto Form Filler and Auto QA Testing">+</button>
+              <div class="zoomControls" aria-label="Smart FormSense panel zoom">
+                <button class="zoomBtn" id="zoomDown" type="button" title="Zoom out Smart FormSense">−</button>
+                <button class="zoomBtn zoomReset" id="zoomReset" type="button" title="Reset Smart FormSense zoom">100%</button>
+                <button class="zoomBtn" id="zoomUp" type="button" title="Zoom in Smart FormSense">+</button>
               </div>
             </div>
           </div>
@@ -19286,8 +19556,8 @@
 
         <div class="body">
           <div class="modeTabs">
-            <button class="modeTab active" id="fillTab">⚡ Form Filling</button>
-            <button class="modeTab" id="qaTab">🧪 QA Testing</button>
+            <button class="modeTab active" id="fillTab">⚡ Auto Form Filler</button>
+            <button class="modeTab" id="qaTab">🧪 Auto QA Testing</button>
           </div>
 
           <div class="workspace active" id="fillWorkspace">
@@ -19339,7 +19609,7 @@
             <div class="utilityGrid">
               <button class="secondary" id="undoBtn">Undo</button>
               <button class="secondary" id="newBtn">New Applicant</button>
-              <button class="secondary" id="debugBtn" title="Download a troubleshooting report">Export Debug</button>
+              <button class="secondary developerOnly" id="debugBtn" title="Download a troubleshooting report">Export Debug</button>
             </div>
           </div>
 
@@ -19377,7 +19647,7 @@
 
             <div class="qaActions">
               <button type="button" class="secondary qaOpenReport" id="qaExportBtn" disabled title="Open the readable QA report in a new tab">View Detailed Report</button>
-              <button type="button" class="secondary" id="qaDebugBtn" title="Download technical QA diagnostics">Export Debug</button>
+              <button type="button" class="secondary developerOnly" id="qaDebugBtn" title="Download technical QA diagnostics">Export Debug</button>
             </div>
           </div>
 
@@ -19396,7 +19666,7 @@
           </details>
 
           <div class="creator">
-            Created with love ❤️ <strong>Akash Singh</strong> · <span id="creatorEmail"></span>
+            Created with love ❤️ <strong>Akash Singh</strong> · <span id="creatorEmail"></span> · <button class="versionTap" id="versionTap" type="button">v17.17.0</button>
           </div>
         </div>
       </div>
@@ -19406,7 +19676,7 @@
       <div class="mini" id="mini" title="Click to restore">
         <div class="miniIcon">✦</div>
         <div class="miniText">
-          <strong>Auto Form Filler and Auto QA Testing</strong>
+          <strong>Smart FormSense</strong>
           <span id="miniStatus">Ready</span>
         </div>
         <div class="miniCount" id="miniCount">0</div>
@@ -19431,31 +19701,61 @@
         </div>
       </div>
 
+
+      <div class="feedbackBack" id="feedbackBack">
+        <div class="feedbackModal" role="dialog" aria-modal="true" aria-label="Share feedback">
+          <div class="feedbackHead">
+            <div><h3>💬 Share Feedback</h3><p>Help improve Smart FormSense.</p></div>
+            <button type="button" class="feedbackClose" id="feedbackClose" title="Close feedback">×</button>
+          </div>
+          <span class="feedbackLabel">What are you sharing?</span>
+          <div class="feedbackCategories" id="feedbackCategories">
+            <button type="button" class="feedbackCategory" data-feedback-category="Bug">🐞 Bug</button>
+            <button type="button" class="feedbackCategory" data-feedback-category="Suggestion">✨ Suggestion</button>
+            <button type="button" class="feedbackCategory" data-feedback-category="Form Fill">⚡ Auto Form Filler</button>
+            <button type="button" class="feedbackCategory" data-feedback-category="Functional QA">🧪 Auto QA Testing</button>
+            <button type="button" class="feedbackCategory" data-feedback-category="Experience">🎨 Experience</button>
+            <button type="button" class="feedbackCategory" data-feedback-category="Other">💬 Other</button>
+          </div>
+          <span class="feedbackLabel">Your experience <span style="font-weight:500;color:#8a8495">(optional)</span></span>
+          <div class="feedbackStars" id="feedbackStars" aria-label="Rating out of five">
+            <button type="button" class="feedbackStar" data-feedback-rating="1">★</button><button type="button" class="feedbackStar" data-feedback-rating="2">★</button><button type="button" class="feedbackStar" data-feedback-rating="3">★</button><button type="button" class="feedbackStar" data-feedback-rating="4">★</button><button type="button" class="feedbackStar" data-feedback-rating="5">★</button>
+          </div>
+          <label class="feedbackLabel" for="feedbackText">Tell us more *</label>
+          <textarea id="feedbackText" maxlength="4000" placeholder="Describe what happened or what you'd like improved..."></textarea>
+          <label class="feedbackLabel" for="feedbackEmail">Your email <span style="font-weight:500;color:#8a8495">(optional)</span></label>
+          <input id="feedbackEmail" type="email" maxlength="254" placeholder="you@example.com">
+          <button type="button" class="feedbackSend" id="feedbackSend">Send Feedback</button>
+          <div class="feedbackMessage" id="feedbackMessage"></div>
+        </div>
+      </div>
+
       <div class="settingsBack" id="settingsBack">
-        <div class="settingsModal" role="dialog" aria-modal="true" aria-label="Auto Form Filler and Auto QA Testing Settings">
+        <div class="settingsModal" role="dialog" aria-modal="true" aria-label="Smart FormSense Settings">
           <div class="settingsHead">
-            <div><h2>⚙ Auto Form Filler and Auto QA Testing Settings</h2><p>Personalize how Auto Form Filler and Auto QA Testing works for you.</p></div>
+            <div><h2>⚙ Smart FormSense Settings</h2><p>Personalize how Smart FormSense works for you.</p></div>
             <button class="settingsClose" id="settingsClose" title="Close Settings">×</button>
           </div>
           <div class="settingsLayout">
             <nav class="settingsNav" id="settingsNav">
               <button class="settingsNavBtn active" data-settings-target="general">⚙ General</button>
-              <button class="settingsNavBtn" data-settings-target="fill">⚡ Form Filling</button>
-              <button class="settingsNavBtn" data-settings-target="qa">🧪 Functional QA</button>
+              <button class="settingsNavBtn" data-settings-target="fill">⚡ Auto Form Filler</button>
+              <button class="settingsNavBtn" data-settings-target="qa">🧪 Auto QA Testing</button>
               <button class="settingsNavBtn" data-settings-target="reports">📄 Reports</button>
+              <button class="settingsNavBtn" data-settings-target="updates">⬆ Updates</button>
               <button class="settingsNavBtn" data-settings-target="shortcuts">⌨ Shortcuts</button>
             </nav>
             <main class="settingsContent">
               <section class="settingsSection active" data-settings-section="general">
-                <h3>General</h3><div class="settingsIntro">Control how the Auto Form Filler and Auto QA Testing panel behaves.</div>
+                <h3>General</h3><div class="settingsIntro">Control how the Smart FormSense panel behaves.</div>
                 <div class="settingCard"><div class="settingRow"><div class="settingText"><b>Show panel automatically on page load</b><span>Default is off.</span></div><label class="switch"><input id="settingAutoShow" type="checkbox"><span class="slider"></span></label></div></div>
                 <div class="settingCard"><div class="settingRow"><div class="settingText"><b>Start panel minimized</b><span>Used only when automatic panel display is enabled.</span></div><label class="switch"><input id="settingStartMinimized" type="checkbox"><span class="slider"></span></label></div></div>
-                <div class="settingCard"><div class="settingRow"><div class="settingText"><b>Remember last workspace</b><span>Reopen Auto Form Filler and Auto QA Testing where you left off.</span></div><label class="switch"><input id="settingRememberWorkspace" type="checkbox"><span class="slider"></span></label></div></div>
+                <div class="settingCard"><div class="settingRow"><div class="settingText"><b>Remember last workspace</b><span>Reopen Smart FormSense where you left off.</span></div><label class="switch"><input id="settingRememberWorkspace" type="checkbox"><span class="slider"></span></label></div></div>
                 <div class="settingCard"><div class="settingText"><b>Default workspace</b><span>Used whenever Remember last workspace is off.</span></div><div class="radioGroup">
-                  <label class="radioChoice"><input type="radio" name="settingDefaultWorkspace" value="fill"><span><strong>Form Filling</strong></span></label>
-                  <label class="radioChoice"><input type="radio" name="settingDefaultWorkspace" value="qa"><span><strong>Functional QA</strong></span></label>
+                  <label class="radioChoice"><input type="radio" name="settingDefaultWorkspace" value="fill"><span><strong>⚡ Auto Form Filler</strong></span></label>
+                  <label class="radioChoice"><input type="radio" name="settingDefaultWorkspace" value="qa"><span><strong>🧪 Auto QA Testing</strong></span></label>
                 </div></div>
-                <div class="settingCard"><div class="settingRow"><div class="settingText"><b>Show completion notifications</b><span>Show a brief message when Auto Form Filler and Auto QA Testing completes an action.</span></div><label class="switch"><input id="settingCompletionNotifications" type="checkbox"><span class="slider"></span></label></div></div>
+                <div class="settingCard"><div class="settingRow"><div class="settingText"><b>Show completion notifications</b><span>Show a brief message when Smart FormSense completes an action.</span></div><label class="switch"><input id="settingCompletionNotifications" type="checkbox"><span class="slider"></span></label></div></div>
                 <div class="settingCard"><div class="settingText"><b>Notification timer</b><span>Choose how long completion notifications stay visible.</span></div><div class="radioGroup">
                   <label class="radioChoice"><input type="radio" name="settingNotificationDuration" value="short"><span><strong>Short</strong><span>About 2 seconds</span></span></label>
                   <label class="radioChoice"><input type="radio" name="settingNotificationDuration" value="normal"><span><strong>Normal</strong><span>About 4 seconds</span></span></label>
@@ -19466,7 +19766,7 @@
               </section>
 
               <section class="settingsSection" data-settings-section="fill">
-                <h3>Form Filling</h3><div class="settingsIntro">Choose what happens when you explicitly select Fill Form.</div>
+                <h3>⚡ Auto Form Filler</h3><div class="settingsIntro">Choose what happens when you explicitly select Fill Form.</div>
                 <div class="settingCard"><div class="settingText"><b>When I choose Fill Form</b></div><div class="radioGroup">
                   <label class="radioChoice"><input type="radio" name="settingFillBehavior" value="ask"><span><strong>Ask every time</strong><span>Safest default. Choose Minimum or Fill All for each run.</span></span></label>
                   <label class="radioChoice"><input type="radio" name="settingFillBehavior" value="minimum"><span><strong>Minimum Required Fields</strong><span>Start the required-fields mode immediately after your Fill action.</span></span></label>
@@ -19475,7 +19775,7 @@
               </section>
 
               <section class="settingsSection" data-settings-section="qa">
-                <h3>Functional QA</h3><div class="settingsIntro">Control safe Next / Continue journey checks. Final actions remain protected.</div>
+                <h3>🧪 Auto QA Testing</h3><div class="settingsIntro">Control safe Next / Continue journey checks. Final actions remain protected.</div>
                 <div class="settingCard"><div class="settingText"><b>Journey progression</b></div><div class="radioGroup">
                   <label class="radioChoice"><input type="radio" name="settingQaProgression" value="auto-safe"><span><strong>Automatically use safe Next / Continue</strong><span>Recommended. Never includes final Submit/Payment/Finalize.</span></span></label>
                   <label class="radioChoice"><input type="radio" name="settingQaProgression" value="ask"><span><strong>Ask before every progression</strong></span></label>
@@ -19486,7 +19786,17 @@
               <section class="settingsSection" data-settings-section="reports">
                 <h3>Reports</h3><div class="settingsIntro">Choose what happens after Functional QA finishes.</div>
                 <div class="settingCard"><div class="settingRow"><div class="settingText"><b>Open report automatically after QA</b></div><label class="switch"><input id="settingAutoOpenReport" type="checkbox"><span class="slider"></span></label></div></div>
-                <div class="settingCard"><div class="settingRow"><div class="settingText"><b>Automatic Debug export</b><span>Off by default.</span></div><label class="switch"><input id="settingAutoDebugExport" type="checkbox"><span class="slider"></span></label></div></div>
+              </section>
+
+
+              <section class="settingsSection" data-settings-section="updates">
+                <h3>Updates</h3><div class="settingsIntro">Keep Smart FormSense current. Update checks are lightweight and cached.</div>
+                <div class="settingCard"><div class="settingRow"><div class="settingText"><b>Automatically check for updates</b><span>Checks at most once every 12 hours.</span></div><label class="switch"><input id="settingAutoCheckUpdates" type="checkbox"><span class="slider"></span></label></div></div>
+                <div class="settingCard">
+                  <div class="settingText"><b>Version status</b><span id="updateStatusText">Checking update status…</span></div>
+                  <div class="updateStatus">Current: <strong id="currentVersionText">v17.17.0</strong> · Latest: <strong id="latestVersionText">—</strong></div>
+                  <div class="updateActions"><button class="settingsAction" id="checkUpdatesBtn" type="button">Check for updates</button><button class="settingsAction updateNow" id="updateNowSettings" type="button">Update Smart FormSense</button></div>
+                </div>
               </section>
 
               <section class="settingsSection" data-settings-section="shortcuts">
@@ -19547,6 +19857,22 @@
       stage: $('stage'),
       status: $('status'),
       modal: $('modalBack'),
+      feedbackBtn: $('feedbackBtn'),
+      updateBtn: $('updateBtn'),
+      versionTap: $('versionTap'),
+      feedbackBack: $('feedbackBack'),
+      feedbackClose: $('feedbackClose'),
+      feedbackCategories: $('feedbackCategories'),
+      feedbackStars: $('feedbackStars'),
+      feedbackText: $('feedbackText'),
+      feedbackEmail: $('feedbackEmail'),
+      feedbackSend: $('feedbackSend'),
+      feedbackMessage: $('feedbackMessage'),
+      updateStatusText: $('updateStatusText'),
+      currentVersionText: $('currentVersionText'),
+      latestVersionText: $('latestVersionText'),
+      checkUpdatesBtn: $('checkUpdatesBtn'),
+      updateNowSettings: $('updateNowSettings'),
       settingsBtn: $('settingsBtn'),
       settingsBack: $('settingsBack'),
       settingsClose: $('settingsClose'),
@@ -19562,6 +19888,135 @@
         'akash.singh@meritto.com';
     }
 
+    let feedbackCategory = '';
+    let feedbackRating = 0;
+    let developerTapCount = 0;
+    let developerTapReset = null;
+    let developerExpiryTimer = null;
+
+    const refreshDeveloperUi = () => {
+      const active = developerModeActive();
+      [refs.debugBtn, refs.qaDebugBtn].forEach(button => {
+        if (!button) return;
+        button.classList.toggle('devVisible', active);
+      });
+      if (developerExpiryTimer) clearTimeout(developerExpiryTimer);
+      if (active) {
+        let until = 0;
+        try { until = Number(GM_getValue(DEV_MODE_UNTIL_KEY, 0) || 0); } catch {}
+        const remaining = Math.max(0, until - Date.now());
+        if (remaining) developerExpiryTimer = setTimeout(refreshDeveloperUi, Math.min(remaining + 100, 2147483647));
+      }
+    };
+
+    const currentUpdateInfo = () => state.updateInfo || readUpdateCache() || null;
+    const renderUpdateStatus = () => {
+      const info = currentUpdateInfo();
+      if (refs.currentVersionText) refs.currentVersionText.textContent = `v${SCRIPT_VERSION}`;
+      if (refs.latestVersionText) refs.latestVersionText.textContent = info?.latestVersion ? `v${info.latestVersion}` : '—';
+      if (refs.updateStatusText) {
+        refs.updateStatusText.textContent = info?.error
+          ? 'Last update check was unavailable.'
+          : info?.available
+            ? `Update available: v${info.latestVersion}`
+            : info?.latestVersion
+              ? 'Smart FormSense is up to date.'
+              : 'No update check has run yet.';
+      }
+      if (refs.updateNowSettings) refs.updateNowSettings.classList.toggle('visible', !!info?.available);
+    };
+
+    const updateUpdateIndicator = info => {
+      state.updateInfo = info || readUpdateCache();
+      const latest = state.updateInfo?.latestVersion || '';
+      const available = !!state.updateInfo?.available || updateAvailableFrom(latest);
+      if (refs.updateBtn) {
+        refs.updateBtn.classList.toggle('updateAvailable', available);
+        refs.updateBtn.style.display = available ? 'grid' : 'none';
+        refs.updateBtn.title = available ? `Update available — v${latest}. Click to update.` : 'Smart FormSense is up to date';
+      }
+      renderUpdateStatus();
+    };
+
+    const resetFeedbackForm = () => {
+      feedbackCategory = state.workspace === 'qa' ? 'Functional QA' : 'Form Fill';
+      feedbackRating = 0;
+      refs.feedbackCategories?.querySelectorAll('[data-feedback-category]').forEach(button => {
+        button.classList.toggle('selected', button.getAttribute('data-feedback-category') === feedbackCategory);
+      });
+      refs.feedbackStars?.querySelectorAll('[data-feedback-rating]').forEach(button => button.classList.remove('selected'));
+      if (refs.feedbackText) refs.feedbackText.value = '';
+      if (refs.feedbackEmail) refs.feedbackEmail.value = '';
+      if (refs.feedbackMessage) { refs.feedbackMessage.textContent = ''; refs.feedbackMessage.className = 'feedbackMessage'; }
+      if (refs.feedbackSend) { refs.feedbackSend.disabled = false; refs.feedbackSend.textContent = 'Send Feedback'; }
+    };
+
+    const openFeedback = () => {
+      resetFeedbackForm();
+      if (refs.feedbackBack) refs.feedbackBack.style.display = 'flex';
+      setTimeout(() => refs.feedbackText?.focus?.(), 0);
+    };
+
+    const closeFeedback = () => {
+      if (refs.feedbackBack) refs.feedbackBack.style.display = 'none';
+    };
+
+    const showFeedbackSuccess = () => {
+      if (!refs.toastStack) return;
+      const toast = document.createElement('div');
+      toast.className = 'toast success feedbackSuccessToast';
+      const heading = document.createElement('b');
+      heading.textContent = '✓ Feedback sent successfully';
+      const message = document.createElement('span');
+      message.textContent = 'Thank you for helping improve Smart FormSense.';
+      const close = document.createElement('button');
+      close.type = 'button';
+      close.className = 'feedbackSuccessClose';
+      close.title = 'Dismiss';
+      close.textContent = '×';
+      let removed = false;
+      const remove = () => { if (removed) return; removed = true; toast.remove(); };
+      close.addEventListener('click', remove);
+      toast.append(heading, message, close);
+      refs.toastStack.appendChild(toast);
+      setTimeout(remove, 10000);
+    };
+
+    const sendFeedback = async () => {
+      const message = String(refs.feedbackText?.value || '').trim();
+      if (!feedbackCategory) {
+        refs.feedbackMessage.textContent = 'Choose a feedback category.';
+        refs.feedbackMessage.className = 'feedbackMessage error';
+        return;
+      }
+      if (message.length < 5) {
+        refs.feedbackMessage.textContent = 'Please add a little more detail.';
+        refs.feedbackMessage.className = 'feedbackMessage error';
+        refs.feedbackText?.focus?.();
+        return;
+      }
+      refs.feedbackSend.disabled = true;
+      refs.feedbackSend.textContent = 'Sending feedback…';
+      refs.feedbackMessage.textContent = '';
+      refs.feedbackMessage.className = 'feedbackMessage';
+      try {
+        await submitFeedbackToFormspree({
+          category: feedbackCategory,
+          rating: feedbackRating,
+          message,
+          email: refs.feedbackEmail?.value || ''
+        });
+        closeFeedback();
+        showFeedbackSuccess();
+      } catch (error) {
+        refs.feedbackMessage.textContent = `${String(error?.message || 'Feedback could not be sent')}. Your message is still here.`;
+        refs.feedbackMessage.className = 'feedbackMessage error';
+      } finally {
+        refs.feedbackSend.disabled = false;
+        refs.feedbackSend.textContent = 'Send Feedback';
+      }
+    };
+
     const setShortcutMessage = (text = '', type = '') => {
       if (!refs.shortcutMessage) return;
       refs.shortcutMessage.textContent = text;
@@ -19575,7 +20030,6 @@
         [refs.validateBtn, 'validate'],
         [refs.undoBtn, 'undo'],
         [refs.newBtn, 'newApplicant'],
-        [refs.debugBtn, 'debug'],
         [refs.qaRunBtn, 'qa'],
         [refs.qaExportBtn, 'report']
       ];
@@ -19617,8 +20071,8 @@
       setChecked('settingRememberWorkspace', s.general.rememberWorkspace);
       setChecked('settingShortcutHints', s.general.showShortcutHints);
       setChecked('settingCompletionNotifications', s.general.completionNotifications);
+      setChecked('settingAutoCheckUpdates', s.general.autoCheckUpdates);
       setChecked('settingAutoOpenReport', s.qa.autoOpenReport);
-      setChecked('settingAutoDebugExport', s.reports.autoDebugExport);
 
       shadow.querySelectorAll('input[name="settingDefaultWorkspace"]').forEach(input => {
         input.checked = input.value === (s.general.defaultWorkspace || 'fill');
@@ -19635,6 +20089,7 @@
 
       renderShortcutRows();
       applyShortcutHints();
+      renderUpdateStatus();
       if (refs.settingsBtn) {
         const shortcut = state.settings?.shortcuts?.settings || '';
         refs.settingsBtn.title = shortcut ? `Settings • ${displayShortcut(shortcut)}` : 'Settings';
@@ -19660,6 +20115,7 @@
       input.addEventListener('change', () => {
         updateSetting(group, key, !!input.checked);
         if (id === 'settingShortcutHints') applyShortcutHints();
+        if (id === 'settingAutoCheckUpdates' && input.checked) checkForUpdates({ force: true, silent: true });
       });
     };
 
@@ -19668,8 +20124,8 @@
     bindSettingToggle('settingRememberWorkspace', 'general', 'rememberWorkspace');
     bindSettingToggle('settingShortcutHints', 'general', 'showShortcutHints');
     bindSettingToggle('settingCompletionNotifications', 'general', 'completionNotifications');
+    bindSettingToggle('settingAutoCheckUpdates', 'general', 'autoCheckUpdates');
     bindSettingToggle('settingAutoOpenReport', 'qa', 'autoOpenReport');
-    bindSettingToggle('settingAutoDebugExport', 'reports', 'autoDebugExport');
 
     shadow.querySelectorAll('input[name="settingDefaultWorkspace"]').forEach(input => {
       input.addEventListener('change', () => {
@@ -19964,7 +20420,7 @@
         const toast = document.createElement('div');
         toast.className = `toast ${['success', 'warning', 'error'].includes(tone) ? tone : 'success'}`;
         const heading = document.createElement('b');
-        heading.textContent = String(title || 'Auto Form Filler and Auto QA Testing');
+        heading.textContent = String(title || 'Smart FormSense');
         toast.appendChild(heading);
         if (detail) {
           const message = document.createElement('span');
@@ -20068,6 +20524,9 @@
       setShortcutMessage,
       applyShortcutHints,
       showWorkspace,
+      openFeedback,
+      refreshDeveloperUi,
+      updateUpdateIndicator,
       minimize,
       restore,
       resetToDefaultOpen() {
@@ -20112,8 +20571,10 @@
       newApplicant();
     };
 
-    refs.debugBtn.onclick = () =>
+    refs.debugBtn.onclick = () => {
+      if (!developerModeActive()) return;
       smartDebugExport(null);
+    };
 
     refs.fillTab.onclick = () =>
       showWorkspace('fill');
@@ -20146,9 +20607,10 @@
       exportQaReport(state.qaReport)
     );
 
-    bindQaAction(refs.qaDebugBtn,
-      smartQaDebugExport
-    );
+    bindQaAction(refs.qaDebugBtn, () => {
+      if (!developerModeActive()) return;
+      smartQaDebugExport();
+    });
 
     refs.qaIssues.addEventListener('click', event => {
       const button = event.target?.closest?.('[data-qa-field]');
@@ -20175,6 +20637,46 @@
         passive: true
       }
     );
+
+    refs.feedbackBtn?.addEventListener('click', event => { event.stopPropagation(); openFeedback(); });
+    refs.feedbackClose?.addEventListener('click', closeFeedback);
+    refs.feedbackBack?.addEventListener('click', event => { if (event.target === refs.feedbackBack) closeFeedback(); });
+    refs.feedbackCategories?.addEventListener('click', event => {
+      const button = event.target?.closest?.('[data-feedback-category]');
+      if (!button) return;
+      feedbackCategory = button.getAttribute('data-feedback-category') || '';
+      refs.feedbackCategories.querySelectorAll('[data-feedback-category]').forEach(item => item.classList.toggle('selected', item === button));
+    });
+    refs.feedbackStars?.addEventListener('click', event => {
+      const button = event.target?.closest?.('[data-feedback-rating]');
+      if (!button) return;
+      feedbackRating = clamp(Number(button.getAttribute('data-feedback-rating') || 0), 0, 5);
+      refs.feedbackStars.querySelectorAll('[data-feedback-rating]').forEach(item => item.classList.toggle('selected', Number(item.getAttribute('data-feedback-rating') || 0) <= feedbackRating));
+    });
+    refs.feedbackSend?.addEventListener('click', sendFeedback);
+
+    refs.updateBtn?.addEventListener('click', event => { event.stopPropagation(); openUserscriptUpdate(); });
+    refs.updateNowSettings?.addEventListener('click', openUserscriptUpdate);
+    refs.checkUpdatesBtn?.addEventListener('click', async () => {
+      refs.checkUpdatesBtn.disabled = true;
+      if (refs.updateStatusText) refs.updateStatusText.textContent = 'Checking for updates…';
+      try { await checkForUpdates({ force: true, silent: false }); }
+      catch (error) { if (refs.updateStatusText) refs.updateStatusText.textContent = String(error?.message || 'Update check failed'); }
+      finally { refs.checkUpdatesBtn.disabled = false; renderUpdateStatus(); }
+    });
+
+    refs.versionTap?.addEventListener('click', event => {
+      event.stopPropagation();
+      developerTapCount += 1;
+      if (developerTapReset) clearTimeout(developerTapReset);
+      developerTapReset = setTimeout(() => { developerTapCount = 0; }, 3500);
+      if (developerTapCount < 5) return;
+      developerTapCount = 0;
+      if (developerTapReset) clearTimeout(developerTapReset);
+      enableDeveloperMode();
+      refreshDeveloperUi();
+      state.panel?.notify?.('Developer Mode enabled', 'Export Debug is available for 1 hour.', 'success');
+    });
 
     refs.settingsBtn.onclick = openSettings;
     refs.zoomDown?.addEventListener('click', event => {
@@ -20337,6 +20839,8 @@
     }
     state.panelScale = 100;
     applyPanelZoom();
+    refreshDeveloperUi();
+    updateUpdateIndicator(currentUpdateInfo());
     refreshCurrentStatus();
 
     if (options.auto && state.settings?.general?.startMinimized) {
@@ -20414,9 +20918,10 @@
   if (IS_TOP) {
     installTopBridge();
     installTopShortcutEngine();
+    setTimeout(() => { checkForUpdates({ force: false, silent: true }); }, 1200);
 
     GM_registerMenuCommand(
-      'Activate Auto Form Filler and Auto QA Testing',
+      'Activate Smart FormSense',
       mountPanel
     );
 
