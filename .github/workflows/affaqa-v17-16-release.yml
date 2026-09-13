@@ -1,0 +1,96 @@
+name: Auto Form Filler and Auto QA Testing v17.16.0 release
+
+on:
+  push:
+    branches: [release/v17-16-0]
+    paths:
+      - '.github/workflows/affaqa-v17-16-release.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout release staging branch
+        uses: actions/checkout@v4
+        with:
+          ref: release/v17-16-0
+          fetch-depth: 0
+
+      - name: Reconstruct validated production patch
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat .github/affaqa-v17-16/chunk00.b64 \
+              .github/affaqa-v17-16/chunk01.b64 \
+              .github/affaqa-v17-16/chunk02.b64 \
+              .github/affaqa-v17-16/chunk03.b64 \
+              .github/affaqa-v17-16/chunk04.b64 \
+              > /tmp/v1716.patch.gz.b64
+          echo '1d6f34e88fd4edfe641f1ed0f1905bef51610e6b3d5ab84f92ce8d4dad10c449  /tmp/v1716.patch.gz.b64' | sha256sum -c -
+          base64 -d /tmp/v1716.patch.gz.b64 | gzip -dc > /tmp/v1716.patch
+          echo '0ff116b5cea0f6f6930952dc968c748aec2e89a3faa5ac202042d490826da5b1  /tmp/v1716.patch' | sha256sum -c -
+
+      - name: Checkout exact current production
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin main
+          git checkout -B production origin/main
+          test "$(git hash-object Smart_Form_Filler.user.js)" = '0ff562d9958d403265cfc2a6dcbb77690395be4d'
+          grep -q '^// @name         Smart FormSense$' Smart_Form_Filler.user.js
+          grep -q '^// @version      17.15.0$' Smart_Form_Filler.user.js
+
+      - name: Build v17.16.0 from validated patch
+        shell: bash
+        run: |
+          set -euo pipefail
+          git apply --check /tmp/v1716.patch
+          git apply /tmp/v1716.patch
+          node --check Smart_Form_Filler.user.js
+          test "$(git hash-object Smart_Form_Filler.user.js)" = '9974d4abe85ce6879f1c86c54e688a3b4707bb90'
+          echo 'fc9e54657fb406c20fd20f4604942fbf9ce2a771337de4a10ab05b21e1a590ec  Smart_Form_Filler.user.js' | sha256sum -c -
+
+      - name: Production invariant checks
+        shell: bash
+        run: |
+          set -euo pipefail
+          f=Smart_Form_Filler.user.js
+          grep -q '^// @name         Auto Form Filler and Auto QA Testing$' "$f"
+          grep -q '^// @version      17.16.0$' "$f"
+          grep -q '^// @match        \*://\*/\*$' "$f"
+          ! grep -q '^// @noframes' "$f"
+          test "$(grep -o 'commitSelectedRadioGroups(' "$f" | wc -l)" -eq 0
+          test "$(grep -o 'meritto' "$f" | wc -l)" -eq 1
+          test "$(grep -o 'akash.singh@meritto.com' "$f" | wc -l)" -eq 1
+          test "$(grep -o 'Smart FormSense' "$f" | wc -l)" -eq 0
+          grep -q 'const SETTINGS_VERSION = 3;' "$f"
+          grep -q "notificationDuration: 'normal'" "$f"
+          grep -q 'short: 2000, normal: 4000, long: 7000' "$f"
+          ! grep -q 'Remember panel position' "$f"
+          ! grep -q 'Automatically handle dependent fields' "$f"
+          grep -q 'handleDependencies: true' "$f"
+          grep -q 'const resetHostPosition = () => {' "$f"
+          grep -q 'Action clicked:' "$f"
+          grep -q 'qaFieldDiagnostics' "$f"
+          grep -q 'hostPageFieldDiagnostics' "$f"
+          grep -q "return 'captcha'" "$f"
+          grep -q 'preventDefault()' "$f"
+          grep -q 'protectedFinal' "$f"
+          grep -q 'highRiskFinal' "$f"
+          test "$(git diff --name-only | wc -l)" -eq 1
+          test "$(git diff --name-only)" = 'Smart_Form_Filler.user.js'
+
+      - name: Release production userscript only
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'Auto Form Filler and Auto QA Testing Release'
+          git config user.email 'actions@users.noreply.github.com'
+          git add Smart_Form_Filler.user.js
+          test "$(git diff --cached --name-only | wc -l)" -eq 1
+          test "$(git diff --cached --name-only)" = 'Smart_Form_Filler.user.js'
+          git commit -m 'Release Auto Form Filler and Auto QA Testing v17.16.0'
+          git push origin HEAD:main
