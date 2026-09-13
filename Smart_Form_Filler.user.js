@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Smart FormSense
 // @namespace    smart-form-filler
-// @version      17.18.0
+// @version      17.18.1
 // @description  Automatic form filling and functional QA testing for authorized web-form validation, safe progression, embedded forms, and synthetic test data.
 // @author       Akash Singh
 // @match        *://*/*
@@ -53,7 +53,7 @@
   const SETTINGS_VERSION = 4;
   const ACTION_DEFAULT_TTL_MS = 5 * 60 * 1000;
   const PRODUCT_NAME = 'Smart FormSense';
-  const SCRIPT_VERSION = '17.18.0';
+  const SCRIPT_VERSION = '17.18.1';
   const FEEDBACK_ENDPOINT = 'https://formspree.io/f/xbgjvoaw';
   const UPDATE_RAW_URL = 'https://raw.githubusercontent.com/akloso/smart-form-filler/main/Smart_Form_Filler.user.js';
   const UPDATE_CHECK_KEY = 'STFF_UPDATE_CHECK_V1';
@@ -216,7 +216,7 @@
     );
 
     console.error(
-      `Smart FormSense V17.18.0 [${stage}]`,
+      `Smart FormSense V17.18.1 [${stage}]`,
       error
     );
 
@@ -12486,7 +12486,7 @@
     const report = {
       reportVersion: 1,
       generatedBy:
-        'Smart FormSense V17.18.0',
+        'Smart FormSense V17.18.1',
       generatedAt:
         new Date().toISOString(),
       mode:
@@ -12651,7 +12651,7 @@
       return report;
     } catch (error) {
       console.error(
-        'Smart FormSense V17.18.0 debug export:',
+        'Smart FormSense V17.18.1 debug export:',
         error
       );
 
@@ -13738,7 +13738,7 @@
       product:
         'Smart FormSense',
       productVersion:
-        '17.18.0',
+        '17.18.1',
       generatedAt,
       auditType:
         'Non-destructive Form Readiness Audit',
@@ -14085,7 +14085,7 @@
   <div class="hero">
     <div class="brand">✦ SMART FORMSENSE QA</div>
     <h1>${esc(qa.page?.title || 'Form')}</h1>
-    <div class="meta">${esc(qa.page?.hostname || location.hostname || '')}<br>${esc(generated)} • v${esc(qa.productVersion || '17.18.0')}</div>
+    <div class="meta">${esc(qa.page?.hostname || location.hostname || '')}<br>${esc(generated)} • v${esc(qa.productVersion || '17.18.1')}</div>
     <div class="status ${statusClass}">${esc(status)}</div>
     <div class="overview">${esc(overview)}</div>
 
@@ -14304,7 +14304,7 @@
       product:
         'Smart FormSense',
       productVersion:
-        '17.18.0',
+        '17.18.1',
       generatedAt:
         new Date().toISOString(),
       purpose:
@@ -14399,7 +14399,7 @@
       return report;
     } catch (error) {
       console.error(
-        'Smart FormSense V17.18.0 QA debug export:',
+        'Smart FormSense V17.18.1 QA debug export:',
         error
       );
 
@@ -16886,7 +16886,7 @@
       : {
           reportVersion: 7,
           product: 'Smart FormSense',
-          productVersion: '17.18.0',
+          productVersion: '17.18.1',
           generatedAt: new Date().toISOString(),
           auditType: 'Black-box Functional Form QA',
           page: {
@@ -16923,7 +16923,7 @@
     const cleanReason = String(reason || '').slice(0, 500);
     return {
       ...base,
-      productVersion: '17.18.0',
+      productVersion: '17.18.1',
       reportVersion: Math.max(5, Number(base.reportVersion || 0)),
       runState,
       incomplete: runState !== 'completed',
@@ -17074,7 +17074,7 @@
       return {
         reportVersion: 7,
         product: 'Smart FormSense',
-        productVersion: '17.18.0',
+        productVersion: '17.18.1',
         generatedAt,
         completedAt: ['completed', 'stopped', 'failed'].includes(runState) ? new Date().toISOString() : null,
         auditType: 'Black-box Functional Form QA',
@@ -17868,16 +17868,38 @@
     return 0;
   };
 
+  const normalizeUpdateInfo = info => {
+    if (!info || typeof info !== 'object') return null;
+    const latestVersion = String(info.latestVersion || '').trim();
+    return {
+      ...info,
+      latestVersion,
+      available: !!latestVersion && compareVersions(latestVersion, SCRIPT_VERSION) > 0,
+      installedVersion: SCRIPT_VERSION
+    };
+  };
+
   const readUpdateCache = () => {
     try {
       const cached = GM_getValue(UPDATE_CHECK_KEY, null);
-      return cached && typeof cached === 'object' ? cached : null;
+      const normalized = normalizeUpdateInfo(cached);
+      if (!normalized) return null;
+      if (
+        normalized.available !== !!cached?.available ||
+        cached?.installedVersion !== SCRIPT_VERSION ||
+        normalized.latestVersion !== String(cached?.latestVersion || '').trim()
+      ) {
+        GM_setValue(UPDATE_CHECK_KEY, normalized);
+      }
+      return normalized;
     } catch { return null; }
   };
 
   const writeUpdateCache = info => {
-    try { GM_setValue(UPDATE_CHECK_KEY, info); } catch {}
-    return info;
+    const normalized = normalizeUpdateInfo(info);
+    if (!normalized) return null;
+    try { GM_setValue(UPDATE_CHECK_KEY, normalized); } catch {}
+    return normalized;
   };
 
   const gmTextRequest = (url, options = {}) => new Promise((resolve, reject) => {
@@ -19675,7 +19697,7 @@
           </details>
 
           <div class="creator">
-            Created with love ❤️ <strong>Akash Singh</strong> · <span id="creatorEmail"></span> · <button class="versionTap" id="versionTap" type="button">v17.18.0</button>
+            Created with love ❤️ <strong>Akash Singh</strong> · <span id="creatorEmail"></span> · <button class="versionTap" id="versionTap" type="button">v17.18.1</button>
           </div>
         </div>
       </div>
@@ -19803,7 +19825,7 @@
                 <div class="settingCard"><div class="settingRow"><div class="settingText"><b>Automatically check for updates</b><span>Checks at most once every 12 hours.</span></div><label class="switch"><input id="settingAutoCheckUpdates" type="checkbox"><span class="slider"></span></label></div></div>
                 <div class="settingCard">
                   <div class="settingText"><b>Version status</b><span id="updateStatusText">Checking update status…</span></div>
-                  <div class="updateStatus">Current: <strong id="currentVersionText">v17.18.0</strong> · Latest: <strong id="latestVersionText">—</strong></div>
+                  <div class="updateStatus">Current: <strong id="currentVersionText">v17.18.1</strong> · Latest: <strong id="latestVersionText">—</strong></div>
                   <div class="updateActions"><button class="settingsAction" id="checkUpdatesBtn" type="button">Check for updates</button><button class="settingsAction updateNow" id="updateNowSettings" type="button">Update Smart FormSense</button></div>
                 </div>
               </section>
@@ -19935,7 +19957,7 @@
       }
     };
 
-    const currentUpdateInfo = () => state.updateInfo || readUpdateCache() || null;
+    const currentUpdateInfo = () => normalizeUpdateInfo(state.updateInfo || readUpdateCache()) || null;
     const renderUpdateStatus = () => {
       const info = currentUpdateInfo();
       if (refs.currentVersionText) refs.currentVersionText.textContent = `v${SCRIPT_VERSION}`;
@@ -19953,9 +19975,9 @@
     };
 
     const updateUpdateIndicator = info => {
-      state.updateInfo = info || readUpdateCache();
+      state.updateInfo = normalizeUpdateInfo(info || readUpdateCache());
       const latest = state.updateInfo?.latestVersion || '';
-      const available = !!state.updateInfo?.available || updateAvailableFrom(latest);
+      const available = updateAvailableFrom(latest);
       if (refs.updateBtn) {
         refs.updateBtn.classList.toggle('updateAvailable', available);
         refs.updateBtn.style.display = available ? 'grid' : 'none';
