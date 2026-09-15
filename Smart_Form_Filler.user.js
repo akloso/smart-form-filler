@@ -20154,14 +20154,20 @@
       style.textContent = `
         .shareBack{display:none;position:fixed;inset:0;width:100vw;height:100vh;background:rgba(19,15,40,.48);backdrop-filter:blur(5px);align-items:center;justify-content:center;padding:16px;z-index:45}
         .shareModal{width:min(430px,calc(100vw - 24px));background:#fff;border:1px solid #e7e2f6;border-radius:18px;box-shadow:0 28px 90px rgba(17,12,45,.34);overflow:hidden;color:#26213a}
-        .shareHead{display:flex;align-items:center;justify-content:space-between;padding:14px 15px;border-bottom:1px solid #eeeaf7;background:linear-gradient(135deg,#faf9ff,#fff)}
-        .shareHead h3{margin:0;font-size:14px}.shareHead p{margin:3px 0 0;font-size:9px;color:#817a91}
-        .shareClose{border:0;background:#f3f0fb;color:#655d78;width:30px;height:30px;border-radius:9px;cursor:pointer;font-size:17px}
-        .shareBody{padding:15px}
-        .shareGrid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
-        .shareChannel{border:1px solid #e7e2f6;background:#fff;border-radius:11px;padding:11px 9px;cursor:pointer;text-align:left;color:#342e48;transition:.15s}
-        .shareChannel:hover,.shareChannel:focus-visible{border-color:#8b5cf6;background:#faf8ff}
-        .shareChannel b{display:block;font-size:10px}.shareChannel span{display:block;font-size:8.5px;color:#817a91;margin-top:2px}
+        .shareHead{display:flex;align-items:center;justify-content:space-between;padding:14px 15px;border-bottom:1px solid #e9e3fb;background:linear-gradient(135deg,#f4f1ff 0%,#fff 48%,#fdf2ff 100%)}
+        .shareHead h3{margin:0;font-size:14px;color:#2f2350}.shareHead p{margin:3px 0 0;font-size:9px;color:#817a91}
+        .shareClose{border:0;background:#eee9ff;color:#655d78;width:30px;height:30px;border-radius:9px;cursor:pointer;font-size:17px;transition:.15s}
+        .shareClose:hover{background:#e4dcff;color:#4c3e78}
+        .shareBody{padding:15px;background:linear-gradient(180deg,#fff 0%,#fcfbff 100%)}
+        .shareGrid{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+        .shareChannel{position:relative;overflow:hidden;border:1px solid #e7e2f6;background:#fff;border-radius:12px;padding:12px 10px;cursor:pointer;text-align:left;color:#342e48;transition:transform .15s ease,box-shadow .15s ease,border-color .15s ease}
+        .shareChannel::after{content:'';position:absolute;width:54px;height:54px;border-radius:999px;right:-17px;top:-18px;opacity:.22;background:currentColor}
+        .shareChannel[data-share-channel='email']{background:linear-gradient(135deg,#eff6ff,#eef2ff);border-color:#bfdbfe;color:#1d4ed8}
+        .shareChannel[data-share-channel='copy']{background:linear-gradient(135deg,#faf5ff,#f5f3ff);border-color:#ddd6fe;color:#6d28d9}
+        .shareChannel[data-share-channel='whatsapp']{background:linear-gradient(135deg,#ecfdf5,#f0fdf4);border-color:#bbf7d0;color:#15803d}
+        .shareChannel[data-share-channel='teams']{background:linear-gradient(135deg,#f5f3ff,#eef2ff);border-color:#c7d2fe;color:#4f46e5}
+        .shareChannel:hover,.shareChannel:focus-visible{transform:translateY(-1px);box-shadow:0 8px 20px rgba(42,32,76,.10);filter:saturate(1.08)}
+        .shareChannel b{display:block;position:relative;z-index:1;font-size:10.5px;color:inherit}.shareChannel span{display:block;position:relative;z-index:1;font-size:8.5px;color:#6f6880;margin-top:3px}
         .shareRecipients{display:none;margin-top:12px;border-top:1px solid #eeeaf7;padding-top:12px}
         .shareRecipients label{display:block;font-size:9.5px;font-weight:850;margin-bottom:6px}
         .shareRecipients input{width:100%;border:1px solid #ddd6e8;border-radius:9px;padding:9px 10px;font-size:10px;outline:none}
@@ -20306,9 +20312,34 @@
 
         if (channel === 'email') {
           const to = parsed.list.join(',');
-          const url = `mailto:${to}?subject=${encodeURIComponent(SHARE_SUBJECT)}&body=${encodeURIComponent(body)}`;
+          const mailtoUrl = `mailto:${to}?subject=${encodeURIComponent(SHARE_SUBJECT)}&body=${encodeURIComponent(body)}`;
+          const webMailUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(to)}&su=${encodeURIComponent(SHARE_SUBJECT)}&body=${encodeURIComponent(body)}`;
+
           trackAnalytics('share_clicked', { channel: 'email', result: 'prepared' });
-          location.href = url;
+
+          let browserLostFocus = false;
+          const markBlurred = () => { browserLostFocus = true; };
+          window.addEventListener('blur', markBlurred, { once: true });
+          document.addEventListener('visibilitychange', () => {
+            if (document.hidden) browserLostFocus = true;
+          }, { once: true });
+
+          const mailLink = document.createElement('a');
+          mailLink.href = mailtoUrl;
+          mailLink.style.display = 'none';
+          (document.body || document.documentElement).appendChild(mailLink);
+          mailLink.click();
+          mailLink.remove();
+
+          setTimeout(() => {
+            if (browserLostFocus || document.hidden || !document.hasFocus()) return;
+            try {
+              GM_openInTab(webMailUrl, { active: true, insert: true, setParent: true });
+              trackAnalytics('share_clicked', { channel: 'email', result: 'web_fallback' });
+            } catch {
+              window.open(webMailUrl, '_blank', 'noopener,noreferrer');
+            }
+          }, 900);
           return;
         }
 
