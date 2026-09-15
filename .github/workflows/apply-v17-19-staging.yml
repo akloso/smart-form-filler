@@ -24,6 +24,9 @@ jobs:
       - name: Configure approved PostHog analytics
         run: python scripts/configure_v17_19_analytics.py
 
+      - name: Refine share UX and email compatibility
+        run: python scripts/refine_v17_19_share.py
+
       - name: Syntax and invariant checks
         shell: bash
         run: |
@@ -37,6 +40,8 @@ jobs:
           grep -q "// @connect      eu.i.posthog.com" Smart_Form_Filler.user.js
           grep -q '\$process_person_profile: false' Smart_Form_Filler.user.js
           grep -q "hostname: location.hostname || ''" Smart_Form_Filler.user.js
+          grep -q "GM_openInTab(webMailUrl" Smart_Form_Filler.user.js
+          grep -q "data-share-channel='whatsapp'" Smart_Form_Filler.user.js
           if grep -q "commitSelectedRadioGroups" Smart_Form_Filler.user.js; then
             echo "Forbidden legacy function found"
             exit 1
@@ -56,5 +61,5 @@ jobs:
           git config user.name "Smart FormSense Release Bot"
           git config user.email "actions@users.noreply.github.com"
           git add Smart_Form_Filler.user.js
-          git commit -m "chore: configure Smart FormSense v17.19.0 analytics"
+          git commit -m "fix: polish share menu and email fallback in v17.19.0"
           git push origin HEAD:sfs-v17-19-0-staging
