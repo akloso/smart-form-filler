@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Smart FormSense
 // @namespace    smart-form-filler
-// @version      17.18.2
+// @version      17.19.0
 // @description  Automatic form filling and functional QA testing for authorized web-form validation, safe progression, embedded forms, and synthetic test data.
 // @author       Akash Singh
 // @match        *://*/*
@@ -53,13 +53,27 @@
   const SETTINGS_VERSION = 4;
   const ACTION_DEFAULT_TTL_MS = 5 * 60 * 1000;
   const PRODUCT_NAME = 'Smart FormSense';
-  const SCRIPT_VERSION = '17.18.2';
+  const SCRIPT_VERSION = '17.19.0';
   const FEEDBACK_ENDPOINT = 'https://formspree.io/f/xbgjvoaw';
   const UPDATE_RAW_URL = 'https://raw.githubusercontent.com/akloso/smart-form-filler/main/Smart_Form_Filler.user.js';
   const UPDATE_CHECK_KEY = 'STFF_UPDATE_CHECK_V1';
   const DEV_MODE_UNTIL_KEY = 'STFF_DEVELOPER_MODE_UNTIL';
   const UPDATE_CHECK_INTERVAL_MS = 12 * 60 * 60 * 1000;
   const DEVELOPER_MODE_MS = 60 * 60 * 1000;
+
+  const SHARE_INSTALL_URL = 'https://greasyfork.org/en/scripts/592133-smart-form-filler';
+  const TAMPERMONKEY_INSTALL_URL = 'https://chromewebstore.google.com/detail/tampermonkey/dhdgffkkebhmkfjojejmpbldmpobfkfo?hl=en';
+  const SHARE_SUBJECT = '🚀 Introducing Smart FormSense || Auto Form Filler & Auto QA Testing';
+
+  // Product Analytics is privacy-first and stays disabled until the project token
+  // and ingestion host are explicitly configured.
+  const POSTHOG_PROJECT_KEY = '';
+  const POSTHOG_HOST = '';
+  const ANALYTICS_INSTALL_ID_KEY = 'STFF_ANALYTICS_INSTALL_ID_V1';
+  const ANALYTICS_FIRST_RUN_KEY = 'STFF_ANALYTICS_FIRST_RUN_V1';
+  const ANALYTICS_LAST_SESSION_KEY = 'STFF_ANALYTICS_LAST_SESSION_V1';
+  const ANALYTICS_VERSION_KEY = 'STFF_ANALYTICS_VERSION_V1';
+  const ANALYTICS_SESSION_GAP_MS = 30 * 60 * 1000;
 
   const BRIDGE_MARKER = '__STFF_V17_7_BRIDGE__';
   const FRAME_DISCOVERY_SOFT_MS = 500;
@@ -216,7 +230,7 @@
     );
 
     console.error(
-      `Smart FormSense V17.18.2 [${stage}]`,
+      `Smart FormSense V17.19.0 [${stage}]`,
       error
     );
 
@@ -12486,7 +12500,7 @@
     const report = {
       reportVersion: 1,
       generatedBy:
-        'Smart FormSense V17.18.2',
+        'Smart FormSense V17.19.0',
       generatedAt:
         new Date().toISOString(),
       mode:
@@ -12651,7 +12665,7 @@
       return report;
     } catch (error) {
       console.error(
-        'Smart FormSense V17.18.2 debug export:',
+        'Smart FormSense V17.19.0 debug export:',
         error
       );
 
@@ -13738,7 +13752,7 @@
       product:
         'Smart FormSense',
       productVersion:
-        '17.18.2',
+        '17.19.0',
       generatedAt,
       auditType:
         'Non-destructive Form Readiness Audit',
@@ -14085,7 +14099,7 @@
   <div class="hero">
     <div class="brand">✦ SMART FORMSENSE QA</div>
     <h1>${esc(qa.page?.title || 'Form')}</h1>
-    <div class="meta">${esc(qa.page?.hostname || location.hostname || '')}<br>${esc(generated)} • v${esc(qa.productVersion || '17.18.2')}</div>
+    <div class="meta">${esc(qa.page?.hostname || location.hostname || '')}<br>${esc(generated)} • v${esc(qa.productVersion || '17.19.0')}</div>
     <div class="status ${statusClass}">${esc(status)}</div>
     <div class="overview">${esc(overview)}</div>
 
@@ -14304,7 +14318,7 @@
       product:
         'Smart FormSense',
       productVersion:
-        '17.18.2',
+        '17.19.0',
       generatedAt:
         new Date().toISOString(),
       purpose:
@@ -14399,7 +14413,7 @@
       return report;
     } catch (error) {
       console.error(
-        'Smart FormSense V17.18.2 QA debug export:',
+        'Smart FormSense V17.19.0 QA debug export:',
         error
       );
 
@@ -16886,7 +16900,7 @@
       : {
           reportVersion: 7,
           product: 'Smart FormSense',
-          productVersion: '17.18.2',
+          productVersion: '17.19.0',
           generatedAt: new Date().toISOString(),
           auditType: 'Black-box Functional Form QA',
           page: {
@@ -16923,7 +16937,7 @@
     const cleanReason = String(reason || '').slice(0, 500);
     return {
       ...base,
-      productVersion: '17.18.2',
+      productVersion: '17.19.0',
       reportVersion: Math.max(5, Number(base.reportVersion || 0)),
       runState,
       incomplete: runState !== 'completed',
@@ -17074,7 +17088,7 @@
       return {
         reportVersion: 7,
         product: 'Smart FormSense',
-        productVersion: '17.18.2',
+        productVersion: '17.19.0',
         generatedAt,
         completedAt: ['completed', 'stopped', 'failed'].includes(runState) ? new Date().toISOString() : null,
         auditType: 'Black-box Functional Form QA',
@@ -17856,6 +17870,181 @@
     try { GM_setValue(DEV_MODE_UNTIL_KEY, until); } catch {}
     return until;
   };
+
+  const disableDeveloperMode = () => {
+    try { GM_setValue(DEV_MODE_UNTIL_KEY, 0); } catch {}
+  };
+
+  const showDeveloperModeNotice = (title, detail = '', tone = 'success') => {
+    if (!IS_TOP) return;
+    const existing = document.getElementById('__sfs_dev_mode_notice');
+    existing?.remove?.();
+
+    const notice = document.createElement('div');
+    notice.id = '__sfs_dev_mode_notice';
+    notice.setAttribute('role', 'status');
+    notice.setAttribute('aria-live', 'polite');
+
+    Object.assign(notice.style, {
+      position: 'fixed',
+      top: '16px',
+      left: '50%',
+      transform: 'translateX(-50%)',
+      width: 'min(420px, calc(100vw - 28px))',
+      zIndex: '2147483647',
+      padding: '11px 14px',
+      borderRadius: '12px',
+      background: tone === 'warning' ? '#fff7ed' : '#f0fdf4',
+      border: tone === 'warning' ? '1px solid #fdba74' : '1px solid #86efac',
+      color: tone === 'warning' ? '#9a3412' : '#166534',
+      boxShadow: '0 16px 40px rgba(15,23,42,.22)',
+      fontFamily: 'Inter,Arial,sans-serif',
+      textAlign: 'center',
+      pointerEvents: 'none'
+    });
+
+    const heading = document.createElement('div');
+    heading.textContent = String(title || 'Smart FormSense');
+    Object.assign(heading.style, {
+      fontSize: '13px',
+      fontWeight: '850',
+      lineHeight: '1.35'
+    });
+    notice.appendChild(heading);
+
+    if (detail) {
+      const body = document.createElement('div');
+      body.textContent = String(detail);
+      Object.assign(body.style, {
+        marginTop: '3px',
+        fontSize: '10px',
+        lineHeight: '1.4',
+        opacity: '.9'
+      });
+      notice.appendChild(body);
+    }
+
+    (document.body || document.documentElement).appendChild(notice);
+    setTimeout(() => notice.remove(), 3800);
+  };
+
+  const analyticsConfigured = () =>
+    /^phc_/i.test(String(POSTHOG_PROJECT_KEY || '').trim()) &&
+    /^https:\/\//i.test(String(POSTHOG_HOST || '').trim());
+
+  const analyticsInstallId = () => {
+    let id = '';
+    try { id = String(GM_getValue(ANALYTICS_INSTALL_ID_KEY, '') || ''); } catch {}
+    if (id) return id;
+
+    try {
+      id = `sfs_${crypto.randomUUID()}`;
+    } catch {
+      id = `sfs_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 12)}`;
+    }
+
+    try { GM_setValue(ANALYTICS_INSTALL_ID_KEY, id); } catch {}
+    return id;
+  };
+
+  const trackAnalytics = (eventName, properties = {}) => {
+    if (!IS_TOP || !analyticsConfigured()) return false;
+
+    const allowed = new Set([
+      'mode',
+      'fill_mode',
+      'channel',
+      'source',
+      'result',
+      'run_state',
+      'fields_checked',
+      'fields_audited',
+      'field_coverage',
+      'validation_coverage'
+    ]);
+
+    const safeExtra = {};
+    for (const [key, value] of Object.entries(properties || {})) {
+      if (!allowed.has(key)) continue;
+      if (!['string', 'number', 'boolean'].includes(typeof value)) continue;
+      safeExtra[key] = value;
+    }
+
+    const payload = {
+      api_key: String(POSTHOG_PROJECT_KEY).trim(),
+      event: `sfs_${String(eventName || 'event').replace(/[^a-z0-9_]+/gi, '_').toLowerCase()}`,
+      timestamp: new Date().toISOString(),
+      properties: {
+        distinct_id: analyticsInstallId(),
+        product: PRODUCT_NAME,
+        version: SCRIPT_VERSION,
+        hostname: location.hostname || '',
+        $process_person_profile: false,
+        $lib: 'smart-formsense-userscript',
+        ...safeExtra
+      }
+    };
+
+    try {
+      GM_xmlhttpRequest({
+        method: 'POST',
+        url: `${String(POSTHOG_HOST).replace(/\/+$/, '')}/i/v0/e/`,
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        data: JSON.stringify(payload),
+        timeout: 8000,
+        onload: () => {},
+        onerror: () => {},
+        ontimeout: () => {}
+      });
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
+  const initAnalytics = () => {
+    if (!IS_TOP || !analyticsConfigured()) return;
+
+    analyticsInstallId();
+
+    let firstRun = false;
+    try { firstRun = !!GM_getValue(ANALYTICS_FIRST_RUN_KEY, false); } catch {}
+    if (!firstRun) {
+      if (trackAnalytics('first_run', { source: 'userscript' })) {
+        try { GM_setValue(ANALYTICS_FIRST_RUN_KEY, true); } catch {}
+      }
+    }
+
+    let lastVersion = '';
+    try { lastVersion = String(GM_getValue(ANALYTICS_VERSION_KEY, '') || ''); } catch {}
+    if (lastVersion !== SCRIPT_VERSION) {
+      if (trackAnalytics('version_loaded', { source: 'userscript' })) {
+        try { GM_setValue(ANALYTICS_VERSION_KEY, SCRIPT_VERSION); } catch {}
+      }
+    }
+
+    let lastSession = 0;
+    try { lastSession = Number(GM_getValue(ANALYTICS_LAST_SESSION_KEY, 0) || 0); } catch {}
+    if (!lastSession || Date.now() - lastSession >= ANALYTICS_SESSION_GAP_MS) {
+      if (trackAnalytics('session_started', { source: 'userscript' })) {
+        try { GM_setValue(ANALYTICS_LAST_SESSION_KEY, Date.now()); } catch {}
+      }
+    }
+  };
+
+  const shareMessageText = () => [
+    'Smart FormSense makes widget or form filling and functional QA testing dramatically faster.',
+    '',
+    '⚡ Auto Form Filler: intelligently fills forms with realistic synthetic test data.',
+    '🧪 Auto QA Testing: tests required fields, valid and invalid values, dynamic journeys, and generates a QA report.',
+    '',
+    'Get started in 2 steps:',
+    `1. Install Tampermonkey: ${TAMPERMONKEY_INSTALL_URL}`,
+    `2. Install Smart FormSense: ${SHARE_INSTALL_URL}`
+  ].join('\n');
 
   const compareVersions = (a, b) => {
     const pa = String(a || '').split('.').map(v => Number.parseInt(v, 10) || 0);
@@ -19700,7 +19889,7 @@
           </details>
 
           <div class="creator">
-            Created with love ❤️ <strong>Akash Singh</strong> · <span id="creatorEmail"></span> · <button class="versionTap" id="versionTap" type="button">v17.18.2</button>
+            Created with love ❤️ <strong>Akash Singh</strong> · <span id="creatorEmail"></span> · <button class="versionTap" id="versionTap" type="button">v17.19.0</button>
           </div>
         </div>
       </div>
@@ -19840,7 +20029,7 @@
                 <div class="settingCard"><div class="settingRow"><div class="settingText"><b>Automatically check for updates</b><span>Checks at most once every 12 hours.</span></div><label class="switch"><input id="settingAutoCheckUpdates" type="checkbox"><span class="slider"></span></label></div></div>
                 <div class="settingCard">
                   <div class="settingText"><b>Version status</b><span id="updateStatusText">Checking update status…</span></div>
-                  <div class="updateStatus">Current: <strong id="currentVersionText">v17.18.2</strong> · Latest: <strong id="latestVersionText">—</strong></div>
+                  <div class="updateStatus">Current: <strong id="currentVersionText">v17.19.0</strong> · Latest: <strong id="latestVersionText">—</strong></div>
                   <div class="updateActions"><button class="settingsAction" id="checkUpdatesBtn" type="button">Check for updates</button><button class="settingsAction updateNow" id="updateNowSettings" type="button">Update Smart FormSense</button></div>
                 </div>
               </section>
@@ -19946,6 +20135,192 @@
     let updateInstallAwaitingReturn = false;
     let updateInstallOpenedAt = 0;
     let updateReloadPending = false;
+
+    const installShareUi = () => {
+      const header = refs.feedbackBtn?.parentElement;
+      if (!header || header.querySelector('#shareBtn')) return;
+
+      const shareBtn = document.createElement('button');
+      shareBtn.type = 'button';
+      shareBtn.id = 'shareBtn';
+      shareBtn.className = 'windowBtn';
+      shareBtn.title = 'Share Smart FormSense';
+      shareBtn.setAttribute('aria-label', 'Share Smart FormSense');
+      shareBtn.innerHTML = '<svg class="uiIcon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="18" cy="5" r="3"></circle><circle cx="6" cy="12" r="3"></circle><circle cx="18" cy="19" r="3"></circle><path d="m8.6 10.7 6.8-4"></path><path d="m8.6 13.3 6.8 4"></path></svg>';
+      header.insertBefore(shareBtn, refs.feedbackBtn);
+
+      const style = document.createElement('style');
+      style.textContent = `
+        .shareBack{display:none;position:fixed;inset:0;width:100vw;height:100vh;background:rgba(19,15,40,.48);backdrop-filter:blur(5px);align-items:center;justify-content:center;padding:16px;z-index:45}
+        .shareModal{width:min(430px,calc(100vw - 24px));background:#fff;border:1px solid #e7e2f6;border-radius:18px;box-shadow:0 28px 90px rgba(17,12,45,.34);overflow:hidden;color:#26213a}
+        .shareHead{display:flex;align-items:center;justify-content:space-between;padding:14px 15px;border-bottom:1px solid #eeeaf7;background:linear-gradient(135deg,#faf9ff,#fff)}
+        .shareHead h3{margin:0;font-size:14px}.shareHead p{margin:3px 0 0;font-size:9px;color:#817a91}
+        .shareClose{border:0;background:#f3f0fb;color:#655d78;width:30px;height:30px;border-radius:9px;cursor:pointer;font-size:17px}
+        .shareBody{padding:15px}
+        .shareGrid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+        .shareChannel{border:1px solid #e7e2f6;background:#fff;border-radius:11px;padding:11px 9px;cursor:pointer;text-align:left;color:#342e48;transition:.15s}
+        .shareChannel:hover,.shareChannel:focus-visible{border-color:#8b5cf6;background:#faf8ff}
+        .shareChannel b{display:block;font-size:10px}.shareChannel span{display:block;font-size:8.5px;color:#817a91;margin-top:2px}
+        .shareRecipients{display:none;margin-top:12px;border-top:1px solid #eeeaf7;padding-top:12px}
+        .shareRecipients label{display:block;font-size:9.5px;font-weight:850;margin-bottom:6px}
+        .shareRecipients input{width:100%;border:1px solid #ddd6e8;border-radius:9px;padding:9px 10px;font-size:10px;outline:none}
+        .shareRecipients input:focus{border-color:#8b5cf6;box-shadow:0 0 0 3px rgba(139,92,246,.1)}
+        .shareHelp{font-size:8.5px;color:#817a91;margin:5px 0 9px;line-height:1.4}
+        .shareAction{width:100%;border:0;border-radius:9px;padding:9px 11px;background:#6d4aff;color:#fff;font-size:10px;font-weight:850;cursor:pointer}
+        .shareMessage{min-height:17px;margin-top:8px;font-size:8.5px;color:#6b7280}.shareMessage.error{color:#dc2626}.shareMessage.ok{color:#15803d}
+        @media(max-width:420px){.shareGrid{grid-template-columns:1fr}}
+      `;
+      shadow.appendChild(style);
+
+      const back = document.createElement('div');
+      back.id = 'shareBack';
+      back.className = 'shareBack';
+      back.innerHTML = `
+        <div class="shareModal" role="dialog" aria-modal="true" aria-labelledby="shareTitle">
+          <div class="shareHead">
+            <div><h3 id="shareTitle">Share Smart FormSense</h3><p>Help someone get started in a few clicks.</p></div>
+            <button type="button" class="shareClose" id="shareClose" aria-label="Close share dialog">×</button>
+          </div>
+          <div class="shareBody">
+            <div class="shareGrid">
+              <button type="button" class="shareChannel" data-share-channel="email"><b>✉ Email</b><span>Prepare a ready-to-send email</span></button>
+              <button type="button" class="shareChannel" data-share-channel="copy"><b>↗ Copy Link</b><span>Copy the Smart FormSense install link</span></button>
+              <button type="button" class="shareChannel" data-share-channel="whatsapp"><b>WhatsApp</b><span>Share a short ready-made message</span></button>
+              <button type="button" class="shareChannel" data-share-channel="teams"><b>Microsoft Teams</b><span>Prepare a chat with recipients</span></button>
+            </div>
+            <div class="shareRecipients" id="shareRecipients">
+              <label for="shareRecipientInput">Recipient email</label>
+              <input id="shareRecipientInput" type="text" autocomplete="off" placeholder="name@company.com, teammate@company.com">
+              <div class="shareHelp">Add one email or multiple comma-separated emails.</div>
+              <button type="button" class="shareAction" id="shareAction">Share</button>
+            </div>
+            <div class="shareMessage" id="shareMessage"></div>
+          </div>
+        </div>
+      `;
+      shadow.appendChild(back);
+
+      const close = () => {
+        back.style.display = 'none';
+        const recipients = back.querySelector('#shareRecipients');
+        if (recipients) recipients.style.display = 'none';
+        const input = back.querySelector('#shareRecipientInput');
+        if (input) input.value = '';
+        const message = back.querySelector('#shareMessage');
+        if (message) { message.textContent = ''; message.className = 'shareMessage'; }
+        back.dataset.channel = '';
+      };
+
+      const setMessage = (value = '', type = '') => {
+        const node = back.querySelector('#shareMessage');
+        if (!node) return;
+        node.textContent = value;
+        node.className = `shareMessage${type ? ` ${type}` : ''}`;
+      };
+
+      const openExternal = url => {
+        try {
+          window.open(url, '_blank', 'noopener,noreferrer');
+          return true;
+        } catch {
+          try { location.href = url; return true; } catch {}
+        }
+        return false;
+      };
+
+      const copyInstallLink = async () => {
+        try {
+          await navigator.clipboard.writeText(SHARE_INSTALL_URL);
+        } catch {
+          const helper = document.createElement('textarea');
+          helper.value = SHARE_INSTALL_URL;
+          helper.setAttribute('readonly', '');
+          helper.style.position = 'fixed';
+          helper.style.opacity = '0';
+          document.body.appendChild(helper);
+          helper.select();
+          document.execCommand('copy');
+          helper.remove();
+        }
+        setMessage('✓ Link copied', 'ok');
+        trackAnalytics('share_clicked', { channel: 'copy_link', result: 'prepared' });
+      };
+
+      const parseRecipients = () => {
+        const raw = String(back.querySelector('#shareRecipientInput')?.value || '');
+        const list = raw.split(',').map(value => value.trim()).filter(Boolean);
+        const emailPattern = /^[^\s@,]+@[^\s@,]+\.[^\s@,]+$/;
+        if (!list.length) return { ok: false, message: 'Enter at least one recipient email.', list: [] };
+        const invalid = list.filter(value => !emailPattern.test(value));
+        if (invalid.length) return { ok: false, message: `Check ${invalid[0]} and try again.`, list: [] };
+        return { ok: true, list: [...new Set(list)] };
+      };
+
+      shareBtn.addEventListener('click', event => {
+        event.stopPropagation();
+        back.style.display = 'flex';
+        trackAnalytics('share_opened', { source: 'header' });
+      });
+
+      back.querySelector('#shareClose')?.addEventListener('click', close);
+      back.addEventListener('click', event => { if (event.target === back) close(); });
+
+      back.querySelectorAll('[data-share-channel]').forEach(button => {
+        button.addEventListener('click', async () => {
+          const channel = button.getAttribute('data-share-channel') || '';
+          setMessage('');
+
+          if (channel === 'copy') {
+            await copyInstallLink();
+            return;
+          }
+
+          if (channel === 'whatsapp') {
+            trackAnalytics('share_clicked', { channel: 'whatsapp', result: 'prepared' });
+            openExternal(`https://wa.me/?text=${encodeURIComponent(shareMessageText())}`);
+            return;
+          }
+
+          back.dataset.channel = channel;
+          const recipients = back.querySelector('#shareRecipients');
+          const label = recipients?.querySelector('label');
+          const action = back.querySelector('#shareAction');
+          if (recipients) recipients.style.display = 'block';
+          if (label) label.textContent = channel === 'teams' ? 'Recipient work email' : 'Recipient email';
+          if (action) action.textContent = 'Share';
+          setTimeout(() => back.querySelector('#shareRecipientInput')?.focus?.(), 0);
+        });
+      });
+
+      back.querySelector('#shareAction')?.addEventListener('click', () => {
+        const parsed = parseRecipients();
+        if (!parsed.ok) {
+          setMessage(parsed.message, 'error');
+          back.querySelector('#shareRecipientInput')?.focus?.();
+          return;
+        }
+
+        const channel = back.dataset.channel;
+        const body = shareMessageText();
+
+        if (channel === 'email') {
+          const to = parsed.list.join(',');
+          const url = `mailto:${to}?subject=${encodeURIComponent(SHARE_SUBJECT)}&body=${encodeURIComponent(body)}`;
+          trackAnalytics('share_clicked', { channel: 'email', result: 'prepared' });
+          location.href = url;
+          return;
+        }
+
+        if (channel === 'teams') {
+          const users = parsed.list.map(value => encodeURIComponent(value)).join(',');
+          const url = `https://teams.microsoft.com/l/chat/0/0?users=${users}&message=${encodeURIComponent(body)}`;
+          trackAnalytics('share_clicked', { channel: 'teams', result: 'prepared' });
+          openExternal(url);
+        }
+      });
+    };
+
+    installShareUi();
 
     const positionToastStack = () => {
       if (!refs.toastStack || host.style.display === 'none') return;
@@ -20117,6 +20492,7 @@
           message,
           email: refs.feedbackEmail?.value || ''
         });
+        trackAnalytics('feedback_submitted', { mode: state.workspace === 'qa' ? 'qa' : 'fill', result: 'success' });
         closeFeedback();
         showFeedbackSuccess();
       } catch (error) {
@@ -20664,6 +21040,37 @@
     };
 
     refs.fillBtn.onclick = () => requestFillAction({ source: 'button' });
+
+    refs.fillBtn?.addEventListener('click', () =>
+      trackAnalytics('form_filler_opened', { mode: 'fill', source: 'button' }), true);
+
+    refs.correctBtn?.addEventListener('click', () =>
+      trackAnalytics('recheck_used', { mode: 'fill', source: 'button' }), true);
+
+    refs.validateBtn?.addEventListener('click', () =>
+      trackAnalytics('validate_used', { mode: 'fill', source: 'button' }), true);
+
+    refs.undoBtn?.addEventListener('click', () =>
+      trackAnalytics('undo_used', { mode: 'fill', source: 'button' }), true);
+
+    refs.newBtn?.addEventListener('click', () =>
+      trackAnalytics('new_applicant_used', { mode: 'fill', source: 'button' }), true);
+
+    refs.qaRunBtn?.addEventListener('click', () =>
+      trackAnalytics('qa_started', { mode: 'qa', source: 'button' }), true);
+
+    refs.qaExportBtn?.addEventListener('click', () =>
+      trackAnalytics('qa_report_exported', { mode: 'qa', source: 'button' }), true);
+
+    refs.updateBtn?.addEventListener('click', () =>
+      trackAnalytics('update_clicked', { source: 'header' }), true);
+
+    refs.fillTab?.addEventListener('click', () =>
+      trackAnalytics('mode_selected', { mode: 'fill', source: 'tab' }), true);
+
+    refs.qaTab?.addEventListener('click', () =>
+      trackAnalytics('mode_selected', { mode: 'qa', source: 'tab' }), true);
+
     refs.correctBtn.onclick = () =>
       runSmartAction(
         'recheck'
@@ -20798,11 +21205,19 @@
       if (developerTapReset) clearTimeout(developerTapReset);
       developerTapReset = setTimeout(() => { developerTapCount = 0; }, 3500);
       if (developerTapCount < 5) return;
+
       developerTapCount = 0;
       if (developerTapReset) clearTimeout(developerTapReset);
-      enableDeveloperMode();
-      refreshDeveloperUi();
-      state.panel?.notify?.('Developer Mode enabled', 'Export Debug is available for 1 hour.', 'success');
+
+      if (developerModeActive()) {
+        disableDeveloperMode();
+        refreshDeveloperUi();
+        showDeveloperModeNotice('Developer Mode disabled', 'Developer-only tools are hidden again.', 'warning');
+      } else {
+        enableDeveloperMode();
+        refreshDeveloperUi();
+        showDeveloperModeNotice('Developer Mode enabled for 1 hour', 'Export Debug is now available.', 'success');
+      }
     });
 
     refs.settingsBtn.onclick = openSettings;
@@ -20833,6 +21248,7 @@
 
     $('minChoice').onclick = () => {
       refs.modal.style.display = 'none';
+      trackAnalytics('fill_started', { mode: 'fill', fill_mode: 'minimum', source: 'button' });
 
       const context = state.pendingFillContext || {};
       state.pendingFillContext = null;
@@ -20848,6 +21264,7 @@
 
     $('allChoice').onclick = () => {
       refs.modal.style.display = 'none';
+      trackAnalytics('fill_started', { mode: 'fill', fill_mode: 'all', source: 'button' });
 
       const context = state.pendingFillContext || {};
       state.pendingFillContext = null;
@@ -21045,6 +21462,7 @@
   };
 
   if (IS_TOP) {
+    initAnalytics();
     installTopBridge();
     installTopShortcutEngine();
     setTimeout(() => { checkForUpdates({ force: false, silent: true }); }, 1200);
