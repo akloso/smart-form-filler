@@ -14,6 +14,7 @@
 // @grant        GM_xmlhttpRequest
 // @connect      formspree.io
 // @connect      raw.githubusercontent.com
+// @connect      eu.i.posthog.com
 // @updateURL    https://raw.githubusercontent.com/akloso/smart-form-filler/main/Smart_Form_Filler.user.js
 // @downloadURL  https://raw.githubusercontent.com/akloso/smart-form-filler/main/Smart_Form_Filler.user.js
 // ==/UserScript==
@@ -67,8 +68,8 @@
 
   // Product Analytics is privacy-first and stays disabled until the project token
   // and ingestion host are explicitly configured.
-  const POSTHOG_PROJECT_KEY = '';
-  const POSTHOG_HOST = '';
+  const POSTHOG_PROJECT_KEY = 'phc_tvkpunebfKwWRdUttkbJ4ZdphYmpeJaqj3MnZ7mP67c8';
+  const POSTHOG_HOST = 'https://eu.i.posthog.com';
   const ANALYTICS_INSTALL_ID_KEY = 'STFF_ANALYTICS_INSTALL_ID_V1';
   const ANALYTICS_FIRST_RUN_KEY = 'STFF_ANALYTICS_FIRST_RUN_V1';
   const ANALYTICS_LAST_SESSION_KEY = 'STFF_ANALYTICS_LAST_SESSION_V1';
