@@ -1,0 +1,83 @@
+name: Smart FormSense v17.22.0 maintenance release
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - '.github/workflows/sfs-v17-22-maintenance.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Apply maintenance-only production patch
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path('Smart_Form_Filler.user.js')
+          text = path.read_text(encoding='utf-8')
+
+          old_version = '17.21.0'
+          new_version = '17.22.0'
+          version_count = text.count(old_version)
+          if version_count < 2:
+              raise SystemExit(f'Expected multiple current version references; found {version_count}')
+
+          old_comment = """  // Product Analytics is privacy-first and stays disabled until the project token
+  // and ingestion host are explicitly configured."""
+          new_comment = """  // Product Analytics is privacy-first. PostHog is configured for anonymous
+  // product-usage telemetry only; form values and sensitive data are excluded."""
+
+          if text.count(old_comment) != 1:
+              raise SystemExit('Expected exactly one stale analytics comment block')
+
+          text = text.replace(old_version, new_version)
+          text = text.replace(old_comment, new_comment)
+          path.write_text(text, encoding='utf-8')
+
+          updated = path.read_text(encoding='utf-8')
+          if old_version in updated:
+              raise SystemExit('Old production version remains in userscript')
+          if '// @version      17.22.0' not in updated:
+              raise SystemExit('Userscript metadata version was not updated')
+          if "const SCRIPT_VERSION = '17.22.0';" not in updated:
+              raise SystemExit('SCRIPT_VERSION was not updated')
+          if 'stays disabled until the project token' in updated:
+              raise SystemExit('Stale analytics comment remains')
+          if "const POSTHOG_HOST = 'https://eu.i.posthog.com';" not in updated:
+              raise SystemExit('PostHog host changed unexpectedly')
+          PY
+
+      - name: Syntax and invariant checks
+        shell: bash
+        run: |
+          node --check Smart_Form_Filler.user.js
+          git diff --check
+          grep -Fq "// @name         Smart FormSense" Smart_Form_Filler.user.js
+          grep -Fq "// @version      17.22.0" Smart_Form_Filler.user.js
+          grep -Fq "const SCRIPT_VERSION = '17.22.0';" Smart_Form_Filler.user.js
+          grep -Fq "const BRIDGE_MARKER = '__STFF_V17_7_BRIDGE__';" Smart_Form_Filler.user.js
+          grep -Fq "const FEEDBACK_ENDPOINT = 'https://formspree.io/f/xbgjvoaw';" Smart_Form_Filler.user.js
+          grep -Fq "const POSTHOG_HOST = 'https://eu.i.posthog.com';" Smart_Form_Filler.user.js
+
+      - name: Commit production maintenance release and remove helper
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm .github/workflows/sfs-v17-22-maintenance.yml
+          git add Smart_Form_Filler.user.js
+          git commit -m "chore: release Smart FormSense v17.22.0 maintenance metadata"
+          git push origin HEAD:main
