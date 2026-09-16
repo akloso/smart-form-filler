@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Smart FormSense
 // @namespace    smart-form-filler
-// @version      17.19.0
+// @version      17.20.0
 // @description  Automatic form filling and functional QA testing for authorized web-form validation, safe progression, embedded forms, and synthetic test data.
 // @author       Akash Singh
 // @match        *://*/*
@@ -54,13 +54,78 @@
   const SETTINGS_VERSION = 4;
   const ACTION_DEFAULT_TTL_MS = 5 * 60 * 1000;
   const PRODUCT_NAME = 'Smart FormSense';
-  const SCRIPT_VERSION = '17.19.0';
+  const SCRIPT_VERSION = '17.20.0';
   const FEEDBACK_ENDPOINT = 'https://formspree.io/f/xbgjvoaw';
   const UPDATE_RAW_URL = 'https://raw.githubusercontent.com/akloso/smart-form-filler/main/Smart_Form_Filler.user.js';
   const UPDATE_CHECK_KEY = 'STFF_UPDATE_CHECK_V1';
   const DEV_MODE_UNTIL_KEY = 'STFF_DEVELOPER_MODE_UNTIL';
   const UPDATE_CHECK_INTERVAL_MS = 12 * 60 * 60 * 1000;
   const DEVELOPER_MODE_MS = 60 * 60 * 1000;
+
+  const THOUGHT_STATE_KEY = 'STFF_CREATOR_THOUGHT_V1';
+  const THOUGHT_ROTATE_MS = 4 * 60 * 60 * 1000;
+  const SMART_THOUGHTS = Object.freeze([
+    "Less form-filling. More chilling. 😎",
+    "Ctrl+C. Ctrl+V. Retired.",
+    "Forms fear this little tool.",
+    "Click less. Live more.",
+    "Powered by clicks, chaos & coffee ☕",
+    "Doing the boring stuff so you don’t have to.",
+    "Your forms called. They want automation.",
+    "Built to bully boring forms.",
+    "Saving your fingers, one field at a time.",
+    "Form filling, but make it smart.",
+    "Tiny tool. Big time saver.",
+    "Fill fast. Test faster.",
+    "Making boring forms slightly less boring.",
+    "No magic. Just suspiciously smart automation.",
+    "Built with logic, caffeine & mild chaos.",
+    "Because typing the same thing twice is unnecessary.",
+    "Your keyboard deserves a break.",
+    "Automation entered the chat.",
+    "Work smarter. Click fewer buttons.",
+    "Forms are temporary. Automation is forever.",
+    "One click closer to freedom.",
+    "Why type when Smart FormSense exists?",
+    "Repetitive work detected. Eliminating…",
+    "Your productivity just got an upgrade.",
+    "Let the machine do the boring part.",
+    "Humans were not designed for repetitive forms.",
+    "Making forms behave since 2026.",
+    "A little automation never hurt anybody.",
+    "More thinking. Less typing.",
+    "You click. We handle the chaos.",
+    "Forms filled. Sanity preserved.",
+    "QA without the “ugh.”",
+    "Testing forms so you don’t have to suffer.",
+    "Another form? Cute.",
+    "Challenge accepted, form.",
+    "Boring task successfully automated.",
+    "Manual typing has left the building.",
+    "The form never saw it coming.",
+    "Fields beware.",
+    "Your shortcut to fewer shortcuts.",
+    "Turning tedious into one-click-ish.",
+    "Somewhere, a keyboard is thanking you.",
+    "Less repetition. More actual work.",
+    "Consider the boring part handled.",
+    "Automation: because life is too short for duplicate entry.",
+    "This could have been manual. Thankfully, it isn’t.",
+    "Making “again?” feel like “done.”",
+    "Smart forms deserve Smart FormSense.",
+    "You bring the form. We bring the shortcuts.",
+    "One tool. Fewer headaches.",
+    "Keep calm and let Smart FormSense fill it.",
+    "The unofficial enemy of repetitive typing.",
+    "Your mouse can relax now.",
+    "Making every click work harder.",
+    "Built for people who have better things to do.",
+    "Manual work? We don’t know her.",
+    "Productivity, with a little personality.",
+    "Fast fingers are optional now.",
+    "Goodbye repetition. Hello Smart FormSense.",
+    "One less boring thing on your screen."
+]);
 
   const SHARE_INSTALL_URL = 'https://greasyfork.org/en/scripts/592133-smart-form-filler';
   const TAMPERMONKEY_INSTALL_URL = 'https://chromewebstore.google.com/detail/tampermonkey/dhdgffkkebhmkfjojejmpbldmpobfkfo?hl=en';
@@ -231,7 +296,7 @@
     );
 
     console.error(
-      `Smart FormSense V17.19.0 [${stage}]`,
+      `Smart FormSense V17.20.0 [${stage}]`,
       error
     );
 
@@ -274,6 +339,53 @@
 
   const randomInt = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
   const pick = arr => arr[randomInt(0, arr.length - 1)];
+
+
+  const readThoughtState = () => {
+    try {
+      const stored = GM_getValue(THOUGHT_STATE_KEY, null);
+      return stored && typeof stored === 'object' ? stored : null;
+    } catch {
+      return null;
+    }
+  };
+
+  const saveThoughtState = value => {
+    try { GM_setValue(THOUGHT_STATE_KEY, value); } catch {}
+  };
+
+  const chooseThoughtIndex = avoidIndex => {
+    if (!SMART_THOUGHTS.length) return -1;
+    if (SMART_THOUGHTS.length === 1) return 0;
+
+    let index = randomInt(0, SMART_THOUGHTS.length - 1);
+    while (index === avoidIndex) {
+      index = randomInt(0, SMART_THOUGHTS.length - 1);
+    }
+    return index;
+  };
+
+  const resolveCreatorThought = (forceNew = false) => {
+    const now = Date.now();
+    const stored = readThoughtState();
+    const parsedIndex = Number(stored?.index);
+    const currentIndex =
+      Number.isInteger(parsedIndex) &&
+      parsedIndex >= 0 &&
+      parsedIndex < SMART_THOUGHTS.length
+        ? parsedIndex
+        : -1;
+    const changedAt = Number(stored?.changedAt || 0);
+    const expired = !changedAt || now - changedAt >= THOUGHT_ROTATE_MS;
+
+    let index = currentIndex;
+    if (forceNew || currentIndex < 0 || expired) {
+      index = chooseThoughtIndex(currentIndex);
+      saveThoughtState({ index, changedAt: now });
+    }
+
+    return SMART_THOUGHTS[index] || 'Smarter forms. Less effort.';
+  };
   const prefixTestName = value => {
     const clean = String(value || '').trim();
     if (!clean) return 'Test';
@@ -12501,7 +12613,7 @@
     const report = {
       reportVersion: 1,
       generatedBy:
-        'Smart FormSense V17.19.0',
+        'Smart FormSense V17.20.0',
       generatedAt:
         new Date().toISOString(),
       mode:
@@ -12666,7 +12778,7 @@
       return report;
     } catch (error) {
       console.error(
-        'Smart FormSense V17.19.0 debug export:',
+        'Smart FormSense V17.20.0 debug export:',
         error
       );
 
@@ -13753,7 +13865,7 @@
       product:
         'Smart FormSense',
       productVersion:
-        '17.19.0',
+        '17.20.0',
       generatedAt,
       auditType:
         'Non-destructive Form Readiness Audit',
@@ -14100,7 +14212,7 @@
   <div class="hero">
     <div class="brand">✦ SMART FORMSENSE QA</div>
     <h1>${esc(qa.page?.title || 'Form')}</h1>
-    <div class="meta">${esc(qa.page?.hostname || location.hostname || '')}<br>${esc(generated)} • v${esc(qa.productVersion || '17.19.0')}</div>
+    <div class="meta">${esc(qa.page?.hostname || location.hostname || '')}<br>${esc(generated)} • v${esc(qa.productVersion || '17.20.0')}</div>
     <div class="status ${statusClass}">${esc(status)}</div>
     <div class="overview">${esc(overview)}</div>
 
@@ -14319,7 +14431,7 @@
       product:
         'Smart FormSense',
       productVersion:
-        '17.19.0',
+        '17.20.0',
       generatedAt:
         new Date().toISOString(),
       purpose:
@@ -14414,7 +14526,7 @@
       return report;
     } catch (error) {
       console.error(
-        'Smart FormSense V17.19.0 QA debug export:',
+        'Smart FormSense V17.20.0 QA debug export:',
         error
       );
 
@@ -16901,7 +17013,7 @@
       : {
           reportVersion: 7,
           product: 'Smart FormSense',
-          productVersion: '17.19.0',
+          productVersion: '17.20.0',
           generatedAt: new Date().toISOString(),
           auditType: 'Black-box Functional Form QA',
           page: {
@@ -16938,7 +17050,7 @@
     const cleanReason = String(reason || '').slice(0, 500);
     return {
       ...base,
-      productVersion: '17.19.0',
+      productVersion: '17.20.0',
       reportVersion: Math.max(5, Number(base.reportVersion || 0)),
       runState,
       incomplete: runState !== 'completed',
@@ -17089,7 +17201,7 @@
       return {
         reportVersion: 7,
         product: 'Smart FormSense',
-        productVersion: '17.19.0',
+        productVersion: '17.20.0',
         generatedAt,
         completedAt: ['completed', 'stopped', 'failed'].includes(runState) ? new Date().toISOString() : null,
         auditType: 'Black-box Functional Form QA',
@@ -19609,6 +19721,50 @@
           color:#8a8fa0;
           word-break:break-word
         }
+        .creatorThought{
+          display:flex;
+          align-items:center;
+          justify-content:center;
+          gap:5px;
+          min-height:20px;
+          margin-bottom:3px;
+          color:#625a78;
+          font-size:9px;
+          font-weight:760;
+          line-height:1.35
+        }
+        .creatorSpark{color:#8b5cf6;font-size:9px;flex:0 0 auto}
+        .creatorThoughtText{
+          display:inline-block;
+          max-width:242px;
+          transition:opacity .16s ease,transform .16s ease
+        }
+        .creatorThoughtText.changing{opacity:0;transform:translateY(2px)}
+        .thoughtShuffle{
+          width:20px;
+          height:20px;
+          display:inline-grid;
+          place-items:center;
+          flex:0 0 auto;
+          padding:0;
+          border:1px solid #e3dcfa;
+          border-radius:999px;
+          background:linear-gradient(135deg,#faf8ff,#f4f0ff);
+          color:#7c3aed;
+          font-size:12px;
+          line-height:1;
+          font-weight:900;
+          cursor:pointer;
+          transition:transform .16s ease,background .16s ease,border-color .16s ease,box-shadow .16s ease
+        }
+        .thoughtShuffle:hover,.thoughtShuffle:focus-visible{
+          transform:rotate(18deg) scale(1.04);
+          background:#f2edff;
+          border-color:#c4b5fd;
+          box-shadow:0 4px 12px rgba(124,58,237,.12);
+          outline:none
+        }
+        .creatorIdentity{color:#8a8fa0}
         .creator strong{
           color:#5e5870;
           font-weight:800
@@ -19890,7 +20046,12 @@
           </details>
 
           <div class="creator">
-            Created with love ❤️ <strong>Akash Singh</strong> · <span id="creatorEmail"></span> · <button class="versionTap" id="versionTap" type="button">v17.19.0</button>
+            <div class="creatorThought">
+              <span class="creatorSpark" aria-hidden="true">✦</span>
+              <span class="creatorThoughtText" id="creatorThought"></span>
+              <button class="thoughtShuffle" id="thoughtShuffle" type="button" title="Show another thought" aria-label="Show another thought">↻</button>
+            </div>
+            <div class="creatorIdentity">❤️ <strong>Akash Singh</strong> · <span id="creatorEmail"></span> · <button class="versionTap" id="versionTap" type="button">v17.20.0</button></div>
           </div>
         </div>
       </div>
@@ -20030,7 +20191,7 @@
                 <div class="settingCard"><div class="settingRow"><div class="settingText"><b>Automatically check for updates</b><span>Checks at most once every 12 hours.</span></div><label class="switch"><input id="settingAutoCheckUpdates" type="checkbox"><span class="slider"></span></label></div></div>
                 <div class="settingCard">
                   <div class="settingText"><b>Version status</b><span id="updateStatusText">Checking update status…</span></div>
-                  <div class="updateStatus">Current: <strong id="currentVersionText">v17.19.0</strong> · Latest: <strong id="latestVersionText">—</strong></div>
+                  <div class="updateStatus">Current: <strong id="currentVersionText">v17.20.0</strong> · Latest: <strong id="latestVersionText">—</strong></div>
                   <div class="updateActions"><button class="settingsAction" id="checkUpdatesBtn" type="button">Check for updates</button><button class="settingsAction updateNow" id="updateNowSettings" type="button">Update Smart FormSense</button></div>
                 </div>
               </section>
@@ -20082,6 +20243,8 @@
       qaWarning: $('qaWarning'),
       qaObservation: $('qaObservation'),
       qaPassed: $('qaPassed'),
+      creatorThought: $('creatorThought'),
+      thoughtShuffle: $('thoughtShuffle'),
       creatorEmail: $('creatorEmail'),
       zoomDown: $('zoomDown'),
       zoomReset: $('zoomReset'),
@@ -20127,6 +20290,30 @@
       refs.creatorEmail.textContent =
         'akash.singh@meritto.com';
     }
+
+
+    const renderCreatorThought = ({ forceNew = false, animate = false } = {}) => {
+      if (!refs.creatorThought) return;
+
+      const apply = () => {
+        refs.creatorThought.textContent = resolveCreatorThought(forceNew);
+        refs.creatorThought.classList.remove('changing');
+      };
+
+      if (animate && refs.creatorThought.textContent) {
+        refs.creatorThought.classList.add('changing');
+        setTimeout(apply, 160);
+      } else {
+        apply();
+      }
+    };
+
+    renderCreatorThought();
+
+    refs.thoughtShuffle?.addEventListener('click', event => {
+      event.stopPropagation();
+      renderCreatorThought({ forceNew: true, animate: true });
+    });
 
     let feedbackCategory = '';
     let feedbackRating = 0;
@@ -20782,6 +20969,7 @@
     const restore = () => {
       refs.mini.style.display = 'none';
       refs.panel.style.display = 'block';
+      renderCreatorThought();
       fitPanelToViewport();
       positionToastStack();
       requestAnimationFrame(() => {
@@ -21055,6 +21243,7 @@
         resetHostPosition();
         refs.mini.style.display = 'none';
         refs.panel.style.display = 'block';
+        renderCreatorThought();
         fitPanelToViewport();
         positionToastStack();
       },
