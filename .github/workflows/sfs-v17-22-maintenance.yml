@@ -25,28 +25,20 @@ jobs:
         run: |
           python3 - <<'PY'
           from pathlib import Path
-
           path = Path('Smart_Form_Filler.user.js')
           text = path.read_text(encoding='utf-8')
-
           old_version = '17.21.0'
           new_version = '17.22.0'
           version_count = text.count(old_version)
           if version_count < 2:
               raise SystemExit(f'Expected multiple current version references; found {version_count}')
-
-          old_comment = """  // Product Analytics is privacy-first and stays disabled until the project token
-  // and ingestion host are explicitly configured."""
-          new_comment = """  // Product Analytics is privacy-first. PostHog is configured for anonymous
-  // product-usage telemetry only; form values and sensitive data are excluded."""
-
+          old_comment = '  // Product Analytics is privacy-first and stays disabled until the project token\n  // and ingestion host are explicitly configured.'
+          new_comment = '  // Product Analytics is privacy-first. PostHog is configured for anonymous\n  // product-usage telemetry only; form values and sensitive data are excluded.'
           if text.count(old_comment) != 1:
               raise SystemExit('Expected exactly one stale analytics comment block')
-
           text = text.replace(old_version, new_version)
           text = text.replace(old_comment, new_comment)
           path.write_text(text, encoding='utf-8')
-
           updated = path.read_text(encoding='utf-8')
           if old_version in updated:
               raise SystemExit('Old production version remains in userscript')
