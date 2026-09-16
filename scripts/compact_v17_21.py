@@ -67,10 +67,11 @@ required = [
     '// @version      17.21.0',
     "const SCRIPT_VERSION = '17.21.0';",
     '/* Compact panel density v17.21 */',
-    'NO ACTIVE COMMAND = NO FIELD WRITES',
+    '// @match        *://*/*',
     'const SMART_THOUGHTS = Object.freeze([',
     'const THOUGHT_ROTATE_MS = 4 * 60 * 60 * 1000;',
-    'GM_openInTab',
+    '// @grant        GM_openInTab',
+    '// @grant        GM_xmlhttpRequest',
     'eu.i.posthog.com',
 ]
 for marker in required:
