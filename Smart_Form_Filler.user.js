@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Smart FormSense
 // @namespace    smart-form-filler
-// @version      17.20.0
+// @version      17.21.0
 // @description  Automatic form filling and functional QA testing for authorized web-form validation, safe progression, embedded forms, and synthetic test data.
 // @author       Akash Singh
 // @match        *://*/*
@@ -54,7 +54,7 @@
   const SETTINGS_VERSION = 4;
   const ACTION_DEFAULT_TTL_MS = 5 * 60 * 1000;
   const PRODUCT_NAME = 'Smart FormSense';
-  const SCRIPT_VERSION = '17.20.0';
+  const SCRIPT_VERSION = '17.21.0';
   const FEEDBACK_ENDPOINT = 'https://formspree.io/f/xbgjvoaw';
   const UPDATE_RAW_URL = 'https://raw.githubusercontent.com/akloso/smart-form-filler/main/Smart_Form_Filler.user.js';
   const UPDATE_CHECK_KEY = 'STFF_UPDATE_CHECK_V1';
@@ -296,7 +296,7 @@
     );
 
     console.error(
-      `Smart FormSense V17.20.0 [${stage}]`,
+      `Smart FormSense V17.21.0 [${stage}]`,
       error
     );
 
@@ -12613,7 +12613,7 @@
     const report = {
       reportVersion: 1,
       generatedBy:
-        'Smart FormSense V17.20.0',
+        'Smart FormSense V17.21.0',
       generatedAt:
         new Date().toISOString(),
       mode:
@@ -12778,7 +12778,7 @@
       return report;
     } catch (error) {
       console.error(
-        'Smart FormSense V17.20.0 debug export:',
+        'Smart FormSense V17.21.0 debug export:',
         error
       );
 
@@ -13865,7 +13865,7 @@
       product:
         'Smart FormSense',
       productVersion:
-        '17.20.0',
+        '17.21.0',
       generatedAt,
       auditType:
         'Non-destructive Form Readiness Audit',
@@ -14212,7 +14212,7 @@
   <div class="hero">
     <div class="brand">✦ SMART FORMSENSE QA</div>
     <h1>${esc(qa.page?.title || 'Form')}</h1>
-    <div class="meta">${esc(qa.page?.hostname || location.hostname || '')}<br>${esc(generated)} • v${esc(qa.productVersion || '17.20.0')}</div>
+    <div class="meta">${esc(qa.page?.hostname || location.hostname || '')}<br>${esc(generated)} • v${esc(qa.productVersion || '17.21.0')}</div>
     <div class="status ${statusClass}">${esc(status)}</div>
     <div class="overview">${esc(overview)}</div>
 
@@ -14431,7 +14431,7 @@
       product:
         'Smart FormSense',
       productVersion:
-        '17.20.0',
+        '17.21.0',
       generatedAt:
         new Date().toISOString(),
       purpose:
@@ -14526,7 +14526,7 @@
       return report;
     } catch (error) {
       console.error(
-        'Smart FormSense V17.20.0 QA debug export:',
+        'Smart FormSense V17.21.0 QA debug export:',
         error
       );
 
@@ -17013,7 +17013,7 @@
       : {
           reportVersion: 7,
           product: 'Smart FormSense',
-          productVersion: '17.20.0',
+          productVersion: '17.21.0',
           generatedAt: new Date().toISOString(),
           auditType: 'Black-box Functional Form QA',
           page: {
@@ -17050,7 +17050,7 @@
     const cleanReason = String(reason || '').slice(0, 500);
     return {
       ...base,
-      productVersion: '17.20.0',
+      productVersion: '17.21.0',
       reportVersion: Math.max(5, Number(base.reportVersion || 0)),
       runState,
       incomplete: runState !== 'completed',
@@ -17201,7 +17201,7 @@
       return {
         reportVersion: 7,
         product: 'Smart FormSense',
-        productVersion: '17.20.0',
+        productVersion: '17.21.0',
         generatedAt,
         completedAt: ['completed', 'stopped', 'failed'].includes(runState) ? new Date().toISOString() : null,
         auditType: 'Black-box Functional Form QA',
@@ -19904,6 +19904,48 @@
         button:focus-visible,summary:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-visible{outline:2px solid #8b5cf6;outline-offset:2px}
         .hero button:focus-visible{outline-color:#fff;box-shadow:0 0 0 2px rgba(91,75,255,.55)}
         @media(max-width:620px){.settingsBack{padding:0}.settingsModal{width:100vw;height:100vh;max-height:none;border-radius:0}.settingsLayout{grid-template-columns:1fr;display:flex;flex-direction:column}.settingsNav{border-right:0;border-bottom:1px solid #eeeaf7;flex-direction:row;overflow:auto;padding:8px}.settingsNavBtn{white-space:nowrap}.settingsContent{padding:13px}.shortcutRow{grid-template-columns:1fr auto}.shortcutRow .shortcutBtn{grid-row:2}.shortcutChip{justify-self:end}}
+        /* Compact panel density v17.21 */
+        .hero{padding:7px 10px 6px}
+        .windowBtn{width:22px;height:22px;border-radius:7px}
+        .title{font-size:12px}
+        .tagline{font-size:8px;margin-top:1px}
+        .profile{margin-top:3px;gap:0}
+        .profile strong{font-size:10px}
+        .profile span{font-size:8.5px;line-height:1.25}
+        .profileBottom{gap:6px}
+        .zoomControls{gap:2px}
+        .zoomBtn{height:18px;min-width:18px;padding:0 4px}
+        .zoomReset{min-width:31px;font-size:8px}
+        .body{padding:7px}
+        .modeTabs{gap:4px;margin-bottom:5px;padding:2px;border-radius:9px}
+        .modeTab{padding:5px 4px;border-radius:7px}
+        .modeRow{margin-bottom:4px}
+        .progress{height:6px}
+        .stage{margin-top:3px;min-height:11px;font-size:8.5px}
+        .stats{gap:3px;margin:5px 0}
+        .stat{border-radius:8px;padding:4px 2px}
+        .stat b{font-size:13px}
+        .stat span{font-size:8px;margin-top:2px}
+        .primary{padding:6px 9px;border-radius:9px}
+        .grid,.utilityGrid{gap:4px;margin-top:4px}
+        .secondary{padding:5px 4px;border-radius:8px}
+        .status{margin-top:5px;padding:5px 7px;min-height:24px;max-height:42px;line-height:1.3}
+        .legend{margin-top:3px;line-height:1.25}
+        details.help{margin-top:2px}
+        .creator{margin-top:4px;padding-top:4px;line-height:1.35}
+        .creatorThought{min-height:18px;margin-bottom:2px;font-size:8.5px;line-height:1.25}
+        .creatorSpark{font-size:8.5px}
+        .thoughtShuffle{width:18px;height:18px;font-size:11px}
+        .panel.qaMode .body{padding:7px}
+        .panel.qaMode .hero{padding-bottom:6px}
+        .qaCompactHead{padding:6px 8px;margin-bottom:5px}
+        .compactStats{margin:4px 0}
+        .compactStats .qaStat{padding:4px 2px}
+        .qaProgressBox{margin:5px 0 2px;padding:5px 7px}
+        .qaProgressMeta{margin-bottom:4px}
+        .qaStats{margin:5px 0}
+        .qaIssues{margin-top:5px;gap:4px}
+        .qaActions{margin-top:5px;gap:4px}
         button:disabled{opacity:.55;cursor:wait}
       </style>
 
@@ -20051,7 +20093,7 @@
               <span class="creatorThoughtText" id="creatorThought"></span>
               <button class="thoughtShuffle" id="thoughtShuffle" type="button" title="Show another thought" aria-label="Show another thought">↻</button>
             </div>
-            <div class="creatorIdentity">❤️ <strong>Akash Singh</strong> · <span id="creatorEmail"></span> · <button class="versionTap" id="versionTap" type="button">v17.20.0</button></div>
+            <div class="creatorIdentity">❤️ <strong>Akash Singh</strong> · <span id="creatorEmail"></span> · <button class="versionTap" id="versionTap" type="button">v17.21.0</button></div>
           </div>
         </div>
       </div>
@@ -20191,7 +20233,7 @@
                 <div class="settingCard"><div class="settingRow"><div class="settingText"><b>Automatically check for updates</b><span>Checks at most once every 12 hours.</span></div><label class="switch"><input id="settingAutoCheckUpdates" type="checkbox"><span class="slider"></span></label></div></div>
                 <div class="settingCard">
                   <div class="settingText"><b>Version status</b><span id="updateStatusText">Checking update status…</span></div>
-                  <div class="updateStatus">Current: <strong id="currentVersionText">v17.20.0</strong> · Latest: <strong id="latestVersionText">—</strong></div>
+                  <div class="updateStatus">Current: <strong id="currentVersionText">v17.21.0</strong> · Latest: <strong id="latestVersionText">—</strong></div>
                   <div class="updateActions"><button class="settingsAction" id="checkUpdatesBtn" type="button">Check for updates</button><button class="settingsAction updateNow" id="updateNowSettings" type="button">Update Smart FormSense</button></div>
                 </div>
               </section>
