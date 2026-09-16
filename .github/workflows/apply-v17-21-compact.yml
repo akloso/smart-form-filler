@@ -1,0 +1,50 @@
+name: Apply Smart FormSense v17.21 compact panel
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/apply-v17-21-compact.yml'
+      - 'scripts/compact_v17_21.py'
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Apply compact panel patch
+        run: python scripts/compact_v17_21.py
+
+      - name: Validate JavaScript syntax
+        run: node --check Smart_Form_Filler.user.js
+
+      - name: Validate release invariants
+        shell: bash
+        run: |
+          grep -F '// @version      17.21.0' Smart_Form_Filler.user.js
+          grep -F "const SCRIPT_VERSION = '17.21.0';" Smart_Form_Filler.user.js
+          grep -F '/* Compact panel density v17.21 */' Smart_Form_Filler.user.js
+          grep -F 'const THOUGHT_ROTATE_MS = 4 * 60 * 60 * 1000;' Smart_Form_Filler.user.js
+          grep -F 'GM_openInTab' Smart_Form_Filler.user.js
+          grep -F 'eu.i.posthog.com' Smart_Form_Filler.user.js
+          git diff --check
+
+      - name: Commit production userscript
+        shell: bash
+        run: |
+          if git diff --quiet -- Smart_Form_Filler.user.js; then
+            echo 'No userscript changes to commit.'
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add Smart_Form_Filler.user.js
+          git commit -m 'release: compact Smart FormSense panel v17.21.0'
+          git push origin HEAD:main
