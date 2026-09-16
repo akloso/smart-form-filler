@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Smart FormSense
 // @namespace    smart-form-filler
-// @version      17.21.0
+// @version      17.22.0
 // @description  Automatic form filling and functional QA testing for authorized web-form validation, safe progression, embedded forms, and synthetic test data.
 // @author       Akash Singh
 // @match        *://*/*
@@ -54,7 +54,7 @@
   const SETTINGS_VERSION = 4;
   const ACTION_DEFAULT_TTL_MS = 5 * 60 * 1000;
   const PRODUCT_NAME = 'Smart FormSense';
-  const SCRIPT_VERSION = '17.21.0';
+  const SCRIPT_VERSION = '17.22.0';
   const FEEDBACK_ENDPOINT = 'https://formspree.io/f/xbgjvoaw';
   const UPDATE_RAW_URL = 'https://raw.githubusercontent.com/akloso/smart-form-filler/main/Smart_Form_Filler.user.js';
   const UPDATE_CHECK_KEY = 'STFF_UPDATE_CHECK_V1';
@@ -131,8 +131,8 @@
   const TAMPERMONKEY_INSTALL_URL = 'https://chromewebstore.google.com/detail/tampermonkey/dhdgffkkebhmkfjojejmpbldmpobfkfo?hl=en';
   const SHARE_SUBJECT = '🚀 Introducing Smart FormSense || Auto Form Filler & Auto QA Testing';
 
-  // Product Analytics is privacy-first and stays disabled until the project token
-  // and ingestion host are explicitly configured.
+  // Product Analytics is privacy-first. PostHog is configured for anonymous
+  // product-usage telemetry only; form values and sensitive data are excluded.
   const POSTHOG_PROJECT_KEY = 'phc_tvkpunebfKwWRdUttkbJ4ZdphYmpeJaqj3MnZ7mP67c8';
   const POSTHOG_HOST = 'https://eu.i.posthog.com';
   const ANALYTICS_INSTALL_ID_KEY = 'STFF_ANALYTICS_INSTALL_ID_V1';
@@ -296,7 +296,7 @@
     );
 
     console.error(
-      `Smart FormSense V17.21.0 [${stage}]`,
+      `Smart FormSense V17.22.0 [${stage}]`,
       error
     );
 
@@ -12613,7 +12613,7 @@
     const report = {
       reportVersion: 1,
       generatedBy:
-        'Smart FormSense V17.21.0',
+        'Smart FormSense V17.22.0',
       generatedAt:
         new Date().toISOString(),
       mode:
@@ -12778,7 +12778,7 @@
       return report;
     } catch (error) {
       console.error(
-        'Smart FormSense V17.21.0 debug export:',
+        'Smart FormSense V17.22.0 debug export:',
         error
       );
 
@@ -13865,7 +13865,7 @@
       product:
         'Smart FormSense',
       productVersion:
-        '17.21.0',
+        '17.22.0',
       generatedAt,
       auditType:
         'Non-destructive Form Readiness Audit',
@@ -14212,7 +14212,7 @@
   <div class="hero">
     <div class="brand">✦ SMART FORMSENSE QA</div>
     <h1>${esc(qa.page?.title || 'Form')}</h1>
-    <div class="meta">${esc(qa.page?.hostname || location.hostname || '')}<br>${esc(generated)} • v${esc(qa.productVersion || '17.21.0')}</div>
+    <div class="meta">${esc(qa.page?.hostname || location.hostname || '')}<br>${esc(generated)} • v${esc(qa.productVersion || '17.22.0')}</div>
     <div class="status ${statusClass}">${esc(status)}</div>
     <div class="overview">${esc(overview)}</div>
 
@@ -14431,7 +14431,7 @@
       product:
         'Smart FormSense',
       productVersion:
-        '17.21.0',
+        '17.22.0',
       generatedAt:
         new Date().toISOString(),
       purpose:
@@ -14526,7 +14526,7 @@
       return report;
     } catch (error) {
       console.error(
-        'Smart FormSense V17.21.0 QA debug export:',
+        'Smart FormSense V17.22.0 QA debug export:',
         error
       );
 
@@ -17013,7 +17013,7 @@
       : {
           reportVersion: 7,
           product: 'Smart FormSense',
-          productVersion: '17.21.0',
+          productVersion: '17.22.0',
           generatedAt: new Date().toISOString(),
           auditType: 'Black-box Functional Form QA',
           page: {
@@ -17050,7 +17050,7 @@
     const cleanReason = String(reason || '').slice(0, 500);
     return {
       ...base,
-      productVersion: '17.21.0',
+      productVersion: '17.22.0',
       reportVersion: Math.max(5, Number(base.reportVersion || 0)),
       runState,
       incomplete: runState !== 'completed',
@@ -17201,7 +17201,7 @@
       return {
         reportVersion: 7,
         product: 'Smart FormSense',
-        productVersion: '17.21.0',
+        productVersion: '17.22.0',
         generatedAt,
         completedAt: ['completed', 'stopped', 'failed'].includes(runState) ? new Date().toISOString() : null,
         auditType: 'Black-box Functional Form QA',
@@ -20093,7 +20093,7 @@
               <span class="creatorThoughtText" id="creatorThought"></span>
               <button class="thoughtShuffle" id="thoughtShuffle" type="button" title="Show another thought" aria-label="Show another thought">↻</button>
             </div>
-            <div class="creatorIdentity">❤️ <strong>Akash Singh</strong> · <span id="creatorEmail"></span> · <button class="versionTap" id="versionTap" type="button">v17.21.0</button></div>
+            <div class="creatorIdentity">❤️ <strong>Akash Singh</strong> · <span id="creatorEmail"></span> · <button class="versionTap" id="versionTap" type="button">v17.22.0</button></div>
           </div>
         </div>
       </div>
@@ -20233,7 +20233,7 @@
                 <div class="settingCard"><div class="settingRow"><div class="settingText"><b>Automatically check for updates</b><span>Checks at most once every 12 hours.</span></div><label class="switch"><input id="settingAutoCheckUpdates" type="checkbox"><span class="slider"></span></label></div></div>
                 <div class="settingCard">
                   <div class="settingText"><b>Version status</b><span id="updateStatusText">Checking update status…</span></div>
-                  <div class="updateStatus">Current: <strong id="currentVersionText">v17.21.0</strong> · Latest: <strong id="latestVersionText">—</strong></div>
+                  <div class="updateStatus">Current: <strong id="currentVersionText">v17.22.0</strong> · Latest: <strong id="latestVersionText">—</strong></div>
                   <div class="updateActions"><button class="settingsAction" id="checkUpdatesBtn" type="button">Check for updates</button><button class="settingsAction updateNow" id="updateNowSettings" type="button">Update Smart FormSense</button></div>
                 </div>
               </section>
