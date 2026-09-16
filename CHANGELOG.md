@@ -1,6 +1,116 @@
 # Changelog
 
-All notable public changes to Smart FormSense are documented here.
+Recent notable public changes to Smart FormSense are documented here. The repository commit history remains the source of truth for intermediate historical patches that predate the current maintained release notes.
+
+## 17.22.0
+
+Maintenance/documentation release.
+
+- Refreshed the production version from **17.21.0** to **17.22.0** in all current userscript version references
+- Corrected an outdated PostHog source comment that still implied analytics were disabled until configuration; anonymous PostHog analytics were already configured and live
+- Kept the existing PostHog project host/configuration and privacy model unchanged
+- Refreshed `README.md` to describe the current Auto Form Filler, Auto QA Testing, compact panel, Share, update flow, feedback, Developer Mode, creator thoughts, shortcuts, and analytics privacy rules
+- Brought the changelog forward through the recent production releases
+- No intended runtime feature or form-mutation behavior changes
+- Existing no-final-submit, existing-value protection, synthetic-data, iframe/cross-origin, Stop, and Undo safety behavior remains unchanged
+
+## 17.21.0
+
+Compact-panel release.
+
+- Reduced vertical screen usage across the Smart FormSense panel without removing functionality
+- Tightened hero/header spacing, title/tagline spacing, profile/zoom controls, body padding, tabs, mode row, progress, stage text, stat cards, primary/secondary controls, status, help/legend, creator footer, creator-thought row, and QA surfaces
+- Preserved the minimal-primary-surface approach so less-frequent configuration stays in Settings/modals
+- Kept the Shadow DOM panel architecture and existing runtime/safety behavior intact
+
+## 17.20.0
+
+Creator personality release.
+
+- Added a pool of **60 curated Smart FormSense thoughts** in the footer
+- Added a **4-hour** thought rotation interval
+- Added manual `↻` shuffle
+- Prevented immediate consecutive repeats
+- Stored thought state locally through Tampermonkey storage
+- Manual shuffle resets the 4-hour interval
+- Kept creator identity fixed while only the thought changes
+- Explicitly kept creator thoughts out of Settings
+- Explicitly kept thought changes/shuffles out of PostHog analytics
+
+## 17.19.0
+
+Sharing and analytics release.
+
+- Added the compact Share menu
+- Added **Email**, **Copy Link**, **WhatsApp**, and **Microsoft Teams** share channels
+- Added comma-separated recipient handling and recipient validation for Email
+- Added default mail-handler flow with Gmail web-compose fallback
+- Kept final send under user control
+- Added colorful channel identities while retaining a compact UI
+- Added anonymous privacy-first PostHog product analytics
+- Added local anonymous installation identity with People profiles disabled
+- Added product events covering first run, sessions, mode selection, Fill/QA starts, sharing, updates/settings/feedback/version flows, and related operational usage
+- Kept form values, entered personal data, passwords/OTPs, payment data, synthetic QA values, full URLs/query strings, and share-recipient emails out of analytics
+- Added/finished the hidden Developer Mode flow and developer-only controls
+- Polished the share menu and email fallback before the final production cleanup
+
+## 17.18.2
+
+Update apply-flow fix.
+
+- Improved the update flow after Tampermonkey installs a newer version
+- Added/clarified the reload step needed for an already-open page to run the newly installed userscript
+
+## 17.18.1
+
+Update-cache reliability fix.
+
+- Fixed update-check caching behavior so current/latest version state refreshes more reliably
+
+## 17.18.0
+
+UI polish release.
+
+- Refined panel header/window controls and icon treatment
+- Improved feedback modal interaction, selected-state clarity, hover/close behavior, and success presentation
+- Continued visual polish around update availability and panel controls
+- Updated current-version references throughout reports/debug/runtime output
+
+## 17.17.0
+
+Smart FormSense branding and product-services refinement release.
+
+- Returned the product name to **Smart FormSense** after the temporary v17.16 naming experiment
+- Added the production `@updateURL` and `@downloadURL` flow pointing to the main userscript
+- Added automatic update-check configuration and current/latest version infrastructure
+- Added Formspree-backed in-product feedback support
+- Added `GM_xmlhttpRequest` and required connection permissions for product services
+- Continued settings migration and report/runtime version consistency work
+- Preserved the existing final manual-submission safeguards
+
+## 17.16.0
+
+Temporary naming and core-behavior/settings refinement release.
+
+- Temporarily renamed the product to **Auto Form Filler and Auto QA Testing**; later releases returned to **Smart FormSense**
+- Clarified the product description around automatic form filling and functional QA
+- Promoted panel position and dependency handling to core behavior instead of ordinary user preferences
+- Removed/ignored legacy stored settings for those concepts during settings merge
+- Added notification-duration configuration
+- Expanded QA field diagnostics and detailed validation evidence, including whether an action was clicked where recorded
+- Continued report branding/version updates
+
+## 17.15.0
+
+Major UX/settings/report refinement release.
+
+- Added settings migration work and new general defaults
+- Added completion notifications and default-workspace behavior
+- Improved live counter/status recomputation after Undo, New Applicant, trusted edits, and other state changes
+- Added panel-scale/status-refresh state used by later UI refinements
+- Expanded the human-readable QA report with grouped **Detailed Validation** evidence
+- Added exact tested value, trigger, expected behavior, observed behavior, and grouped pass/fail presentation where available
+- Preserved the existing form-filling and final-submission safety model
 
 ## 17.10.0
 
