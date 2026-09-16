@@ -2,41 +2,140 @@
 
 *Intelligent Form Filling & QA Testing*
 
-Smart FormSense is a Tampermonkey userscript for authorized form filling and black-box functional QA with synthetic test data. It combines fast completion-first form automation with applicant-side QA that safely exercises the finished form without touching backend configuration or automatically submitting the final form.
+Smart FormSense is a Tampermonkey userscript for authorized form filling and black-box functional QA with synthetic test data. It combines completion-first form automation with applicant-side testing that exercises the finished form safely from the user perspective.
 
-## Current version
+## Current production version
 
-**17.10.0**
+**17.22.0**
 
-## Two modes
+v17.22.0 is a maintenance/documentation release. Runtime behavior remains based on the compact v17.21.0 production release; the production source metadata was refreshed and an outdated analytics comment was corrected to match the already-live PostHog configuration.
 
-### ⚡ Form Filling
+## Core product rules
 
-- Fill **Minimum Required Fields** or **Fill All Fields**
-- Preserve existing user-entered values by default
-- Understand fields using labels, placeholders, attributes, table context, options, constraints, and validation messages
-- Repair many common validation failures where possible
-- Support native controls, dynamic/custom controls, dependent fields, and embedded/cross-origin forms
-- Keep required file uploads and other genuinely manual actions as **Manual Required**
-- Provide Validate, Recheck & Correct, Stop, Undo, New Applicant, and Debug Export tools
+These rules are intentionally treated as product invariants:
 
-### 🧪 QA Testing
+- **No active command = no field writes.** Opening a page or opening Smart FormSense must not silently mutate a form.
+- Final **Submit / Payment / Finalize / Complete** actions remain manual.
+- Meaningful existing user-entered values are preserved by default.
+- Undo should reverse Smart FormSense-owned changes without destroying later manual edits.
+- Generated identities and values are synthetic and are used only during explicit Fill/QA actions.
+- File uploads remain manual.
+- CAPTCHA is never solved automatically.
 
-- Run **black-box functional QA** from the applicant/user point of view instead of auditing backend implementation choices
-- Temporarily exercise fields with relevant blank, valid, invalid, and boundary values, then restore the original state after each test
-- Test mandatory-field behaviour, valid/invalid input handling, dropdown selection, radio/checkbox interaction, and common numeric/text boundaries
-- Use field semantics to generate relevant cases for email, mobile, pincode, percentage/CGPA, names, passing years, and dates where safe
-- Probe common dependency chains such as **Country → State → District → City** and report whether child fields react to parent changes
-- Recognize read-only datepicker controls as widget-driven fields instead of automatically treating them as broken
-- Keep file uploads, datepicker UI details, and journey-only validation as explicit review/manual test cases where browser restrictions or no-submit safety prevent a reliable automated conclusion
-- Produce a **Functional QA Score** based on executed test cases
-- Summarize **Failed**, **Warning**, **Review**, and **Passed** test cases
-- Keep findings navigable to the affected field when supported
-- Support embedded/cross-origin forms through the existing child-frame agent bridge
-- Export a human-readable **HTML Functional QA Report**
-- Export a separate **QA Debug JSON** with detailed field/test/runtime diagnostics for troubleshooting
+## Two workspaces
 
-Smart FormSense never automatically performs the final submission. Functional QA temporarily changes field state only for safe test execution and restores values afterward.
+### ⚡ Auto Form Filler
+
+Smart FormSense understands the form and fills it with synthetic test data when the user explicitly starts a fill action.
+
+- **Minimum Required Fields** — completes the minimum meaningful set needed for progression.
+- **Fill All Fields** — attempts all relevant fields while protecting existing meaningful values and manual-only controls.
+- Uses labels, placeholders, IDs/names, nearby text, row/column context, options, required signals, native constraints, validation messages, current state, and dependency relationships to understand fields.
+- Supports text inputs, dropdowns, radios, checkboxes, custom controls, repeating rows, academic/table layouts, delayed DOM updates, and dynamic/dependent fields.
+- Includes **Validate**, **Recheck & Correct**, **Stop**, **Undo**, **New Applicant**, navigation counters, and debug export.
+- Supports embedded and cross-origin forms through the existing top-page/child-frame bridge.
+
+### 🧪 Auto QA Testing
+
+QA is **black-box applicant-side functional testing**, not a backend configuration audit.
+
+Where safe, Smart FormSense can exercise:
+
+- required/blank behavior
+- valid, invalid, and boundary values
+- email, mobile, pincode, names, percentage/CGPA, passing years, and dates
+- min/max/maxlength constraints
+- dropdowns, radios, and checkboxes
+- dependency chains such as **Country → State → District → City**
+- safe Next/Continue progression when needed to trigger meaningful validation
+
+QA temporarily changes field state, observes actual behavior, and restores the original state where supported. If something cannot be proven safely—such as a widget restriction, file upload, datepicker detail, or journey-only check—it is reported as **Review/manual** instead of being invented as a failure.
+
+QA outcomes distinguish:
+
+- **Failed / blocker**
+- **Warning**
+- **Review/manual**
+- **Passed**
+
+Reports can include the field, test name, exact test value, trigger, whether an action was clicked, expected behavior, observed behavior, and outcome. Smart FormSense can export a human-readable HTML QA report and QA Debug JSON.
+
+## Compact panel
+
+The v17.21 compact-panel release reduced vertical screen usage without removing product functionality. The current panel keeps the primary surface small and pushes less-frequent configuration into Settings/modals.
+
+The visible panel uses Shadow DOM to reduce CSS collisions with host websites.
+
+## Sharing
+
+The Share menu supports:
+
+- **Email** — accepts one or more comma-separated recipients and prepares a draft; the user performs the final send.
+- **Copy Link** — copies the public Smart FormSense installation link.
+- **WhatsApp** — opens a prepared share message.
+- **Microsoft Teams** — opens a prepared Teams chat/draft.
+
+Recipient email addresses are never sent to analytics.
+
+## Updates
+
+The production source is:
+
+`https://raw.githubusercontent.com/akloso/smart-form-filler/main/Smart_Form_Filler.user.js`
+
+Both `@updateURL` and `@downloadURL` point to `main`.
+
+Smart FormSense includes automatic update checks, current/latest version status, **Check for Updates**, and **Update Smart FormSense**. Returning to an already-open page after installing an update may require a page reload so the newly installed userscript is injected.
+
+## Feedback
+
+Smart FormSense includes an in-product feedback flow for category/rating/message and optional contact email. Feedback is separate from form contents.
+
+## Developer Mode
+
+Developer Mode is intentionally hidden from the normal surface.
+
+- Click the displayed version **5 times** to enable Developer Mode for **1 hour**.
+- Click the version **5 times** again while enabled to disable it.
+- Developer-only debug controls become visible while Developer Mode is active.
+
+## Creator thoughts
+
+The footer includes a small rotating Smart FormSense thought above the fixed creator identity.
+
+- 60 curated thoughts
+- 4-hour rotation
+- manual `↻` shuffle
+- no immediate consecutive repeat
+- locally persisted state
+- no Settings option
+- no PostHog event for thought changes
+
+## Analytics and privacy
+
+Smart FormSense uses privacy-first anonymous PostHog product analytics. A random local installation ID is used and People profiles are disabled.
+
+Analytics may include safe operational metadata such as:
+
+- anonymous installation ID
+- Smart FormSense version
+- mode
+- counts and duration
+- hostname
+- share channel
+- timestamps
+
+Smart FormSense analytics must never send:
+
+- form field values
+- names or email addresses entered in forms
+- phone numbers
+- Aadhaar or PAN values
+- passwords or OTPs
+- payment information
+- synthetic QA values
+- full URLs or query strings
+- Share recipient email addresses
 
 ## Installation
 
@@ -48,22 +147,37 @@ The stable public userscript filename remains:
 
 `Smart_Form_Filler.user.js`
 
-This filename is intentionally retained so the existing GitHub → Greasy Fork source sync continues without changing the public source URL.
-
-Every public production code change must increment the userscript `@version` metadata.
+This filename is intentionally retained so the existing GitHub → Greasy Fork source path remains stable.
 
 ## Usage
 
 1. Install Tampermonkey in a supported browser.
 2. Install Smart FormSense from Greasy Fork.
-3. Open a form you are authorized to test.
-4. Activate **Smart FormSense** from the Tampermonkey menu.
-5. Use **⚡ Form Filling** for completion assistance or **🧪 QA Testing** for black-box functional testing.
-6. Review reproduced failures, warnings, review/manual cases, and the exported report before go-live approval.
+3. Open a form you are authorized to fill/test.
+4. Open Smart FormSense.
+5. Use **⚡ Auto Form Filler** for form completion assistance or **🧪 Auto QA Testing** for applicant-side functional QA.
+6. Review any failures, warnings, review/manual items, and reports before making a final manual submission or go-live decision.
+
+## Default keyboard shortcuts
+
+`PRIMARY` means **Ctrl** on Windows/Linux and **Command** on macOS.
+
+| Action | Shortcut |
+| --- | --- |
+| Open / Minimize | `PRIMARY + ALT + M` |
+| Settings | `PRIMARY + ALT + S` |
+| Fill Form | `PRIMARY + ALT + F` |
+| Validate | `PRIMARY + ALT + V` |
+| Recheck | `PRIMARY + ALT + C` |
+| Stop | `PRIMARY + ALT + X` |
+| Undo | `PRIMARY + ALT + Z` |
+| New Applicant | `PRIMARY + ALT + N` |
+| Run QA | `PRIMARY + ALT + Q` |
+| Report | `PRIMARY + ALT + R` |
 
 ## Safety
 
-Smart FormSense is intended for authorized QA, testing, staging, demo, and development workflows. It generates synthetic test data, preserves/restores user state during QA where supported, and does not intentionally submit the final form.
+Smart FormSense is intended for authorized QA, testing, staging, demo, development, and legitimate form-filling workflows. It does not automatically complete irreversible final submission/payment/finalization actions.
 
 ## Creator
 
