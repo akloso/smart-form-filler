@@ -125,7 +125,7 @@ jobs:
               raise SystemExit('Could not patch post-update return flow')
 
           begin_pattern = re.compile(
-              r"""    const beginUpdateInstallFlow = event => \{.*?\n    \};\n\n    const resetFeedbackForm""",
+              r"""\s*const beginUpdateInstallFlow = event => \{.*?\n\s*\};\n\n\s*const resetFeedbackForm""",
               re.S
           )
           begin_replacement = """    const beginUpdateInstallFlow = event => {
