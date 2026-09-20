@@ -6,9 +6,9 @@ Smart FormSense is a Tampermonkey userscript for authorized form filling and bla
 
 ## Current production version
 
-**17.23.0**
+**17.24.0**
 
-v17.23.0 fixes the in-product update flow. Smart FormSense now sends users to the Greasy Fork installation/update page instead of trying to open the raw GitHub userscript as an installer, prevents stale update actions from being shown as actionable, and no longer assumes that returning from the update page means an update was successfully installed.
+v17.24.0 completes the update-flow fix by moving update discovery to Greasy Fork's public API. This removes the browser-side dependency on the repository's raw GitHub URL, keeps update/install navigation on Greasy Fork, and prevents private-source 404 responses from breaking update checks.
 
 ## Core product rules
 
@@ -79,13 +79,15 @@ Recipient email addresses are never sent to analytics.
 
 ## Updates
 
-The production source is:
+Public installation and updates use Greasy Fork:
 
-`https://raw.githubusercontent.com/akloso/smart-form-filler/main/Smart_Form_Filler.user.js`
+`https://greasyfork.org/en/scripts/592133-smart-form-filler`
 
-Both `@updateURL` and `@downloadURL` point to `main`.
+Smart FormSense checks the public Greasy Fork JSON API for the currently published version. Automatic checks run at most once per 24 hours; **Check for Updates** can still be run manually.
 
-Smart FormSense includes automatic update checks, current/latest version status, **Check for Updates**, and **Update Smart FormSense**. Returning to an already-open page after installing an update may require a page reload so the newly installed userscript is injected.
+The source metadata `@updateURL` and `@downloadURL` also point to the public Greasy Fork userscript endpoint. Greasy Fork may rewrite these metadata keys when publishing, which is expected.
+
+When an update is available, **Update Smart FormSense** opens the Greasy Fork page. Complete the Tampermonkey update there, then reload any already-open form page so the new userscript version is injected.
 
 ## Feedback
 

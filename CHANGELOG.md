@@ -2,6 +2,18 @@
 
 Recent notable public changes to Smart FormSense are documented here. The repository commit history remains the source of truth for intermediate historical patches that predate the current maintained release notes.
 
+## 17.24.0
+
+Public update-source reliability fix.
+
+- Moved in-product update discovery from the repository raw URL to the public Greasy Fork JSON API
+- Added Greasy Fork API access permission for version checks
+- Changed source `@updateURL` / `@downloadURL` metadata to the public Greasy Fork userscript endpoint
+- Kept the in-product Update action on the public Greasy Fork page
+- Changed automatic update-check cadence from 12 hours to 24 hours
+- Removed the remaining browser-side dependency on the private/raw GitHub source for update discovery
+- Existing form-filling, QA, safety, analytics, sharing, iframe, Stop, Undo, and final-submit protection behavior is unchanged
+
 ## 17.23.0
 
 Update-flow reliability fix.

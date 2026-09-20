@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Smart FormSense
 // @namespace    smart-form-filler
-// @version      17.23.0
+// @version      17.24.0
 // @description  Automatic form filling and functional QA testing for authorized web-form validation, safe progression, embedded forms, and synthetic test data.
 // @author       Akash Singh
 // @match        *://*/*
@@ -13,10 +13,10 @@
 // @grant        GM_download
 // @grant        GM_xmlhttpRequest
 // @connect      formspree.io
-// @connect      raw.githubusercontent.com
+// @connect      api.greasyfork.org
 // @connect      eu.i.posthog.com
-// @updateURL    https://raw.githubusercontent.com/akloso/smart-form-filler/main/Smart_Form_Filler.user.js
-// @downloadURL  https://raw.githubusercontent.com/akloso/smart-form-filler/main/Smart_Form_Filler.user.js
+// @updateURL    https://greasyfork.org/scripts/592133/code/userscript.user.js
+// @downloadURL  https://greasyfork.org/scripts/592133/code/userscript.user.js
 // ==/UserScript==
 
 (() => {
@@ -54,12 +54,12 @@
   const SETTINGS_VERSION = 4;
   const ACTION_DEFAULT_TTL_MS = 5 * 60 * 1000;
   const PRODUCT_NAME = 'Smart FormSense';
-  const SCRIPT_VERSION = '17.23.0';
+  const SCRIPT_VERSION = '17.24.0';
   const FEEDBACK_ENDPOINT = 'https://formspree.io/f/xbgjvoaw';
-  const UPDATE_RAW_URL = 'https://raw.githubusercontent.com/akloso/smart-form-filler/main/Smart_Form_Filler.user.js';
+  const UPDATE_INFO_URL = 'https://api.greasyfork.org/en/scripts/592133.json';
   const UPDATE_CHECK_KEY = 'STFF_UPDATE_CHECK_V1';
   const DEV_MODE_UNTIL_KEY = 'STFF_DEVELOPER_MODE_UNTIL';
-  const UPDATE_CHECK_INTERVAL_MS = 12 * 60 * 60 * 1000;
+  const UPDATE_CHECK_INTERVAL_MS = 24 * 60 * 60 * 1000;
   const DEVELOPER_MODE_MS = 60 * 60 * 1000;
 
   const THOUGHT_STATE_KEY = 'STFF_CREATOR_THOUGHT_V1';
@@ -297,7 +297,7 @@
     );
 
     console.error(
-      `Smart FormSense V17.23.0 [${stage}]`,
+      `Smart FormSense V17.24.0 [${stage}]`,
       error
     );
 
@@ -12614,7 +12614,7 @@
     const report = {
       reportVersion: 1,
       generatedBy:
-        'Smart FormSense V17.23.0',
+        'Smart FormSense V17.24.0',
       generatedAt:
         new Date().toISOString(),
       mode:
@@ -12779,7 +12779,7 @@
       return report;
     } catch (error) {
       console.error(
-        'Smart FormSense V17.23.0 debug export:',
+        'Smart FormSense V17.24.0 debug export:',
         error
       );
 
@@ -13866,7 +13866,7 @@
       product:
         'Smart FormSense',
       productVersion:
-        '17.23.0',
+        '17.24.0',
       generatedAt,
       auditType:
         'Non-destructive Form Readiness Audit',
@@ -14213,7 +14213,7 @@
   <div class="hero">
     <div class="brand">✦ SMART FORMSENSE QA</div>
     <h1>${esc(qa.page?.title || 'Form')}</h1>
-    <div class="meta">${esc(qa.page?.hostname || location.hostname || '')}<br>${esc(generated)} • v${esc(qa.productVersion || '17.23.0')}</div>
+    <div class="meta">${esc(qa.page?.hostname || location.hostname || '')}<br>${esc(generated)} • v${esc(qa.productVersion || '17.24.0')}</div>
     <div class="status ${statusClass}">${esc(status)}</div>
     <div class="overview">${esc(overview)}</div>
 
@@ -14432,7 +14432,7 @@
       product:
         'Smart FormSense',
       productVersion:
-        '17.23.0',
+        '17.24.0',
       generatedAt:
         new Date().toISOString(),
       purpose:
@@ -14527,7 +14527,7 @@
       return report;
     } catch (error) {
       console.error(
-        'Smart FormSense V17.23.0 QA debug export:',
+        'Smart FormSense V17.24.0 QA debug export:',
         error
       );
 
@@ -17014,7 +17014,7 @@
       : {
           reportVersion: 7,
           product: 'Smart FormSense',
-          productVersion: '17.23.0',
+          productVersion: '17.24.0',
           generatedAt: new Date().toISOString(),
           auditType: 'Black-box Functional Form QA',
           page: {
@@ -17051,7 +17051,7 @@
     const cleanReason = String(reason || '').slice(0, 500);
     return {
       ...base,
-      productVersion: '17.23.0',
+      productVersion: '17.24.0',
       reportVersion: Math.max(5, Number(base.reportVersion || 0)),
       runState,
       incomplete: runState !== 'completed',
@@ -17202,7 +17202,7 @@
       return {
         reportVersion: 7,
         product: 'Smart FormSense',
-        productVersion: '17.23.0',
+        productVersion: '17.24.0',
         generatedAt,
         completedAt: ['completed', 'stopped', 'failed'].includes(runState) ? new Date().toISOString() : null,
         auditType: 'Black-box Functional Form QA',
@@ -18220,9 +18220,13 @@
     } catch (error) { reject(error); }
   });
 
-  const latestVersionFromScript = text => {
-    const match = String(text || '').match(/^\/\/\s*@version\s+([^\s]+)\s*$/m);
-    return match ? String(match[1]).trim() : '';
+  const latestVersionFromGreasyForkInfo = text => {
+    try {
+      const info = JSON.parse(String(text || '{}'));
+      return String(info?.version || '').trim();
+    } catch {
+      return '';
+    }
   };
 
   const updateAvailableFrom = latest => !!latest && compareVersions(latest, SCRIPT_VERSION) > 0;
@@ -18245,11 +18249,11 @@
     }
 
     try {
-      const response = await gmTextRequest(`${UPDATE_RAW_URL}?t=${now}`, { timeout: 12000 });
+      const response = await gmTextRequest(`${UPDATE_INFO_URL}?t=${now}`, { timeout: 12000 });
       if (Number(response.status || 0) < 200 || Number(response.status || 0) >= 300) {
         throw new Error(`Update server returned ${response.status || 'an error'}`);
       }
-      const latestVersion = latestVersionFromScript(response.responseText || '');
+      const latestVersion = latestVersionFromGreasyForkInfo(response.responseText || '');
       if (!latestVersion) throw new Error('Latest version could not be read');
       const info = writeUpdateCache({
         checkedAt: now,
@@ -20094,7 +20098,7 @@
               <span class="creatorThoughtText" id="creatorThought"></span>
               <button class="thoughtShuffle" id="thoughtShuffle" type="button" title="Show another thought" aria-label="Show another thought">↻</button>
             </div>
-            <div class="creatorIdentity">❤️ <strong>Akash Singh</strong> · <span id="creatorEmail"></span> · <button class="versionTap" id="versionTap" type="button">v17.23.0</button></div>
+            <div class="creatorIdentity">❤️ <strong>Akash Singh</strong> · <span id="creatorEmail"></span> · <button class="versionTap" id="versionTap" type="button">v17.24.0</button></div>
           </div>
         </div>
       </div>
@@ -20234,7 +20238,7 @@
                 <div class="settingCard"><div class="settingRow"><div class="settingText"><b>Automatically check for updates</b><span>Checks at most once every 12 hours.</span></div><label class="switch"><input id="settingAutoCheckUpdates" type="checkbox"><span class="slider"></span></label></div></div>
                 <div class="settingCard">
                   <div class="settingText"><b>Version status</b><span id="updateStatusText">Checking update status…</span></div>
-                  <div class="updateStatus">Current: <strong id="currentVersionText">v17.23.0</strong> · Latest: <strong id="latestVersionText">—</strong></div>
+                  <div class="updateStatus">Current: <strong id="currentVersionText">v17.24.0</strong> · Latest: <strong id="latestVersionText">—</strong></div>
                   <div class="updateActions"><button class="settingsAction" id="checkUpdatesBtn" type="button">Check for updates</button><button class="settingsAction updateNow" id="updateNowSettings" type="button">Update Smart FormSense</button></div>
                 </div>
               </section>
