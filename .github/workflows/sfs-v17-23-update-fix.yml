@@ -48,29 +48,24 @@ jobs:
                   1
               )
 
-          old_open = """  const openUserscriptUpdate = () => {
-            try {
-              GM_openInTab(`${UPDATE_RAW_URL}?install=${Date.now()}`, { active: true, insert: true, setParent: true });
-              return true;
-            } catch {
-              try { window.open(UPDATE_RAW_URL, '_blank', 'noopener'); return true; } catch {}
-            }
-            return false;
-          };"""
-
-          new_open = """  const openUserscriptUpdate = () => {
-            try {
-              GM_openInTab(UPDATE_INSTALL_URL, { active: true, insert: true, setParent: true });
-              return true;
-            } catch {
-              try { window.open(UPDATE_INSTALL_URL, '_blank', 'noopener,noreferrer'); return true; } catch {}
-            }
-            return false;
-          };"""
-
-          if old_open not in text:
-              raise SystemExit('Expected current raw-GitHub update opener')
-          text = text.replace(old_open, new_open, 1)
+          open_pattern = re.compile(
+              r"""  const openUserscriptUpdate = \(\) => \{.*?\n  \};""",
+              re.S
+          )
+          open_replacement = "\n".join([
+              "  const openUserscriptUpdate = () => {",
+              "    try {",
+              "      GM_openInTab(UPDATE_INSTALL_URL, { active: true, insert: true, setParent: true });",
+              "      return true;",
+              "    } catch {",
+              "      try { window.open(UPDATE_INSTALL_URL, '_blank', 'noopener,noreferrer'); return true; } catch {}",
+              "    }",
+              "    return false;",
+              "  };"
+          ])
+          text, count = open_pattern.subn(open_replacement, text, count=1)
+          if count != 1:
+              raise SystemExit('Could not patch raw-GitHub update opener')
 
           render_pattern = re.compile(
               r"""    const renderUpdateStatus = \(\) => \{.*?\n    \};\n\n    const updateUpdateIndicator""",
