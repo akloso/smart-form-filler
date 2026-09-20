@@ -6,9 +6,9 @@ Smart FormSense is a Tampermonkey userscript for authorized form filling and bla
 
 ## Current production version
 
-**17.22.0**
+**17.23.0**
 
-v17.22.0 is a maintenance/documentation release. Runtime behavior remains based on the compact v17.21.0 production release; the production source metadata was refreshed and an outdated analytics comment was corrected to match the already-live PostHog configuration.
+v17.23.0 fixes the in-product update flow. Smart FormSense now sends users to the Greasy Fork installation/update page instead of trying to open the raw GitHub userscript as an installer, prevents stale update actions from being shown as actionable, and no longer assumes that returning from the update page means an update was successfully installed.
 
 ## Core product rules
 

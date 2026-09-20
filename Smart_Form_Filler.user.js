@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Smart FormSense
 // @namespace    smart-form-filler
-// @version      17.22.0
+// @version      17.23.0
 // @description  Automatic form filling and functional QA testing for authorized web-form validation, safe progression, embedded forms, and synthetic test data.
 // @author       Akash Singh
 // @match        *://*/*
@@ -54,7 +54,7 @@
   const SETTINGS_VERSION = 4;
   const ACTION_DEFAULT_TTL_MS = 5 * 60 * 1000;
   const PRODUCT_NAME = 'Smart FormSense';
-  const SCRIPT_VERSION = '17.22.0';
+  const SCRIPT_VERSION = '17.23.0';
   const FEEDBACK_ENDPOINT = 'https://formspree.io/f/xbgjvoaw';
   const UPDATE_RAW_URL = 'https://raw.githubusercontent.com/akloso/smart-form-filler/main/Smart_Form_Filler.user.js';
   const UPDATE_CHECK_KEY = 'STFF_UPDATE_CHECK_V1';
@@ -128,6 +128,7 @@
 ]);
 
   const SHARE_INSTALL_URL = 'https://greasyfork.org/en/scripts/592133-smart-form-filler';
+  const UPDATE_INSTALL_URL = SHARE_INSTALL_URL;
   const TAMPERMONKEY_INSTALL_URL = 'https://chromewebstore.google.com/detail/tampermonkey/dhdgffkkebhmkfjojejmpbldmpobfkfo?hl=en';
   const SHARE_SUBJECT = '🚀 Introducing Smart FormSense || Auto Form Filler & Auto QA Testing';
 
@@ -296,7 +297,7 @@
     );
 
     console.error(
-      `Smart FormSense V17.22.0 [${stage}]`,
+      `Smart FormSense V17.23.0 [${stage}]`,
       error
     );
 
@@ -12613,7 +12614,7 @@
     const report = {
       reportVersion: 1,
       generatedBy:
-        'Smart FormSense V17.22.0',
+        'Smart FormSense V17.23.0',
       generatedAt:
         new Date().toISOString(),
       mode:
@@ -12778,7 +12779,7 @@
       return report;
     } catch (error) {
       console.error(
-        'Smart FormSense V17.22.0 debug export:',
+        'Smart FormSense V17.23.0 debug export:',
         error
       );
 
@@ -13865,7 +13866,7 @@
       product:
         'Smart FormSense',
       productVersion:
-        '17.22.0',
+        '17.23.0',
       generatedAt,
       auditType:
         'Non-destructive Form Readiness Audit',
@@ -14212,7 +14213,7 @@
   <div class="hero">
     <div class="brand">✦ SMART FORMSENSE QA</div>
     <h1>${esc(qa.page?.title || 'Form')}</h1>
-    <div class="meta">${esc(qa.page?.hostname || location.hostname || '')}<br>${esc(generated)} • v${esc(qa.productVersion || '17.22.0')}</div>
+    <div class="meta">${esc(qa.page?.hostname || location.hostname || '')}<br>${esc(generated)} • v${esc(qa.productVersion || '17.23.0')}</div>
     <div class="status ${statusClass}">${esc(status)}</div>
     <div class="overview">${esc(overview)}</div>
 
@@ -14431,7 +14432,7 @@
       product:
         'Smart FormSense',
       productVersion:
-        '17.22.0',
+        '17.23.0',
       generatedAt:
         new Date().toISOString(),
       purpose:
@@ -14526,7 +14527,7 @@
       return report;
     } catch (error) {
       console.error(
-        'Smart FormSense V17.22.0 QA debug export:',
+        'Smart FormSense V17.23.0 QA debug export:',
         error
       );
 
@@ -17013,7 +17014,7 @@
       : {
           reportVersion: 7,
           product: 'Smart FormSense',
-          productVersion: '17.22.0',
+          productVersion: '17.23.0',
           generatedAt: new Date().toISOString(),
           auditType: 'Black-box Functional Form QA',
           page: {
@@ -17050,7 +17051,7 @@
     const cleanReason = String(reason || '').slice(0, 500);
     return {
       ...base,
-      productVersion: '17.22.0',
+      productVersion: '17.23.0',
       reportVersion: Math.max(5, Number(base.reportVersion || 0)),
       runState,
       incomplete: runState !== 'completed',
@@ -17201,7 +17202,7 @@
       return {
         reportVersion: 7,
         product: 'Smart FormSense',
-        productVersion: '17.22.0',
+        productVersion: '17.23.0',
         generatedAt,
         completedAt: ['completed', 'stopped', 'failed'].includes(runState) ? new Date().toISOString() : null,
         auditType: 'Black-box Functional Form QA',
@@ -18276,10 +18277,10 @@
 
   const openUserscriptUpdate = () => {
     try {
-      GM_openInTab(`${UPDATE_RAW_URL}?install=${Date.now()}`, { active: true, insert: true, setParent: true });
+      GM_openInTab(UPDATE_INSTALL_URL, { active: true, insert: true, setParent: true });
       return true;
     } catch {
-      try { window.open(UPDATE_RAW_URL, '_blank', 'noopener'); return true; } catch {}
+      try { window.open(UPDATE_INSTALL_URL, '_blank', 'noopener,noreferrer'); return true; } catch {}
     }
     return false;
   };
@@ -20093,7 +20094,7 @@
               <span class="creatorThoughtText" id="creatorThought"></span>
               <button class="thoughtShuffle" id="thoughtShuffle" type="button" title="Show another thought" aria-label="Show another thought">↻</button>
             </div>
-            <div class="creatorIdentity">❤️ <strong>Akash Singh</strong> · <span id="creatorEmail"></span> · <button class="versionTap" id="versionTap" type="button">v17.22.0</button></div>
+            <div class="creatorIdentity">❤️ <strong>Akash Singh</strong> · <span id="creatorEmail"></span> · <button class="versionTap" id="versionTap" type="button">v17.23.0</button></div>
           </div>
         </div>
       </div>
@@ -20233,7 +20234,7 @@
                 <div class="settingCard"><div class="settingRow"><div class="settingText"><b>Automatically check for updates</b><span>Checks at most once every 12 hours.</span></div><label class="switch"><input id="settingAutoCheckUpdates" type="checkbox"><span class="slider"></span></label></div></div>
                 <div class="settingCard">
                   <div class="settingText"><b>Version status</b><span id="updateStatusText">Checking update status…</span></div>
-                  <div class="updateStatus">Current: <strong id="currentVersionText">v17.22.0</strong> · Latest: <strong id="latestVersionText">—</strong></div>
+                  <div class="updateStatus">Current: <strong id="currentVersionText">v17.23.0</strong> · Latest: <strong id="latestVersionText">—</strong></div>
                   <div class="updateActions"><button class="settingsAction" id="checkUpdatesBtn" type="button">Check for updates</button><button class="settingsAction updateNow" id="updateNowSettings" type="button">Update Smart FormSense</button></div>
                 </div>
               </section>
@@ -20617,22 +20618,23 @@
 
     const currentUpdateInfo = () => normalizeUpdateInfo(state.updateInfo || readUpdateCache()) || null;
     const renderUpdateStatus = () => {
-      const info = currentUpdateInfo();
-      if (refs.currentVersionText) refs.currentVersionText.textContent = `v${SCRIPT_VERSION}`;
-      if (refs.latestVersionText) refs.latestVersionText.textContent = info?.latestVersion ? `v${info.latestVersion}` : '—';
-      if (refs.updateStatusText) {
-        refs.updateStatusText.textContent = info?.error
-          ? 'Last update check was unavailable.'
-          : info?.available
-            ? `Update available: v${info.latestVersion}`
-            : info?.latestVersion
-              ? 'Smart FormSense is up to date.'
-              : 'No update check has run yet.';
-      }
-      if (refs.updateNowSettings) refs.updateNowSettings.classList.toggle('visible', !!info?.available);
-    };
+    const info = currentUpdateInfo();
+    const available = updateAvailableFrom(info?.latestVersion || '');
+    if (refs.currentVersionText) refs.currentVersionText.textContent = `v${SCRIPT_VERSION}`;
+    if (refs.latestVersionText) refs.latestVersionText.textContent = info?.latestVersion ? `v${info.latestVersion}` : '—';
+    if (refs.updateStatusText) {
+      refs.updateStatusText.textContent = info?.error
+        ? 'Last update check was unavailable.'
+        : available
+          ? `Update available: v${info.latestVersion}`
+          : info?.latestVersion
+            ? 'Smart FormSense is up to date.'
+            : 'No update check has run yet.';
+    }
+    if (refs.updateNowSettings) refs.updateNowSettings.classList.toggle('visible', available);
+  };
 
-    const updateUpdateIndicator = info => {
+  const updateUpdateIndicator = info => {
       state.updateInfo = normalizeUpdateInfo(info || readUpdateCache());
       const latest = state.updateInfo?.latestVersion || '';
       const available = updateAvailableFrom(latest);
@@ -20657,33 +20659,61 @@
       setTimeout(() => refs.reloadApplyBtn?.focus?.(), 0);
     };
 
-    const maybeShowUpdateReloadAfterReturn = () => {
-      if (!updateInstallAwaitingReturn || document.hidden) return;
-      const elapsed = Date.now() - updateInstallOpenedAt;
-      if (elapsed < 700) {
-        setTimeout(maybeShowUpdateReloadAfterReturn, 750 - elapsed);
-        return;
-      }
-      updateInstallAwaitingReturn = false;
-      showUpdateReloadPrompt();
-    };
+    const maybeShowUpdateReloadAfterReturn = async () => {
+    if (!updateInstallAwaitingReturn || document.hidden) return;
+    const elapsed = Date.now() - updateInstallOpenedAt;
+    if (elapsed < 700) {
+      setTimeout(maybeShowUpdateReloadAfterReturn, 750 - elapsed);
+      return;
+    }
 
-    const beginUpdateInstallFlow = event => {
-      try { event?.preventDefault?.(); } catch {}
-      try { event?.stopPropagation?.(); } catch {}
-      if (updateReloadPending) {
-        showUpdateReloadPrompt();
-        return;
-      }
-      if (!openUserscriptUpdate()) {
-        state.panel?.notify?.('Update could not be opened', 'Open Settings → Updates and try again.', 'error');
-        return;
-      }
-      updateInstallAwaitingReturn = true;
-      updateInstallOpenedAt = Date.now();
-    };
+    updateInstallAwaitingReturn = false;
 
-    const resetFeedbackForm = () => {
+    try {
+      const info = await checkForUpdates({ force: true, silent: true });
+      state.panel?.updateUpdateIndicator?.(info);
+    } catch {}
+
+    state.panel?.notify?.(
+      'Update page returned',
+      `If you completed the Tampermonkey update, reload this page to activate it. This page is still running v${SCRIPT_VERSION}.`,
+      'warning'
+    );
+  };    const beginUpdateInstallFlow = event => {
+    try { event?.preventDefault?.(); } catch {}
+    try { event?.stopPropagation?.(); } catch {}
+
+    const info = currentUpdateInfo();
+    if (info?.latestVersion && !updateAvailableFrom(info.latestVersion)) {
+      updateUpdateIndicator(info);
+      state.panel?.notify?.(
+        'Smart FormSense is up to date',
+        `This page is already running v${SCRIPT_VERSION}.`,
+        'success'
+      );
+      return;
+    }
+
+    if (!openUserscriptUpdate()) {
+      state.panel?.notify?.(
+        'Update could not be opened',
+        'Open the Smart FormSense Greasy Fork page and update from there.',
+        'error'
+      );
+      return;
+    }
+
+    updateInstallAwaitingReturn = true;
+    updateInstallOpenedAt = Date.now();
+
+    state.panel?.notify?.(
+      'Greasy Fork opened',
+      'Complete the update in Tampermonkey. After installation, return here and reload this page.',
+      'success'
+    );
+  };
+
+  const resetFeedbackForm = () => {
       feedbackCategory = state.workspace === 'qa' ? 'Functional QA' : 'Form Fill';
       feedbackRating = 0;
       refs.feedbackCategories?.querySelectorAll('[data-feedback-category]').forEach(button => {

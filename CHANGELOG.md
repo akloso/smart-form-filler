@@ -2,6 +2,18 @@
 
 Recent notable public changes to Smart FormSense are documented here. The repository commit history remains the source of truth for intermediate historical patches that predate the current maintained release notes.
 
+## 17.23.0
+
+Update-flow reliability fix.
+
+- Changed the in-product **Update Smart FormSense** action to open the public Greasy Fork page instead of the raw GitHub userscript URL
+- Kept GitHub raw source only for lightweight version checking
+- Recomputed update visibility from the current runtime version instead of trusting stale cached availability state
+- Prevented a stale/invalid update action from opening when Smart FormSense is already current
+- Removed the false assumption that returning from the update tab means installation succeeded
+- After returning from Greasy Fork, Smart FormSense now tells the user to reload only if they actually completed the Tampermonkey update
+- Existing form-filling, QA, safety, analytics, sharing, iframe, Stop, Undo, and final-submit protection behavior is unchanged
+
 ## 17.22.0
 
 Maintenance/documentation release.
