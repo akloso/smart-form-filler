@@ -2,6 +2,19 @@
 
 Recent notable public changes to Smart FormSense are documented here. The repository commit history remains the source of truth for intermediate historical patches that predate the current maintained release notes.
 
+## 17.25.0
+
+Embedded-form lifecycle and modal-interaction reliability fix.
+
+- Isolated Smart FormSense panel pointer/click/touch events so host-page outside-click handlers do not normally treat panel interaction as a page click
+- Required a fresh iframe/frame-agent response during embedded-form discovery instead of trusting a recently cached agent
+- Added a pre-command liveness acknowledgement before Fill, Validate, Recheck, QA, and embedded Undo actions
+- Added an active embedded-form watchdog that pings the frame while a remote action is running
+- If the iframe closes or disappears, Smart FormSense now stops safely within a few seconds instead of waiting for the full remote-command timeout
+- Stale embedded agents are dropped after an unsuccessful discovery pass
+- Remote results with `ok: false` are now surfaced as failures instead of being treated as successful completion
+- Existing form-filling logic, synthetic-data rules, existing-value protection, Stop, Undo, analytics, sharing, and final-submit/payment safety behavior remain unchanged
+
 ## 17.24.0
 
 Public update-source reliability fix.
