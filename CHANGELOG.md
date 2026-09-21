@@ -2,6 +2,22 @@
 
 Recent notable public changes to Smart FormSense are documented here. The repository commit history remains the source of truth for intermediate historical patches that predate the current maintained release notes.
 
+## 17.26.0
+
+Embedded-form access detection and onboarding guidance.
+
+- Added proactive diagnostics for likely embedded/cross-origin forms whose Smart FormSense iframe agent is unavailable
+- Added a compact in-panel **Embedded form access required** guide with the Chrome/Tampermonkey path: **Extensions → Tampermonkey → Details → Site access → On all sites**
+- Added **Recheck Access** so users can verify the fix without needing to understand iframe internals
+- Displays the embedded-form hostname when it can be determined safely
+- Runs a silent access check when the panel opens on a page that appears to contain an embedded form
+- Reuses the same guidance when Fill/Validate/Recheck/QA cannot find an accessible embedded form
+- Successful iframe communication clears the warning automatically
+- Updated Share onboarding from two steps to three steps so recipients are told about required Tampermonkey site access
+- Updated README installation/usage guidance with the required Chrome site-access step
+- Smart FormSense still cannot read or change Chrome extension permissions directly; the diagnostic is based on whether the embedded frame can run/respond
+- Existing form-filling logic, QA behavior, synthetic-data rules, existing-value protection, Stop, Undo, analytics privacy, and final-submit/payment safety remain unchanged
+
 ## 17.25.0
 
 Embedded-form lifecycle and modal-interaction reliability fix.
