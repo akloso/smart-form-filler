@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Smart FormSense
 // @namespace    smart-form-filler
-// @version      17.25.0
+// @version      17.26.0
 // @description  Automatic form filling and functional QA testing for authorized web-form validation, safe progression, embedded forms, and synthetic test data.
 // @author       Akash Singh
 // @match        *://*/*
@@ -54,11 +54,14 @@
   const SETTINGS_VERSION = 4;
   const ACTION_DEFAULT_TTL_MS = 5 * 60 * 1000;
   const PRODUCT_NAME = 'Smart FormSense';
-  const SCRIPT_VERSION = '17.25.0';
+  const SCRIPT_VERSION = '17.26.0';
   const FEEDBACK_ENDPOINT = 'https://formspree.io/f/xbgjvoaw';
   const UPDATE_INFO_URL = 'https://api.greasyfork.org/en/scripts/592133.json';
   const UPDATE_CHECK_KEY = 'STFF_UPDATE_CHECK_V1';
   const DEV_MODE_UNTIL_KEY = 'STFF_DEVELOPER_MODE_UNTIL';
+  const EMBED_ACCESS_GUIDE_KEY = 'STFF_EMBED_ACCESS_GUIDE_V1';
+  const EMBED_ACCESS_SUCCESS_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+  const EMBED_ACCESS_DISMISS_TTL_MS = 7 * 24 * 60 * 60 * 1000;
   const UPDATE_CHECK_INTERVAL_MS = 24 * 60 * 60 * 1000;
   const DEVELOPER_MODE_MS = 60 * 60 * 1000;
 
@@ -300,7 +303,7 @@
     );
 
     console.error(
-      `Smart FormSense V17.25.0 [${stage}]`,
+      `Smart FormSense V17.26.0 [${stage}]`,
       error
     );
 
@@ -12617,7 +12620,7 @@
     const report = {
       reportVersion: 1,
       generatedBy:
-        'Smart FormSense V17.25.0',
+        'Smart FormSense V17.26.0',
       generatedAt:
         new Date().toISOString(),
       mode:
@@ -12782,7 +12785,7 @@
       return report;
     } catch (error) {
       console.error(
-        'Smart FormSense V17.25.0 debug export:',
+        'Smart FormSense V17.26.0 debug export:',
         error
       );
 
@@ -13869,7 +13872,7 @@
       product:
         'Smart FormSense',
       productVersion:
-        '17.25.0',
+        '17.26.0',
       generatedAt,
       auditType:
         'Non-destructive Form Readiness Audit',
@@ -14216,7 +14219,7 @@
   <div class="hero">
     <div class="brand">✦ SMART FORMSENSE QA</div>
     <h1>${esc(qa.page?.title || 'Form')}</h1>
-    <div class="meta">${esc(qa.page?.hostname || location.hostname || '')}<br>${esc(generated)} • v${esc(qa.productVersion || '17.25.0')}</div>
+    <div class="meta">${esc(qa.page?.hostname || location.hostname || '')}<br>${esc(generated)} • v${esc(qa.productVersion || '17.26.0')}</div>
     <div class="status ${statusClass}">${esc(status)}</div>
     <div class="overview">${esc(overview)}</div>
 
@@ -14435,7 +14438,7 @@
       product:
         'Smart FormSense',
       productVersion:
-        '17.25.0',
+        '17.26.0',
       generatedAt:
         new Date().toISOString(),
       purpose:
@@ -14530,7 +14533,7 @@
       return report;
     } catch (error) {
       console.error(
-        'Smart FormSense V17.25.0 QA debug export:',
+        'Smart FormSense V17.26.0 QA debug export:',
         error
       );
 
@@ -14702,6 +14705,233 @@
     } catch {
       return false;
     }
+  };
+
+  const readEmbeddedAccessGuideState = () => {
+    try {
+      const value =
+        GM_getValue(
+          EMBED_ACCESS_GUIDE_KEY,
+          null
+        );
+
+      return value &&
+        typeof value === 'object'
+          ? value
+          : {};
+    } catch {
+      return {};
+    }
+  };
+
+  const writeEmbeddedAccessGuideState = patch => {
+    const next = {
+      ...readEmbeddedAccessGuideState(),
+      ...(patch || {})
+    };
+
+    try {
+      GM_setValue(
+        EMBED_ACCESS_GUIDE_KEY,
+        next
+      );
+    } catch {}
+
+    return next;
+  };
+
+  const rememberEmbeddedAccessSuccess = details => {
+    writeEmbeddedAccessGuideState({
+      lastSuccessAt:
+        Date.now(),
+      lastSuccessHost:
+        String(
+          details?.primaryHostname ||
+          location.hostname ||
+          ''
+        ).slice(0, 120),
+      lastWarnAt:
+        0
+    });
+
+    state.panel?.hideAccessGuide?.();
+  };
+
+  const embeddedFrameAccessDiagnostics = () => {
+    if (!IS_TOP) {
+      return {
+        iframeCount: 0,
+        visibleIframeCount: 0,
+        likelyEmbeddedForm: false,
+        primaryHostname: '',
+        hostnames: []
+      };
+    }
+
+    const formPattern =
+      /(?:form|widget|enquiry|inquiry|application|apply|admission|register|signup|contact|lead|crm|nopaperforms|meritto)/i;
+
+    let pageFormSignal =
+      false;
+
+    try {
+      pageFormSignal =
+        !!document.querySelector(
+          '[class*="form" i],[id*="form" i],[class*="widget" i],[id*="widget" i],[class*="enquiry" i],[id*="enquiry" i],[class*="inquiry" i],[id*="inquiry" i],[class*="apply" i],[id*="apply" i]'
+        ) ||
+        [
+          ...document.scripts
+        ].some(
+          script =>
+            formPattern.test(
+              String(
+                script.src || ''
+              )
+            )
+        );
+    } catch {}
+
+    const frames =
+      [];
+
+    try {
+      document
+        .querySelectorAll(
+          'iframe'
+        )
+        .forEach(frame => {
+          try {
+            const rect =
+              frame.getBoundingClientRect();
+
+            const visible =
+              rect.width >= 80 &&
+              rect.height >= 60 &&
+              rect.bottom > 0 &&
+              rect.right > 0 &&
+              rect.top <
+                window.innerHeight +
+                  240 &&
+              rect.left <
+                window.innerWidth +
+                  240;
+
+            const src =
+              String(
+                frame.getAttribute(
+                  'src'
+                ) ||
+                frame.src ||
+                ''
+              );
+
+            const text =
+              [
+                src,
+                frame.title || '',
+                frame.name || '',
+                frame.id || '',
+                frame.className || '',
+                frame.getAttribute?.(
+                  'aria-label'
+                ) || ''
+              ]
+                .join(
+                  ' '
+                )
+                .trim();
+
+            let hostname =
+              '';
+
+            let crossOrigin =
+              false;
+
+            try {
+              if (src) {
+                const url =
+                  new URL(
+                    src,
+                    location.href
+                  );
+
+                hostname =
+                  url.hostname ||
+                  '';
+
+                crossOrigin =
+                  !!url.origin &&
+                  url.origin !==
+                    location.origin;
+              }
+            } catch {}
+
+            const explicitFormSignal =
+              formPattern.test(
+                text
+              );
+
+            const likely =
+              explicitFormSignal ||
+              (
+                visible &&
+                crossOrigin &&
+                pageFormSignal
+              );
+
+            frames.push({
+              visible,
+              src,
+              hostname,
+              crossOrigin,
+              explicitFormSignal,
+              likely
+            });
+          } catch {}
+        });
+    } catch {}
+
+    const likelyFrames =
+      frames.filter(
+        frame =>
+          frame.likely
+      );
+
+    const hostnames =
+      [
+        ...new Set(
+          likelyFrames
+            .map(
+              frame =>
+                String(
+                  frame.hostname ||
+                  ''
+                )
+                  .trim()
+                  .toLowerCase()
+            )
+            .filter(
+              Boolean
+            )
+        )
+      ];
+
+    return {
+      iframeCount:
+        frames.length,
+      visibleIframeCount:
+        frames.filter(
+          frame =>
+            frame.visible
+        ).length,
+      likelyEmbeddedForm:
+        likelyFrames.length >
+        0,
+      primaryHostname:
+        hostnames[0] ||
+        '',
+      hostnames
+    };
   };
 
   const frameWindowsForDiscovery = () => {
@@ -14923,6 +15153,12 @@
             stableSince >=
             180
         ) {
+          rememberEmbeddedAccessSuccess({
+            primaryHostname:
+              candidates[0]?.hostname ||
+              ''
+          });
+
           return candidates;
         }
 
@@ -14969,7 +15205,177 @@
         }
       }
 
+      if (
+        freshAgents.length
+      ) {
+        rememberEmbeddedAccessSuccess({
+          primaryHostname:
+            freshAgents[0]?.hostname ||
+            ''
+        });
+      }
+
       return freshAgents;
+    };
+
+  const runEmbeddedAccessEnvironmentCheck =
+    async (
+      {
+        force = false,
+        automatic = false
+      } = {}
+    ) => {
+      if (
+        !IS_TOP ||
+        state.running ||
+        state.activeAction
+      ) {
+        return null;
+      }
+
+      const diagnostics =
+        embeddedFrameAccessDiagnostics();
+
+      if (
+        !diagnostics.likelyEmbeddedForm
+      ) {
+        if (force) {
+          state.panel?.hideAccessGuide?.();
+
+          state.panel?.notify?.(
+            'Access check complete',
+            'No inaccessible embedded form was detected on this page.',
+            'success'
+          );
+        }
+
+        return {
+          status:
+            'not-detected',
+          diagnostics
+        };
+      }
+
+      const guideState =
+        readEmbeddedAccessGuideState();
+
+      if (
+        automatic &&
+        !force
+      ) {
+        if (
+          Number(
+            guideState.lastSuccessAt ||
+            0
+          ) &&
+          Date.now() -
+            Number(
+              guideState.lastSuccessAt ||
+              0
+            ) <
+            EMBED_ACCESS_SUCCESS_TTL_MS
+        ) {
+          return {
+            status:
+              'previously-confirmed',
+            diagnostics
+          };
+        }
+
+        if (
+          Number(
+            guideState.lastDismissedAt ||
+            0
+          ) &&
+          Date.now() -
+            Number(
+              guideState.lastDismissedAt ||
+              0
+            ) <
+            EMBED_ACCESS_DISMISS_TTL_MS
+        ) {
+          return {
+            status:
+              'dismissed',
+            diagnostics
+          };
+        }
+      }
+
+      const local =
+        localFormMetrics();
+
+      const agents =
+        await discoverEmbeddedAgents({
+          localMetrics: {
+            ...local,
+            meaningful:
+              false
+          }
+        });
+
+      if (
+        agents.length
+      ) {
+        rememberEmbeddedAccessSuccess({
+          primaryHostname:
+            agents[0]?.hostname ||
+            diagnostics.primaryHostname ||
+            ''
+        });
+
+        if (force) {
+          state.panel?.setStatus(
+            `Embedded form access is ready${agents[0]?.hostname ? ` • ${agents[0].hostname}` : ''}.`
+          );
+
+          state.panel?.notify?.(
+            '✓ Embedded form access ready',
+            'Smart FormSense can communicate with the embedded form.',
+            'success'
+          );
+        }
+
+        return {
+          status:
+            'ready',
+          diagnostics,
+          agents
+        };
+      }
+
+      writeEmbeddedAccessGuideState({
+        lastWarnAt:
+          Date.now(),
+        lastWarnHost:
+          String(
+            diagnostics.primaryHostname ||
+            location.hostname ||
+            ''
+          ).slice(0, 120)
+      });
+
+      state.panel?.showAccessGuide?.(
+        diagnostics
+      );
+
+      state.panel?.setStatus(
+        'Embedded form detected, but Smart FormSense could not access it. Check Tampermonkey Site access.'
+      );
+
+      if (force) {
+        state.panel?.notify?.(
+          '⚠ Embedded form access required',
+          'Set Tampermonkey → Details → Site access → On all sites, reload the page, then recheck.',
+          'warning'
+        );
+      }
+
+      return {
+        status:
+          'blocked',
+        diagnostics
+      };
     };
 
   const chooseExecutionContext =
@@ -15398,12 +15804,54 @@
           result = await sendRemoteCommand(context.agent, action, extra);
           completed = true;
         } else if (context.kind === 'none') {
-          state.panel?.setProgress(0, 'No fillable form detected');
-          state.panel?.setStatus(
-            hasEmbeddedFormHints()
-              ? 'An embedded widget/frame exists, but no active form fields became accessible. Reload once and try again if the widget is still loading.'
-              : 'No meaningful fillable form was found on this page.'
-          );
+          const accessDiagnostics =
+            embeddedFrameAccessDiagnostics();
+
+          if (
+            accessDiagnostics.likelyEmbeddedForm
+          ) {
+            writeEmbeddedAccessGuideState({
+              lastWarnAt:
+                Date.now(),
+              lastWarnHost:
+                String(
+                  accessDiagnostics.primaryHostname ||
+                  location.hostname ||
+                  ''
+                ).slice(0, 120)
+            });
+
+            state.panel?.showAccessGuide?.(
+              accessDiagnostics
+            );
+
+            state.panel?.setProgress(
+              0,
+              'Embedded form access required'
+            );
+
+            state.panel?.setStatus(
+              'Smart FormSense found an embedded form, but Tampermonkey may not have permission to run inside it.'
+            );
+
+            state.panel?.notify?.(
+              '⚠ Embedded form access required',
+              'Set Tampermonkey → Details → Site access → On all sites, then reload this page.',
+              'warning'
+            );
+          } else {
+            state.panel?.setProgress(
+              0,
+              'No fillable form detected'
+            );
+
+            state.panel?.setStatus(
+              hasEmbeddedFormHints()
+                ? 'An embedded widget/frame exists, but no active form fields became accessible. Reload once and try again if the widget is still loading.'
+                : 'No meaningful fillable form was found on this page.'
+            );
+          }
+
           return;
         } else {
           state.lastRemoteAgentId = null;
@@ -17212,7 +17660,7 @@
       : {
           reportVersion: 7,
           product: 'Smart FormSense',
-          productVersion: '17.25.0',
+          productVersion: '17.26.0',
           generatedAt: new Date().toISOString(),
           auditType: 'Black-box Functional Form QA',
           page: {
@@ -17249,7 +17697,7 @@
     const cleanReason = String(reason || '').slice(0, 500);
     return {
       ...base,
-      productVersion: '17.25.0',
+      productVersion: '17.26.0',
       reportVersion: Math.max(5, Number(base.reportVersion || 0)),
       runState,
       incomplete: runState !== 'completed',
@@ -17400,7 +17848,7 @@
       return {
         reportVersion: 7,
         product: 'Smart FormSense',
-        productVersion: '17.25.0',
+        productVersion: '17.26.0',
         generatedAt,
         completedAt: ['completed', 'stopped', 'failed'].includes(runState) ? new Date().toISOString() : null,
         auditType: 'Black-box Functional Form QA',
@@ -18353,9 +18801,10 @@
     '⚡ Auto Form Filler: intelligently fills forms with realistic synthetic test data.',
     '🧪 Auto QA Testing: tests required fields, valid and invalid values, dynamic journeys, and generates a QA report.',
     '',
-    'Get started in 2 steps:',
+    'Get started in 3 steps:',
     `1. Install Tampermonkey: ${TAMPERMONKEY_INSTALL_URL}`,
-    `2. Install Smart FormSense: ${SHARE_INSTALL_URL}`
+    `2. Install Smart FormSense: ${SHARE_INSTALL_URL}`,
+    '3. In Chrome: Extensions → Tampermonkey → Details → Site access → On all sites'
   ].join('\n');
 
   const compareVersions = (a, b) => {
@@ -20206,6 +20655,18 @@
         .qaIssues{margin-top:5px;gap:4px}
         .qaActions{margin-top:5px;gap:4px}
         button:disabled{opacity:.55;cursor:wait}
+        .accessGuide{display:none;margin:6px 0 5px;border:1px solid #fdba74;border-radius:10px;background:linear-gradient(135deg,#fff7ed,#fffbeb);padding:8px;color:#7c2d12}
+        .accessGuide.visible{display:block}
+        .accessGuideHead{display:flex;align-items:flex-start;justify-content:space-between;gap:7px}
+        .accessGuideTitle{font-size:9.5px;font-weight:900;line-height:1.3}
+        .accessGuideClose{border:0;background:transparent;color:#9a3412;font-size:14px;line-height:1;cursor:pointer;padding:0 2px}
+        .accessGuideDomain{font-size:8px;font-weight:800;color:#9a3412;margin-top:2px;word-break:break-word}
+        .accessGuideText{font-size:8.5px;line-height:1.4;margin-top:5px;color:#7c2d12}
+        .accessGuideSteps{margin-top:5px;padding:5px 6px;border-radius:7px;background:rgba(255,255,255,.72);border:1px solid #fed7aa;font-size:8px;line-height:1.45;color:#7c2d12}
+        .accessGuideActions{display:grid;grid-template-columns:1fr auto;gap:5px;margin-top:6px}
+        .accessGuideRecheck,.accessGuideLater{border-radius:7px;padding:5px 7px;font-size:8.5px;font-weight:850;cursor:pointer}
+        .accessGuideRecheck{border:0;background:#c2410c;color:#fff}
+        .accessGuideLater{border:1px solid #fed7aa;background:#fff;color:#9a3412}
       </style>
 
       <div class="panel" id="panel">
@@ -20332,6 +20793,27 @@
             </div>
           </div>
 
+          <div class="accessGuide" id="accessGuide" role="alert">
+            <div class="accessGuideHead">
+              <div>
+                <div class="accessGuideTitle">⚠ Embedded form access required</div>
+                <div class="accessGuideDomain" id="accessGuideDomain"></div>
+              </div>
+              <button type="button" class="accessGuideClose" id="accessGuideClose" title="Dismiss">×</button>
+            </div>
+            <div class="accessGuideText">
+              Smart FormSense detected an embedded form, but it cannot currently run inside that frame. A common cause is Tampermonkey site access.
+            </div>
+            <div class="accessGuideSteps">
+              <b>Chrome:</b> Extensions → Tampermonkey → Details → Site access → <b>On all sites</b><br>
+              Then reload this page, reopen the form if needed, and recheck access.
+            </div>
+            <div class="accessGuideActions">
+              <button type="button" class="accessGuideRecheck" id="accessRecheckBtn">Recheck Access</button>
+              <button type="button" class="accessGuideLater" id="accessGuideLater">Later</button>
+            </div>
+          </div>
+
           <div class="status" id="status">
             Ready. Existing values will never be overwritten.
           </div>
@@ -20352,7 +20834,7 @@
               <span class="creatorThoughtText" id="creatorThought"></span>
               <button class="thoughtShuffle" id="thoughtShuffle" type="button" title="Show another thought" aria-label="Show another thought">↻</button>
             </div>
-            <div class="creatorIdentity">❤️ <strong>Akash Singh</strong> · <span id="creatorEmail"></span> · <button class="versionTap" id="versionTap" type="button">v17.25.0</button></div>
+            <div class="creatorIdentity">❤️ <strong>Akash Singh</strong> · <span id="creatorEmail"></span> · <button class="versionTap" id="versionTap" type="button">v17.26.0</button></div>
           </div>
         </div>
       </div>
@@ -20492,7 +20974,7 @@
                 <div class="settingCard"><div class="settingRow"><div class="settingText"><b>Automatically check for updates</b><span>Checks at most once every 12 hours.</span></div><label class="switch"><input id="settingAutoCheckUpdates" type="checkbox"><span class="slider"></span></label></div></div>
                 <div class="settingCard">
                   <div class="settingText"><b>Version status</b><span id="updateStatusText">Checking update status…</span></div>
-                  <div class="updateStatus">Current: <strong id="currentVersionText">v17.25.0</strong> · Latest: <strong id="latestVersionText">—</strong></div>
+                  <div class="updateStatus">Current: <strong id="currentVersionText">v17.26.0</strong> · Latest: <strong id="latestVersionText">—</strong></div>
                   <div class="updateActions"><button class="settingsAction" id="checkUpdatesBtn" type="button">Check for updates</button><button class="settingsAction updateNow" id="updateNowSettings" type="button">Update Smart FormSense</button></div>
                 </div>
               </section>
@@ -20556,6 +21038,11 @@
       bar: $('bar'),
       stage: $('stage'),
       status: $('status'),
+      accessGuide: $('accessGuide'),
+      accessGuideDomain: $('accessGuideDomain'),
+      accessGuideClose: $('accessGuideClose'),
+      accessRecheckBtn: $('accessRecheckBtn'),
+      accessGuideLater: $('accessGuideLater'),
       modal: $('modalBack'),
       feedbackBtn: $('feedbackBtn'),
       updateBtn: $('updateBtn'),
@@ -21335,6 +21822,37 @@
         refs.status.textContent = text;
       },
 
+      showAccessGuide(details = {}) {
+        if (!refs.accessGuide) return;
+
+        const hostname =
+          String(
+            details.primaryHostname ||
+            ''
+          ).trim();
+
+        if (refs.accessGuideDomain) {
+          refs.accessGuideDomain.textContent =
+            hostname
+              ? `Embedded form: ${hostname}`
+              : 'An embedded form was detected on this page.';
+        }
+
+        refs.accessGuide.classList.add(
+          'visible'
+        );
+
+        fitPanelToViewport();
+      },
+
+      hideAccessGuide() {
+        refs.accessGuide?.classList.remove(
+          'visible'
+        );
+
+        fitPanelToViewport();
+      },
+
       setMode(mode) {
         refs.mode.textContent =
           mode === 'minimum'
@@ -21589,6 +22107,59 @@
         }
       }
     };
+
+    const dismissAccessGuide = () => {
+      writeEmbeddedAccessGuideState({
+        lastDismissedAt:
+          Date.now()
+      });
+
+      state.panel?.hideAccessGuide?.();
+    };
+
+    refs.accessGuideClose?.addEventListener(
+      'click',
+      dismissAccessGuide
+    );
+
+    refs.accessGuideLater?.addEventListener(
+      'click',
+      dismissAccessGuide
+    );
+
+    refs.accessRecheckBtn?.addEventListener(
+      'click',
+      async () => {
+        if (
+          refs.accessRecheckBtn.disabled
+        ) {
+          return;
+        }
+
+        refs.accessRecheckBtn.disabled =
+          true;
+
+        const oldText =
+          refs.accessRecheckBtn.textContent;
+
+        refs.accessRecheckBtn.textContent =
+          'Checking…';
+
+        try {
+          await runEmbeddedAccessEnvironmentCheck({
+            force:
+              true
+          });
+        } finally {
+          refs.accessRecheckBtn.disabled =
+            false;
+
+          refs.accessRecheckBtn.textContent =
+            oldText ||
+            'Recheck Access';
+        }
+      }
+    );
 
     refs.fillBtn.onclick = () => requestFillAction({ source: 'button' });
 
@@ -21939,6 +22510,18 @@
     refreshDeveloperUi();
     updateUpdateIndicator(currentUpdateInfo());
     refreshCurrentStatus();
+
+    setTimeout(
+      () => {
+        runEmbeddedAccessEnvironmentCheck({
+          automatic:
+            true
+        }).catch(
+          () => {}
+        );
+      },
+      700
+    );
 
     if (options.auto && state.settings?.general?.startMinimized) {
       minimize();
