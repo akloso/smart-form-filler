@@ -60,8 +60,7 @@
   const UPDATE_CHECK_KEY = 'STFF_UPDATE_CHECK_V1';
   const DEV_MODE_UNTIL_KEY = 'STFF_DEVELOPER_MODE_UNTIL';
   const EMBED_ACCESS_GUIDE_KEY = 'STFF_EMBED_ACCESS_GUIDE_V1';
-  const EMBED_ACCESS_SUCCESS_TTL_MS = 30 * 24 * 60 * 60 * 1000;
-  const EMBED_ACCESS_DISMISS_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+  const EMBED_ACCESS_DISMISS_TTL_MS = 60 * 60 * 1000;
   const UPDATE_CHECK_INTERVAL_MS = 24 * 60 * 60 * 1000;
   const DEVELOPER_MODE_MS = 60 * 60 * 1000;
 
@@ -15261,45 +15260,23 @@
 
       if (
         automatic &&
-        !force
-      ) {
-        if (
-          Number(
-            guideState.lastSuccessAt ||
-            0
-          ) &&
-          Date.now() -
-            Number(
-              guideState.lastSuccessAt ||
-              0
-            ) <
-            EMBED_ACCESS_SUCCESS_TTL_MS
-        ) {
-          return {
-            status:
-              'previously-confirmed',
-            diagnostics
-          };
-        }
-
-        if (
+        !force &&
+        Number(
+          guideState.lastDismissedAt ||
+          0
+        ) &&
+        Date.now() -
           Number(
             guideState.lastDismissedAt ||
             0
-          ) &&
-          Date.now() -
-            Number(
-              guideState.lastDismissedAt ||
-              0
-            ) <
-            EMBED_ACCESS_DISMISS_TTL_MS
-        ) {
-          return {
-            status:
-              'dismissed',
-            diagnostics
-          };
-        }
+          ) <
+          EMBED_ACCESS_DISMISS_TTL_MS
+      ) {
+        return {
+          status:
+            'dismissed',
+          diagnostics
+        };
       }
 
       const local =
