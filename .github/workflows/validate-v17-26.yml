@@ -1,0 +1,35 @@
+name: Validate Smart FormSense v17.26
+
+on:
+  push:
+    branches:
+      - sfs-v17-26-access-guidance
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Syntax and invariant checks
+        shell: bash
+        run: |
+          node --check Smart_Form_Filler.user.js
+          git diff --check HEAD~1..HEAD || true
+          grep -Fq "// @version      17.26.0" Smart_Form_Filler.user.js
+          grep -Fq "const SCRIPT_VERSION = '17.26.0';" Smart_Form_Filler.user.js
+          grep -Fq "const EMBED_ACCESS_GUIDE_KEY = 'STFF_EMBED_ACCESS_GUIDE_V1';" Smart_Form_Filler.user.js
+          grep -Fq "const embeddedFrameAccessDiagnostics = () =>" Smart_Form_Filler.user.js
+          grep -Fq "const runEmbeddedAccessEnvironmentCheck =" Smart_Form_Filler.user.js
+          grep -Fq "showAccessGuide(details = {})" Smart_Form_Filler.user.js
+          grep -Fq "id=\"accessRecheckBtn\"" Smart_Form_Filler.user.js
+          grep -Fq "Site access → <b>On all sites</b>" Smart_Form_Filler.user.js
+          grep -Fq "const BRIDGE_MARKER = '__STFF_V17_7_BRIDGE__';" Smart_Form_Filler.user.js
+          grep -Fq "const FEEDBACK_ENDPOINT = 'https://formspree.io/f/xbgjvoaw';" Smart_Form_Filler.user.js
+          grep -Fq "const POSTHOG_HOST = 'https://eu.i.posthog.com';" Smart_Form_Filler.user.js
+          grep -Fq "const UPDATE_INFO_URL = 'https://api.greasyfork.org/en/scripts/592133.json';" Smart_Form_Filler.user.js
+          grep -Fq "**17.26.0**" README.md
+          grep -Fq "## 17.26.0" CHANGELOG.md
