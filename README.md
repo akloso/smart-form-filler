@@ -6,9 +6,9 @@ Smart FormSense is a Tampermonkey userscript for authorized form filling and bla
 
 ## Current production version
 
-**17.25.0**
+**17.26.0**
 
-v17.25.0 hardens embedded/cross-origin form handling. Smart FormSense now isolates panel interactions from host-page outside-click handlers, requires a fresh iframe response before routing an action, watches active embedded forms for disappearance, and fails quickly and safely if an embedded form closes or becomes unavailable.
+v17.26.0 adds proactive embedded-form access diagnostics and end-user guidance. Smart FormSense can now detect when a likely embedded form exists but its frame agent is unavailable, explain that Tampermonkey site access may be blocking the iframe, show the relevant embedded-form hostname when available, and provide an in-panel **Recheck Access** flow.
 
 ## Core product rules
 
@@ -151,14 +151,25 @@ The stable public userscript filename remains:
 
 This filename is intentionally retained so the existing GitHub → Greasy Fork source path remains stable.
 
+### Required Chrome / Tampermonkey site access
+
+For Smart FormSense to work inside embedded or cross-origin forms, Tampermonkey must be allowed to run on the form's website and iframe domain.
+
+In Chrome:
+
+**Extensions → Tampermonkey → Details → Site access → On all sites**
+
+Smart FormSense cannot change this Chrome extension permission itself. If it detects a likely embedded form but cannot communicate with the iframe, it now shows an in-product access warning with **Recheck Access**.
+
 ## Usage
 
 1. Install Tampermonkey in a supported browser.
 2. Install Smart FormSense from Greasy Fork.
-3. Open a form you are authorized to fill/test.
-4. Open Smart FormSense.
-5. Use **⚡ Auto Form Filler** for form completion assistance or **🧪 Auto QA Testing** for applicant-side functional QA.
-6. Review any failures, warnings, review/manual items, and reports before making a final manual submission or go-live decision.
+3. In Chrome, set **Tampermonkey → Details → Site access → On all sites**.
+4. Open a form you are authorized to fill/test.
+5. Open Smart FormSense.
+6. Use **⚡ Auto Form Filler** for form completion assistance or **🧪 Auto QA Testing** for applicant-side functional QA.
+7. Review any failures, warnings, review/manual items, and reports before making a final manual submission or go-live decision.
 
 ## Default keyboard shortcuts
 
