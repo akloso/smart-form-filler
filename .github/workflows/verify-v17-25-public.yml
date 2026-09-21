@@ -1,0 +1,28 @@
+name: Verify Smart FormSense public release
+
+on:
+  push:
+    branches:
+      - sfs-v17-25-iframe-fix
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify Greasy Fork version
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import json
+          import urllib.request
+          url = 'https://api.greasyfork.org/en/scripts/592133.json'
+          with urllib.request.urlopen(url, timeout=15) as response:
+              data = json.load(response)
+          version = str(data.get('version') or '').strip()
+          print('Greasy Fork version:', version)
+          if version != '17.25.0':
+              raise SystemExit(f'Expected 17.25.0, got {version or "unknown"}')
+          PY
