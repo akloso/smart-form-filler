@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Smart FormSense
 // @namespace    smart-form-filler
-// @version      17.24.0
+// @version      17.25.0
 // @description  Automatic form filling and functional QA testing for authorized web-form validation, safe progression, embedded forms, and synthetic test data.
 // @author       Akash Singh
 // @match        *://*/*
@@ -54,7 +54,7 @@
   const SETTINGS_VERSION = 4;
   const ACTION_DEFAULT_TTL_MS = 5 * 60 * 1000;
   const PRODUCT_NAME = 'Smart FormSense';
-  const SCRIPT_VERSION = '17.24.0';
+  const SCRIPT_VERSION = '17.25.0';
   const FEEDBACK_ENDPOINT = 'https://formspree.io/f/xbgjvoaw';
   const UPDATE_INFO_URL = 'https://api.greasyfork.org/en/scripts/592133.json';
   const UPDATE_CHECK_KEY = 'STFF_UPDATE_CHECK_V1';
@@ -146,6 +146,9 @@
   const FRAME_DISCOVERY_SOFT_MS = 500;
   const FRAME_DISCOVERY_HARD_MS = 2600;
   const FRAME_AGENT_STALE_MS = 12000;
+  const REMOTE_AGENT_ACK_TIMEOUT_MS = 1200;
+  const REMOTE_AGENT_PING_MS = 900;
+  const REMOTE_AGENT_WATCHDOG_MS = 4500;
   const REMOTE_COMMAND_TIMEOUT_MS = 42000;
   const QA_REMOTE_COMMAND_TIMEOUT_MS = 300000;
 
@@ -297,7 +300,7 @@
     );
 
     console.error(
-      `Smart FormSense V17.24.0 [${stage}]`,
+      `Smart FormSense V17.25.0 [${stage}]`,
       error
     );
 
@@ -12614,7 +12617,7 @@
     const report = {
       reportVersion: 1,
       generatedBy:
-        'Smart FormSense V17.24.0',
+        'Smart FormSense V17.25.0',
       generatedAt:
         new Date().toISOString(),
       mode:
@@ -12779,7 +12782,7 @@
       return report;
     } catch (error) {
       console.error(
-        'Smart FormSense V17.24.0 debug export:',
+        'Smart FormSense V17.25.0 debug export:',
         error
       );
 
@@ -13866,7 +13869,7 @@
       product:
         'Smart FormSense',
       productVersion:
-        '17.24.0',
+        '17.25.0',
       generatedAt,
       auditType:
         'Non-destructive Form Readiness Audit',
@@ -14213,7 +14216,7 @@
   <div class="hero">
     <div class="brand">✦ SMART FORMSENSE QA</div>
     <h1>${esc(qa.page?.title || 'Form')}</h1>
-    <div class="meta">${esc(qa.page?.hostname || location.hostname || '')}<br>${esc(generated)} • v${esc(qa.productVersion || '17.24.0')}</div>
+    <div class="meta">${esc(qa.page?.hostname || location.hostname || '')}<br>${esc(generated)} • v${esc(qa.productVersion || '17.25.0')}</div>
     <div class="status ${statusClass}">${esc(status)}</div>
     <div class="overview">${esc(overview)}</div>
 
@@ -14432,7 +14435,7 @@
       product:
         'Smart FormSense',
       productVersion:
-        '17.24.0',
+        '17.25.0',
       generatedAt:
         new Date().toISOString(),
       purpose:
@@ -14527,7 +14530,7 @@
       return report;
     } catch (error) {
       console.error(
-        'Smart FormSense V17.24.0 QA debug export:',
+        'Smart FormSense V17.25.0 QA debug export:',
         error
       );
 
@@ -14797,7 +14800,7 @@
     }
   };
 
-  const embeddedAgentCandidates = () => {
+  const embeddedAgentCandidates = (freshAfter = 0) => {
     pruneFrameAgents();
 
     return [
@@ -14806,7 +14809,8 @@
       .filter(
         agent =>
           agent.metrics?.meaningful &&
-          agent.source
+          agent.source &&
+          Number(agent.lastSeen || 0) >= Number(freshAfter || 0)
       )
       .sort(
         (a, b) =>
@@ -14871,7 +14875,7 @@
         pruneFrameAgents();
 
         const candidates =
-          embeddedAgentCandidates();
+          embeddedAgentCandidates(started - 25);
 
         let iframeCount = 0;
 
@@ -14942,7 +14946,30 @@
         }
       }
 
-      return embeddedAgentCandidates();
+      const freshAgents =
+        embeddedAgentCandidates(
+          started - 25
+        );
+
+      if (!freshAgents.length) {
+        for (
+          const [id, agent]
+          of bridge.agents
+        ) {
+          if (
+            Number(
+              agent.lastSeen || 0
+            ) <
+            started - 25
+          ) {
+            bridge.agents.delete(
+              id
+            );
+          }
+        }
+      }
+
+      return freshAgents;
     };
 
   const chooseExecutionContext =
@@ -15010,8 +15037,69 @@
           ) || null
         : null;
 
+  const confirmRemoteAgentLive =
+    async (
+      agent,
+      timeoutMs =
+        REMOTE_AGENT_ACK_TIMEOUT_MS
+    ) => {
+      if (
+        !agent?.source
+      ) {
+        return false;
+      }
+
+      const started =
+        Date.now();
+
+      try {
+        agent.source.postMessage(
+          bridgePayload(
+            'DISCOVER',
+            {
+              sessionId:
+                bridge.sessionId,
+              at:
+                started
+            }
+          ),
+          '*'
+        );
+      } catch {
+        return false;
+      }
+
+      while (
+        Date.now() -
+          started <
+        timeoutMs
+      ) {
+        await sleep(
+          90
+        );
+
+        const current =
+          bridge.agents.get(
+            agent.id
+          );
+
+        if (
+          current?.source ===
+            agent.source &&
+          Number(
+            current.lastSeen || 0
+          ) >=
+            started
+        ) {
+          return true;
+        }
+      }
+
+      return false;
+    };
+
   const sendRemoteCommand =
-    (
+    async (
       agent,
       action,
       extra = {}
@@ -15019,17 +15107,41 @@
       if (
         !agent?.source
       ) {
-        return Promise.reject(
-          new Error(
-            'Embedded form frame is no longer available'
-          )
+        throw new Error(
+          'Embedded form frame is no longer available'
         );
       }
 
-      const authorization = serializedActiveAuthorization();
+      const live =
+        await confirmRemoteAgentLive(
+          agent
+        );
 
-      if (!authorization || authorization.kind !== canonicalActionKind(action)) {
-        return Promise.reject(new Error('No authorized Smart FormSense action is active'));
+      if (
+        !live
+      ) {
+        bridge.agents.delete(
+          agent.id
+        );
+
+        throw new Error(
+          'Embedded form closed or became unavailable. Reopen the form and try again.'
+        );
+      }
+
+      const authorization =
+        serializedActiveAuthorization();
+
+      if (
+        !authorization ||
+        authorization.kind !==
+          canonicalActionKind(
+            action
+          )
+      ) {
+        throw new Error(
+          'No authorized Smart FormSense action is active'
+        );
       }
 
       const requestId =
@@ -15068,38 +15180,76 @@
           resolve,
           reject
         ) => {
+          let watchdog =
+            null;
+
+          const clearRemoteWaiters =
+            () => {
+              clearTimeout(
+                timer
+              );
+
+              if (
+                watchdog
+              ) {
+                clearInterval(
+                  watchdog
+                );
+
+                watchdog =
+                  null;
+              }
+            };
+
+          const failRemoteCommand =
+            message => {
+              if (
+                !bridge.pending.has(
+                  requestId
+                )
+              ) {
+                return;
+              }
+
+              bridge.pending.delete(
+                requestId
+              );
+
+              clearRemoteWaiters();
+
+              if (
+                state.activeRemoteRequestId ===
+                  requestId
+              ) {
+                state.running =
+                  false;
+
+                state.activeRemoteAgentId =
+                  null;
+
+                state.activeRemoteRequestId =
+                  null;
+
+                state.activeRemoteAction =
+                  null;
+
+                state.panel?.setBusy(
+                  false
+                );
+              }
+
+              reject(
+                new Error(
+                  message
+                )
+              );
+            };
+
           const timer =
             setTimeout(
               () => {
-                bridge.pending.delete(
-                  requestId
-                );
-
-                if (
-                  state.activeRemoteRequestId ===
-                  requestId
-                ) {
-                  state.running =
-                    false;
-
-                  state.activeRemoteAgentId =
-                    null;
-
-                  state.activeRemoteRequestId =
-                    null;
-
-                  state.activeRemoteAction =
-                    null;
-
-                  state.panel?.setBusy(
-                    false
-                  );
-                }
-
-                reject(
-                  new Error(
-                    'Embedded form stopped responding before the command completed'
-                  )
+                failRemoteCommand(
+                  'Embedded form stopped responding before the command completed'
                 );
               },
               action === 'qa-audit'
@@ -15113,11 +15263,66 @@
               resolve,
               reject,
               timer,
+              clearRemoteWaiters,
               agentId:
                 agent.id,
               action
             }
           );
+
+          watchdog =
+            setInterval(
+              () => {
+                const current =
+                  bridge.agents.get(
+                    agent.id
+                  );
+
+                const lastSeen =
+                  Number(
+                    current?.lastSeen || 0
+                  );
+
+                if (
+                  !current?.source ||
+                  current.source !==
+                    agent.source ||
+                  Date.now() -
+                    lastSeen >
+                    REMOTE_AGENT_WATCHDOG_MS
+                ) {
+                  bridge.agents.delete(
+                    agent.id
+                  );
+
+                  failRemoteCommand(
+                    'Embedded form closed or became unavailable. Reopen the form and try again.'
+                  );
+
+                  return;
+                }
+
+                try {
+                  agent.source.postMessage(
+                    bridgePayload(
+                      'DISCOVER',
+                      {
+                        sessionId:
+                          bridge.sessionId,
+                        at:
+                          Date.now()
+                      }
+                    ),
+                    '*'
+                  );
+                } catch {
+                  failRemoteCommand(
+                    'Embedded form closed or became unavailable. Reopen the form and try again.'
+                  );
+                }
+              },
+              REMOTE_AGENT_PING_MS
+            );
 
           try {
             agent.source.postMessage(
@@ -15137,16 +15342,9 @@
               '*'
             );
           } catch (error) {
-            clearTimeout(
-              timer
-            );
-
-            bridge.pending.delete(
-              requestId
-            );
-
-            reject(
-              error
+            failRemoteCommand(
+              error?.message ||
+              'Embedded form command could not be sent'
             );
           }
         }
@@ -17014,7 +17212,7 @@
       : {
           reportVersion: 7,
           product: 'Smart FormSense',
-          productVersion: '17.24.0',
+          productVersion: '17.25.0',
           generatedAt: new Date().toISOString(),
           auditType: 'Black-box Functional Form QA',
           page: {
@@ -17051,7 +17249,7 @@
     const cleanReason = String(reason || '').slice(0, 500);
     return {
       ...base,
-      productVersion: '17.24.0',
+      productVersion: '17.25.0',
       reportVersion: Math.max(5, Number(base.reportVersion || 0)),
       runState,
       incomplete: runState !== 'completed',
@@ -17202,7 +17400,7 @@
       return {
         reportVersion: 7,
         product: 'Smart FormSense',
-        productVersion: '17.24.0',
+        productVersion: '17.25.0',
         generatedAt,
         completedAt: ['completed', 'stopped', 'failed'].includes(runState) ? new Date().toISOString() : null,
         auditType: 'Black-box Functional Form QA',
@@ -18763,9 +18961,16 @@
             );
 
           if (pending) {
-            clearTimeout(
-              pending.timer
-            );
+            if (
+              typeof pending.clearRemoteWaiters ===
+              'function'
+            ) {
+              pending.clearRemoteWaiters();
+            } else {
+              clearTimeout(
+                pending.timer
+              );
+            }
 
             bridge.pending.delete(
               requestId
@@ -18812,9 +19017,21 @@
               false
             );
 
-            pending.resolve(
-              data
-            );
+            if (
+              data.ok ===
+              false
+            ) {
+              pending.reject(
+                new Error(
+                  data.status ||
+                  `Embedded ${pending.action || 'action'} stopped safely`
+                )
+              );
+            } else {
+              pending.resolve(
+                data
+              );
+            }
           }
         }
       },
@@ -19339,6 +19556,43 @@
 
 
     const shadow = host.attachShadow({ mode: 'open' });
+
+    // Prevent Smart FormSense panel interactions from bubbling into the
+    // host page. Many embedded-form modals close on document-level
+    // outside clicks, and panel clicks must remain isolated from that logic.
+    const isolatePanelEvent =
+      event => {
+        try {
+          event.stopPropagation();
+        } catch {}
+      };
+
+    [
+      'pointerdown',
+      'pointerup',
+      'pointercancel',
+      'mousedown',
+      'mouseup',
+      'click',
+      'dblclick',
+      'touchstart',
+      'touchend',
+      'contextmenu'
+    ].forEach(
+      type => {
+        shadow.addEventListener(
+          type,
+          isolatePanelEvent,
+          false
+        );
+
+        host.addEventListener(
+          type,
+          isolatePanelEvent,
+          false
+        );
+      }
+    );
 
     shadow.innerHTML = `
       <style>
@@ -20098,7 +20352,7 @@
               <span class="creatorThoughtText" id="creatorThought"></span>
               <button class="thoughtShuffle" id="thoughtShuffle" type="button" title="Show another thought" aria-label="Show another thought">↻</button>
             </div>
-            <div class="creatorIdentity">❤️ <strong>Akash Singh</strong> · <span id="creatorEmail"></span> · <button class="versionTap" id="versionTap" type="button">v17.24.0</button></div>
+            <div class="creatorIdentity">❤️ <strong>Akash Singh</strong> · <span id="creatorEmail"></span> · <button class="versionTap" id="versionTap" type="button">v17.25.0</button></div>
           </div>
         </div>
       </div>
@@ -20238,7 +20492,7 @@
                 <div class="settingCard"><div class="settingRow"><div class="settingText"><b>Automatically check for updates</b><span>Checks at most once every 12 hours.</span></div><label class="switch"><input id="settingAutoCheckUpdates" type="checkbox"><span class="slider"></span></label></div></div>
                 <div class="settingCard">
                   <div class="settingText"><b>Version status</b><span id="updateStatusText">Checking update status…</span></div>
-                  <div class="updateStatus">Current: <strong id="currentVersionText">v17.24.0</strong> · Latest: <strong id="latestVersionText">—</strong></div>
+                  <div class="updateStatus">Current: <strong id="currentVersionText">v17.25.0</strong> · Latest: <strong id="latestVersionText">—</strong></div>
                   <div class="updateActions"><button class="settingsAction" id="checkUpdatesBtn" type="button">Check for updates</button><button class="settingsAction updateNow" id="updateNowSettings" type="button">Update Smart FormSense</button></div>
                 </div>
               </section>
