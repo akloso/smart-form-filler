@@ -6,9 +6,9 @@ Smart FormSense is a Tampermonkey userscript for authorized form filling and bla
 
 ## Current production version
 
-**17.24.0**
+**17.25.0**
 
-v17.24.0 completes the update-flow fix by moving update discovery to Greasy Fork's public API. This removes the browser-side dependency on the repository's raw GitHub URL, keeps update/install navigation on Greasy Fork, and prevents private-source 404 responses from breaking update checks.
+v17.25.0 hardens embedded/cross-origin form handling. Smart FormSense now isolates panel interactions from host-page outside-click handlers, requires a fresh iframe response before routing an action, watches active embedded forms for disappearance, and fails quickly and safely if an embedded form closes or becomes unavailable.
 
 ## Core product rules
 
