@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Smart FormSense
 // @namespace    smart-form-filler
-// @version      17.26.0
+// @version      17.27.0
 // @description  Automatic form filling and functional QA testing for authorized web-form validation, safe progression, embedded forms, and synthetic test data.
 // @author       Akash Singh
 // @match        *://*/*
@@ -54,7 +54,7 @@
   const SETTINGS_VERSION = 4;
   const ACTION_DEFAULT_TTL_MS = 5 * 60 * 1000;
   const PRODUCT_NAME = 'Smart FormSense';
-  const SCRIPT_VERSION = '17.26.0';
+  const SCRIPT_VERSION = '17.27.0';
   const FEEDBACK_ENDPOINT = 'https://formspree.io/f/xbgjvoaw';
   const UPDATE_INFO_URL = 'https://api.greasyfork.org/en/scripts/592133.json';
   const UPDATE_CHECK_KEY = 'STFF_UPDATE_CHECK_V1';
@@ -247,14 +247,34 @@
     type,
     details = {}
   ) => {
+    const safeDetails = {
+      ...(details || {})
+    };
+
+    if (
+      Object.prototype.hasOwnProperty.call(
+        safeDetails,
+        'type'
+      )
+    ) {
+      safeDetails.fieldType =
+        safeDetails.type;
+
+      delete safeDetails.type;
+    }
+
     const event = {
       at: new Date().toISOString(),
       elapsedMs:
         state.startTime
           ? Date.now() - state.startTime
           : null,
-      type,
-      ...details
+      ...safeDetails,
+      type:
+        String(
+          type ||
+          'event'
+        )
     };
 
     state.debugEvents.push(event);
@@ -302,7 +322,7 @@
     );
 
     console.error(
-      `Smart FormSense V17.26.0 [${stage}]`,
+      `Smart FormSense V17.27.0 [${stage}]`,
       error
     );
 
@@ -966,136 +986,629 @@
   };
 
   const createProfile = () => {
-    const token = `${Date.now().toString().slice(-7)}${randomInt(10, 99)}`;
-    const first = pick(['Aarav', 'Akash', 'Arjun', 'Rohan', 'Aditya', 'Kabir', 'Vihaan', 'Kunal']);
-    const last = pick(['Sharma', 'Verma', 'Singh', 'Mehta', 'Kapoor', 'Gupta']);
-    const fatherFirst = pick(['Rajesh', 'Suresh', 'Manoj', 'Vijay', 'Anil', 'Rakesh']);
-    const motherFirst = pick(['Sunita', 'Anita', 'Kavita', 'Pooja', 'Meena', 'Neha']);
-    const guardianFirst = pick(['Vikram', 'Amit', 'Deepak', 'Sanjay', 'Nitin']);
+    const token =
+      `${Date.now().toString().slice(-8)}${randomInt(100, 999)}`;
 
-    const applicantFirst = prefixTestName(first);
-    const applicantFull = `${applicantFirst} ${last}`;
-    const fatherName = `Test ${fatherFirst} ${last}`;
-    const motherName = `Test ${motherFirst} ${last}`;
-    const guardianName = `Test ${guardianFirst} ${last}`;
+    const first =
+      pick([
+        'Aarav', 'Ayaan', 'Aditya', 'Arjun', 'Atharv',
+        'Kabir', 'Kunal', 'Rohan', 'Vihaan', 'Vivaan',
+        'Ananya', 'Aditi', 'Diya', 'Ishita', 'Kavya',
+        'Kiara', 'Meera', 'Naina', 'Riya', 'Siya'
+      ]);
 
-    const dobYear = 2000;
-    const dobISO = `${dobYear}-11-18`;
-    const year10 = dobYear + 16;
-    const year12 = dobYear + 18;
-    const ugStart = year12;
-    const ugEnd = dobYear + 22;
-    const pgStart = ugEnd;
-    const pgEnd = dobYear + 24;
+    const last =
+      pick([
+        'Sharma', 'Verma', 'Singh', 'Mehta', 'Kapoor',
+        'Gupta', 'Patel', 'Malhotra', 'Joshi', 'Rao',
+        'Mishra', 'Agarwal'
+      ]);
+
+    const femaleFirstNames =
+      new Set([
+        'Ananya', 'Aditi', 'Diya', 'Ishita', 'Kavya',
+        'Kiara', 'Meera', 'Naina', 'Riya', 'Siya'
+      ]);
+
+    const gender =
+      femaleFirstNames.has(
+        first
+      )
+        ? 'Female'
+        : 'Male';
+
+    const title =
+      gender === 'Female'
+        ? pick(['Ms', 'Mrs'])
+        : 'Mr';
+
+    const middle =
+      pick([
+        'Kumar', 'Raj', 'Dev', 'Aryan', 'Sai',
+        'Kiran', 'Neel', 'Ravi'
+      ]);
+
+    const fatherFirst =
+      pick([
+        'Rajesh', 'Suresh', 'Manoj', 'Vijay', 'Anil',
+        'Rakesh', 'Amit', 'Deepak', 'Sanjay', 'Vikram'
+      ]);
+
+    const motherFirst =
+      pick([
+        'Sunita', 'Anita', 'Kavita', 'Pooja', 'Meena',
+        'Neha', 'Seema', 'Rekha', 'Priya', 'Nisha'
+      ]);
+
+    const guardianFirst =
+      pick([
+        'Vikram', 'Amit', 'Deepak', 'Sanjay', 'Nitin',
+        'Rahul', 'Ajay', 'Mohan'
+      ]);
+
+    const locationProfile =
+      pick([
+        {
+          state: 'Delhi',
+          district: 'Central Delhi',
+          city: 'New Delhi',
+          locality: 'Karol Bagh',
+          pincode: '110005'
+        },
+        {
+          state: 'Uttar Pradesh',
+          district: 'Prayagraj',
+          city: 'Prayagraj',
+          locality: 'Civil Lines',
+          pincode: '211001'
+        },
+        {
+          state: 'Gujarat',
+          district: 'Ahmedabad',
+          city: 'Ahmedabad',
+          locality: 'Navrangpura',
+          pincode: '380009'
+        },
+        {
+          state: 'Maharashtra',
+          district: 'Pune',
+          city: 'Pune',
+          locality: 'Kothrud',
+          pincode: '411038'
+        },
+        {
+          state: 'Karnataka',
+          district: 'Bengaluru Urban',
+          city: 'Bengaluru',
+          locality: 'Indiranagar',
+          pincode: '560038'
+        }
+      ]);
+
+    const applicantFirst =
+      prefixTestName(
+        first
+      );
+
+    const applicantFull =
+      `${applicantFirst} ${last}`;
+
+    const fatherName =
+      `Test ${fatherFirst} ${last}`;
+
+    const motherName =
+      `Test ${motherFirst} ${last}`;
+
+    const guardianName =
+      `Test ${guardianFirst} ${last}`;
+
+    const currentYear =
+      new Date().getFullYear();
+
+    const dobYear =
+      randomInt(
+        currentYear - 29,
+        currentYear - 24
+      );
+
+    const dobMonth =
+      randomInt(
+        1,
+        12
+      );
+
+    const dobDay =
+      randomInt(
+        1,
+        28
+      );
+
+    const dobISO =
+      `${dobYear}-${String(dobMonth).padStart(2, '0')}-${String(dobDay).padStart(2, '0')}`;
+
+    const year10 =
+      dobYear + 16;
+
+    const year12 =
+      dobYear + 18;
+
+    const ugStart =
+      year12;
+
+    const ugEnd =
+      dobYear + 22;
+
+    const pgStart =
+      ugEnd;
+
+    const pgEnd =
+      Math.min(
+        currentYear,
+        dobYear + 24
+      );
+
+    const scorePack = (
+      maxMarks,
+      minPct,
+      maxPct
+    ) => {
+      const percentage =
+        randomInt(
+          minPct,
+          maxPct
+        );
+
+      const obtainedMarks =
+        Math.max(
+          1,
+          Math.round(
+            maxMarks *
+            percentage /
+            100
+          )
+        );
+
+      return {
+        maxMarks:
+          String(
+            maxMarks
+          ),
+        obtainedMarks:
+          String(
+            obtainedMarks
+          ),
+        percentage:
+          String(
+            percentage
+          ),
+        cgpa:
+          (
+            percentage /
+            10
+          ).toFixed(1)
+      };
+    };
+
+    const class10Score =
+      scorePack(
+        500,
+        66,
+        94
+      );
+
+    const class12Score =
+      scorePack(
+        500,
+        64,
+        93
+      );
+
+    const ugScore =
+      scorePack(
+        1000,
+        62,
+        88
+      );
+
+    const pgScore =
+      scorePack(
+        1000,
+        64,
+        90
+      );
+
+    const class10Board =
+      pick([
+        'CBSE',
+        'ICSE',
+        'State Board'
+      ]);
+
+    const class12Board =
+      pick([
+        'CBSE',
+        'ICSE',
+        'State Board'
+      ]);
+
+    const class12Stream =
+      pick([
+        'Science',
+        'Commerce',
+        'Arts'
+      ]);
+
+    const ugQualification =
+      pick([
+        'B.Tech',
+        'B.Sc',
+        'BBA',
+        'B.Com'
+      ]);
+
+    const ugStream =
+      ugQualification === 'B.Tech'
+        ? pick([
+            'Computer Science',
+            'Information Technology',
+            'Electronics'
+          ])
+        : ugQualification === 'B.Sc'
+          ? pick([
+              'Computer Science',
+              'Mathematics',
+              'Physics'
+            ])
+          : ugQualification === 'B.Com'
+            ? 'Commerce'
+            : 'Management';
+
+    const pgQualification =
+      pick([
+        'MBA',
+        'M.Sc',
+        'M.Tech'
+      ]);
+
+    const pgStream =
+      pgQualification === 'MBA'
+        ? pick([
+            'Finance',
+            'Marketing',
+            'Operations'
+          ])
+        : pgQualification === 'M.Sc'
+          ? pick([
+              'Computer Science',
+              'Mathematics'
+            ])
+          : pick([
+              'Computer Science',
+              'Information Technology'
+            ]);
 
     const academic = {
       class10: {
-        school: 'Test Greenfield Public School',
-        board: 'CBSE',
-        year: String(year10),
-        passingDate: `${year10}-05-31`,
-        maxMarks: '500',
-        obtainedMarks: '410',
-        percentage: '82',
-        cgpa: '8.2'
+        school:
+          pick([
+            'Test Greenfield Public School',
+            'Test Sunrise Public School',
+            'Test Heritage Academy',
+            'Test Valley International School'
+          ]),
+        board:
+          class10Board,
+        year:
+          String(
+            year10
+          ),
+        passingDate:
+          `${year10}-${String(randomInt(4, 6)).padStart(2, '0')}-${String(randomInt(10, 28)).padStart(2, '0')}`,
+        ...class10Score
       },
       class12: {
-        school: 'Test Greenfield Senior Secondary School',
-        board: 'CBSE',
-        stream: 'Science',
-        year: String(year12),
-        passingDate: `${year12}-05-31`,
-        maxMarks: '500',
-        obtainedMarks: '420',
-        percentage: '84',
-        cgpa: '8.4'
+        school:
+          pick([
+            'Test Greenfield Senior Secondary School',
+            'Test Sunrise Senior School',
+            'Test Heritage Senior Academy',
+            'Test Valley Senior Secondary School'
+          ]),
+        board:
+          class12Board,
+        stream:
+          class12Stream,
+        year:
+          String(
+            year12
+          ),
+        passingDate:
+          `${year12}-${String(randomInt(4, 6)).padStart(2, '0')}-${String(randomInt(10, 28)).padStart(2, '0')}`,
+        ...class12Score
       },
       ug: {
-        institution: 'Test National Institute of Technology',
-        qualification: 'B.Tech',
-        stream: 'Computer Science',
-        startYear: String(ugStart),
-        endYear: String(ugEnd),
-        passingDate: `${ugEnd}-05-31`,
-        maxMarks: '1000',
-        obtainedMarks: '780',
-        percentage: '78',
-        cgpa: '7.8'
+        institution:
+          pick([
+            'Test National Institute of Technology',
+            'Test Institute of Engineering',
+            'Test Central College',
+            'Test Metropolitan University'
+          ]),
+        qualification:
+          ugQualification,
+        stream:
+          ugStream,
+        startYear:
+          String(
+            ugStart
+          ),
+        endYear:
+          String(
+            ugEnd
+          ),
+        passingDate:
+          `${ugEnd}-${String(randomInt(4, 7)).padStart(2, '0')}-${String(randomInt(10, 28)).padStart(2, '0')}`,
+        ...ugScore
       },
       pg: {
-        institution: 'Test Institute of Management',
-        qualification: 'MBA',
-        stream: 'Finance',
-        startYear: String(pgStart),
-        endYear: String(pgEnd),
-        passingDate: `${pgEnd}-05-31`,
-        maxMarks: '1000',
-        obtainedMarks: '800',
-        percentage: '80',
-        cgpa: '8.0'
+        institution:
+          pick([
+            'Test Institute of Management',
+            'Test School of Advanced Studies',
+            'Test Metropolitan University',
+            'Test National Business School'
+          ]),
+        qualification:
+          pgQualification,
+        stream:
+          pgStream,
+        startYear:
+          String(
+            Math.min(
+              pgStart,
+              pgEnd - 2
+            )
+          ),
+        endYear:
+          String(
+            pgEnd
+          ),
+        passingDate:
+          `${pgEnd}-${String(randomInt(4, 7)).padStart(2, '0')}-${String(randomInt(10, 28)).padStart(2, '0')}`,
+        ...pgScore
       }
     };
 
+    const familyIncome =
+      pick([
+        '3-5 Lakh',
+        '5-10 Lakh',
+        '10-15 Lakh'
+      ]);
+
+    const incomeValue =
+      familyIncome === '3-5 Lakh'
+        ? String(
+            randomInt(
+              320000,
+              490000
+            )
+          )
+        : familyIncome === '5-10 Lakh'
+          ? String(
+              randomInt(
+                520000,
+                980000
+              )
+            )
+          : String(
+              randomInt(
+                1050000,
+                1480000
+              )
+            );
+
+    const applicantOccupation =
+      pick([
+        'Student',
+        'Student',
+        'Student',
+        'Intern'
+      ]);
+
     return {
-      id: `QA-${token.slice(-8)}`,
+      id:
+        `QA-${token.slice(-8)}`,
       token,
-      seed: hash32(token),
-      title: 'Mr',
-      gender: 'Male',
-      firstName: applicantFirst,
-      middleName: 'Test Kumar',
-      lastName: prefixTestName(last),
-      fullName: applicantFull,
-      email: makeEmail(applicantFull),
-      mobile: makeMobile('90000', token),
-      alternateMobile: makeMobile('90100', token),
+      seed:
+        hash32(
+          `${token}|${Math.random()}`
+        ),
+      title,
+      gender,
+      firstName:
+        applicantFirst,
+      middleName:
+        prefixTestName(
+          middle
+        ),
+      lastName:
+        prefixTestName(
+          last
+        ),
+      fullName:
+        applicantFull,
+      email:
+        makeEmail(
+          applicantFull,
+          token,
+          true
+        ),
+      mobile:
+        makeMobile(
+          '',
+          token
+        ),
+      alternateMobile:
+        makeMobile(
+          '',
+          `${token}9`
+        ),
       dobISO,
-      age: String(new Date().getFullYear() - dobYear),
-      bloodGroup: 'B+',
-      maritalStatus: 'Single',
-      religion: 'HINDUISM',
-      nationality: 'Indian',
-      category: 'General',
-      aadhaar: `9999${digitsOnly(token).slice(-8).padStart(8, '0')}`,
-      pan: `TESTP${digitsOnly(token).slice(-4).padStart(4, '0')}T`,
+      age:
+        String(
+          currentYear -
+          dobYear
+        ),
+      bloodGroup:
+        pick([
+          'A+',
+          'B+',
+          'O+',
+          'AB+',
+          'A-',
+          'B-'
+        ]),
+      maritalStatus:
+        pick([
+          'Single',
+          'Unmarried'
+        ]),
+      religion:
+        pick([
+          'HINDUISM',
+          'CHRISTIANITY',
+          'ISLAM',
+          'SIKHISM'
+        ]),
+      nationality:
+        'Indian',
+      category:
+        pick([
+          'General',
+          'OBC',
+          'SC',
+          'ST'
+        ]),
+      aadhaar:
+        `9999${digitsOnly(token).slice(-8).padStart(8, String(randomInt(0, 9)))}`,
+      pan:
+        `TESTP${digitsOnly(token).slice(-4).padStart(4, '0')}T`,
       father: {
-        title: 'Mr',
-        name: fatherName,
-        email: makeEmail(fatherName),
-        mobile: makeMobile('91000', `${token}1`),
-        occupation: 'Business'
+        title:
+          'Mr',
+        name:
+          fatherName,
+        email:
+          makeEmail(
+            fatherName,
+            `${token}1`,
+            true
+          ),
+        mobile:
+          makeMobile(
+            '',
+            `${token}1`
+          ),
+        occupation:
+          pick([
+            'Business',
+            'Service',
+            'Engineer',
+            'Teacher'
+          ])
       },
       mother: {
-        title: 'Mrs',
-        name: motherName,
-        email: makeEmail(motherName),
-        mobile: makeMobile('92000', `${token}2`),
-        occupation: 'Homemaker'
+        title:
+          pick([
+            'Mrs',
+            'Ms'
+          ]),
+        name:
+          motherName,
+        email:
+          makeEmail(
+            motherName,
+            `${token}2`,
+            true
+          ),
+        mobile:
+          makeMobile(
+            '',
+            `${token}2`
+          ),
+        occupation:
+          pick([
+            'Homemaker',
+            'Teacher',
+            'Service',
+            'Business'
+          ])
       },
       guardian: {
-        title: 'Mr',
-        name: guardianName,
-        email: makeEmail(guardianName),
-        mobile: makeMobile('93000', `${token}3`),
-        occupation: 'Business',
-        relationship: 'Uncle'
+        title:
+          'Mr',
+        name:
+          guardianName,
+        email:
+          makeEmail(
+            guardianName,
+            `${token}3`,
+            true
+          ),
+        mobile:
+          makeMobile(
+            '',
+            `${token}3`
+          ),
+        occupation:
+          pick([
+            'Business',
+            'Service',
+            'Engineer',
+            'Teacher'
+          ]),
+        relationship:
+          pick([
+            'Uncle',
+            'Brother',
+            'Guardian'
+          ])
       },
       address: {
-        country: 'India',
-        state: 'Delhi',
-        district: 'Central Delhi',
-        city: 'New Delhi',
-        line1: `Test House ${randomInt(10, 99)}, Sector 18`,
-        line2: 'Test Locality',
-        pincode: '110001'
+        country:
+          'India',
+        state:
+          locationProfile.state,
+        district:
+          locationProfile.district,
+        city:
+          locationProfile.city,
+        line1:
+          `Test House ${randomInt(10, 999)}, ${pick(['Road', 'Lane', 'Block', 'Sector'])} ${randomInt(1, 40)}`,
+        line2:
+          `Test ${locationProfile.locality}`,
+        pincode:
+          locationProfile.pincode
       },
-      occupation: 'Student',
-      organization: 'Test Organization',
-      familyIncome: '5-10 Lakh',
-      place: 'New Delhi',
+      occupation:
+        applicantOccupation,
+      organization:
+        pick([
+          'Test Horizon Organization',
+          'Test Vertex Services',
+          'Test Nova Institute',
+          'Test Pioneer Group'
+        ]),
+      familyIncome,
+      incomeValue,
+      place:
+        locationProfile.city,
       academic,
-      paragraph: `This is synthetic test data generated for QA testing. Test reference ${token}.`,
-      genericText: 'Test Data'
+      paragraph:
+        `This is synthetic test data generated for QA testing. Test reference ${token}.`,
+      genericText:
+        `Test Data ${token.slice(-5)}`
     };
   };
 
@@ -5136,7 +5649,7 @@
     if (semantic === 'place') return { value: profile.place };
     if (semantic === 'nationality') return { value: profile.nationality };
     if (semantic === 'occupation') return { value: entity === 'father' ? profile.father.occupation : entity === 'mother' ? profile.mother.occupation : entity === 'guardian' ? profile.guardian.occupation : profile.occupation };
-    if (semantic === 'income') return { value: '500000' };
+    if (semantic === 'income') return { value: profile.incomeValue || String(randomInt(350000, 950000)) };
     if (semantic === 'organization') return { value: profile.organization };
     if (semantic === 'paragraph') return { value: profile.paragraph };
 
@@ -5358,7 +5871,7 @@
     if (/mother.*occupation|occupation.*mother/.test(key)) return { value: profile.mother.occupation };
     if (/guardian.*occupation|occupation.*guardian/.test(key)) return { value: profile.guardian.occupation };
     if (/occupation|profession/.test(key)) return { value: profile.occupation };
-    if (/annual income|family income|monthly income|\bincome\b/.test(key)) return { value: '500000' };
+    if (/annual income|family income|monthly income|\bincome\b/.test(key)) return { value: profile.incomeValue || String(randomInt(350000, 950000)) };
     if (/organization|organisation|company|employer/.test(key)) return { value: profile.organization };
 
     if (/remarks|comments|description|message|about yourself|statement|reason|purpose|objective/.test(key)) return { value: profile.paragraph };
@@ -5379,23 +5892,136 @@
     if (type === 'month') return { value: '2024-06' };
     if (type === 'time') return { value: '10:00' };
     if (type === 'datetime-local') return { value: `${formatTodayISO()}T10:00` };
-    if (type === 'url') return { value: 'https://example.com' };
+    if (type === 'url') {
+      return {
+        value:
+          `https://example.com/test-${String(profile.token || '').slice(-5)}`
+      };
+    }
+
     if (type === 'number') {
-      let v = 10;
-      const min = Number(el.min); const max = Number(el.max);
-      if (el.min !== '' && Number.isFinite(min)) v = Math.max(v, min);
-      if (el.max !== '' && Number.isFinite(max)) v = Math.min(v, max);
-      return { value: String(v) };
+      const min =
+        Number(
+          el.min
+        );
+
+      const max =
+        Number(
+          el.max
+        );
+
+      const lower =
+        el.min !== '' &&
+        Number.isFinite(
+          min
+        )
+          ? min
+          : 1;
+
+      const upper =
+        el.max !== '' &&
+        Number.isFinite(
+          max
+        )
+          ? max
+          : Math.max(
+              lower + 50,
+              100
+            );
+
+      const safeUpper =
+        Math.max(
+          lower,
+          Math.min(
+            upper,
+            lower + 10000
+          )
+        );
+
+      const v =
+        randomInt(
+          Math.ceil(
+            lower
+          ),
+          Math.max(
+            Math.ceil(
+              lower
+            ),
+            Math.floor(
+              safeUpper
+            )
+          )
+        );
+
+      return {
+        value:
+          String(
+            v
+          )
+      };
     }
 
     if (intelligence.constraints.numeric) {
-      let v = '10';
-      if (intelligence.constraints.min !== null) v = String(Math.max(Number(v), intelligence.constraints.min));
-      if (intelligence.constraints.max !== null) v = String(Math.min(Number(v), intelligence.constraints.max));
-      return { value: v };
+      const lower =
+        intelligence.constraints.min !== null
+          ? Number(
+              intelligence.constraints.min
+            )
+          : 1;
+
+      const upper =
+        intelligence.constraints.max !== null
+          ? Number(
+              intelligence.constraints.max
+            )
+          : Math.max(
+              lower + 50,
+              100
+            );
+
+      const value =
+        randomInt(
+          Math.ceil(
+            Number.isFinite(lower)
+              ? lower
+              : 1
+          ),
+          Math.max(
+            Math.ceil(
+              Number.isFinite(lower)
+                ? lower
+                : 1
+            ),
+            Math.floor(
+              Math.min(
+                Number.isFinite(upper)
+                  ? upper
+                  : 100,
+                (
+                  Number.isFinite(lower)
+                    ? lower
+                    : 1
+                ) +
+                10000
+              )
+            )
+          )
+        );
+
+      return {
+        value:
+          String(
+            value
+          )
+      };
     }
 
-    if (intelligence.constraints.alpha) return { value: 'Test Value' };
+    if (intelligence.constraints.alpha) {
+      return {
+        value:
+          `Test ${pick(['Alpha', 'Sample', 'Value', 'Entry', 'Record'])}`
+      };
+    }
     if (intelligence.constraints.email) return { value: profile.email };
     if (intelligence.constraints.dateLike) return { date: formatTodayISO() };
 
@@ -5443,17 +6069,61 @@
 
     const options = validOptions(select);
 
-    // V13 rule requested for Country only:
-    // choose the first real option exactly as the form presents it.
-    // This is deliberately NOT applied to State/District/City or other dependencies.
+    const seededOption =
+      () => {
+        if (!options.length) {
+          return null;
+        }
+
+        const seedText =
+          [
+            profile.seed ||
+              profile.token ||
+              Date.now(),
+            state.currentFormSignature ||
+              location.hostname,
+            fieldKey(select),
+            options.length
+          ].join('|');
+
+        return options[
+          hash32(
+            seedText
+          ) %
+          options.length
+        ] ||
+        options[0] ||
+        null;
+      };
+
     if (
       semantic === 'country' ||
       /\bcountry\b/.test(key)
     ) {
+      const india =
+        options.find(
+          option =>
+            /^(?:india|ind)$/i.test(
+              String(
+                option.text ||
+                option.value ||
+                ''
+              ).trim()
+            )
+        );
+
       return {
-        option: options[0] || null,
-        low: false,
-        reason: 'Country uses first valid option in displayed order'
+        option:
+          india ||
+          seededOption(),
+        low:
+          !india &&
+          intelligence.risk ===
+            'meaning-sensitive',
+        reason:
+          india
+            ? 'Country matched synthetic profile'
+            : 'Country selected from valid options for this synthetic applicant'
       };
     }
 
@@ -5467,7 +6137,15 @@
       const partial = options.find(o => normalize(o.text).includes(target) || target.includes(normalize(o.text)));
       if (partial) return { option: partial, low: intelligence.risk === 'meaning-sensitive' };
     }
-    return { option: options[0] || null, low: intelligence.risk === 'meaning-sensitive', reason: 'First valid option accepted for QA completion' };
+    return {
+      option:
+        seededOption(),
+      low:
+        intelligence.risk ===
+        'meaning-sensitive',
+      reason:
+        'A valid option was selected for this synthetic applicant'
+    };
   };
 
   const shouldFillField = el => {
@@ -6092,14 +6770,19 @@
           keyText
         )
       ) {
+        const targetGender =
+          normalize(
+            profile.gender ||
+            ''
+          );
+
         choice =
           labels.find(
             item =>
-              /\bmale\b/.test(
-                item.text
-              ) &&
-              !/female/.test(
-                item.text
+              item.text ===
+                targetGender ||
+              item.text.includes(
+                targetGender
               )
           );
       } else if (
@@ -6119,7 +6802,21 @@
           keyText
         )
       ) {
+        const targetMarital =
+          normalize(
+            profile.maritalStatus ||
+            ''
+          );
+
         choice =
+          labels.find(
+            item =>
+              item.text ===
+                targetMarital ||
+              item.text.includes(
+                targetMarital
+              )
+          ) ||
           labels.find(
             item =>
               /single|unmarried/.test(
@@ -6143,14 +6840,30 @@
         low = true;
       }
 
-      if (!choice) {
+      if (
+        !choice &&
+        labels.length
+      ) {
+        const seedText =
+          [
+            profile.seed ||
+              profile.token ||
+              Date.now(),
+            state.currentFormSignature ||
+              location.hostname,
+            fieldKey(
+              representative
+            ),
+            labels.length
+          ].join('|');
+
         choice =
-          labels.find(
-            item =>
-              /\bno\b/.test(
-                item.text
-              )
-          ) ||
+          labels[
+            hash32(
+              seedText
+            ) %
+            labels.length
+          ] ||
           labels[0];
 
         low = true;
@@ -6326,23 +7039,72 @@
       const popup = doc.getElementById(id);
       if (!popup) continue;
 
-      option = [...popup.querySelectorAll('[role="option"]')]
-        .find(node =>
-          isVisible(node) &&
-          node.getAttribute('aria-disabled') !== 'true' &&
-          normalize(node.innerText || node.textContent)
-        );
+      const popupOptions =
+        [...popup.querySelectorAll('[role="option"]')]
+          .filter(node =>
+            isVisible(node) &&
+            node.getAttribute('aria-disabled') !== 'true' &&
+            normalize(node.innerText || node.textContent)
+          );
+
+      if (
+        popupOptions.length
+      ) {
+        const seedText =
+          [
+            profile.seed ||
+              profile.token ||
+              Date.now(),
+            state.currentFormSignature ||
+              location.hostname,
+            fieldKey(el),
+            popupOptions.length
+          ].join('|');
+
+        option =
+          popupOptions[
+            hash32(
+              seedText
+            ) %
+            popupOptions.length
+          ];
+      }
 
       if (option) break;
     }
 
     if (!option) {
-      option = [...doc.querySelectorAll('[role="listbox"] [role="option"],[role="option"]')]
-        .find(node =>
-          isVisible(node) &&
-          node.getAttribute('aria-disabled') !== 'true' &&
-          normalize(node.innerText || node.textContent)
-        );
+      const visibleOptions =
+        [...doc.querySelectorAll('[role="listbox"] [role="option"],[role="option"]')]
+          .filter(node =>
+            isVisible(node) &&
+            node.getAttribute('aria-disabled') !== 'true' &&
+            normalize(node.innerText || node.textContent)
+          );
+
+      if (
+        visibleOptions.length
+      ) {
+        const seedText =
+          [
+            profile.seed ||
+              profile.token ||
+              Date.now(),
+            state.currentFormSignature ||
+              location.hostname,
+            fieldKey(el),
+            visibleOptions.length,
+            'aria'
+          ].join('|');
+
+        option =
+          visibleOptions[
+            hash32(
+              seedText
+            ) %
+            visibleOptions.length
+          ];
+      }
     }
 
     if (!option) {
@@ -11692,6 +12454,18 @@
 
       for (const doc of collectDocuments()) {
         for (const el of allFields(doc)) {
+          if (
+            !isFieldOperationallyVisible(
+              el
+            ) ||
+            el.disabled ||
+            isLikelyInternalField(
+              el
+            )
+          ) {
+            continue;
+          }
+
           const key =
             fieldKey(el);
 
@@ -11835,9 +12609,52 @@
     return restored;
   };
 
-  const newApplicant = () => {
-    profile = normalizeProfileTestNames(createProfile());
+  const refreshSyntheticProfile = (
+    {
+      announce = false,
+      reason = 'new-applicant'
+    } = {}
+  ) => {
+    profile =
+      normalizeProfileTestNames(
+        createProfile()
+      );
+
     saveProfile();
+
+    state.generatedValues.clear();
+    state.usedMobiles.clear();
+    state.usedEmails.clear();
+    state.sourceProfile = {};
+
+    state.panel?.refreshProfile();
+
+    debugEvent(
+      'synthetic-profile-refreshed',
+      {
+        reason,
+        profileId:
+          profile.id
+      }
+    );
+
+    if (announce) {
+      state.panel?.setStatus(
+        `New applicant created: ${profile.fullName}`
+      );
+    }
+
+    return profile;
+  };
+
+  const newApplicant = () => {
+    refreshSyntheticProfile({
+      announce:
+        true,
+      reason:
+        'manual-new-applicant'
+    });
+
     state.snapshots.clear();
     state.lastScriptValues.clear();
     state.stats.filled.clear();
@@ -11846,8 +12663,6 @@
     state.stats.errors.clear();
     state.stats.manual.clear();
     state.formModel.clear();
-    state.panel?.refreshProfile();
-    state.panel?.setStatus(`New applicant created: ${profile.fullName}`);
     state.panel?.setMode('ready');
     refreshCurrentStatus();
     setProgress(0, 'Ready');
@@ -12616,10 +13431,74 @@
         location.pathname
     };
 
+    let embeddedAccess =
+      null;
+
+    try {
+      const diagnostics =
+        embeddedFrameAccessDiagnostics();
+
+      const now =
+        Date.now();
+
+      embeddedAccess = {
+        ...diagnostics,
+        responsiveAgents:
+          [
+            ...bridge.agents.values()
+          ].map(
+            agent => ({
+              id:
+                agent.id,
+              hostname:
+                agent.hostname ||
+                '',
+              operational:
+                Number(
+                  agent.metrics?.operational ||
+                  0
+                ),
+              meaningful:
+                !!agent.metrics?.meaningful,
+              score:
+                Number(
+                  agent.metrics?.score ||
+                  0
+                ),
+              lastSeenMsAgo:
+                Math.max(
+                  0,
+                  now -
+                  Number(
+                    agent.lastSeen ||
+                    0
+                  )
+                )
+            })
+          ),
+        activeRemoteAgentId:
+          state.activeRemoteAgentId ||
+          null,
+        lastRemoteAgentId:
+          state.lastRemoteAgentId ||
+          null,
+        activeRemoteAction:
+          state.activeRemoteAction ||
+          null,
+        guideState:
+          readEmbeddedAccessGuideState()
+      };
+    } catch {
+      embeddedAccess = {
+        unavailable:
+          true
+      };
+    }
+
     const report = {
       reportVersion: 1,
       generatedBy:
-        'Smart FormSense V17.26.0',
+        'Smart FormSense V17.27.0',
       generatedAt:
         new Date().toISOString(),
       mode:
@@ -12649,6 +13528,7 @@
       stats,
       domSummary:
         debugDomSummary(),
+      embeddedAccess,
       academicPlan:
         state.academicPlan,
       lastRuntimeError:
@@ -12671,6 +13551,8 @@
       notes: [
         'Preserved/user-entered values are redacted by default.',
         'Values written by the script may be included because they are synthetic test data.',
+        'accepted/rejected counts represent active operational fields evaluated after the fill run.',
+        'embeddedAccess reports iframe discovery/liveness diagnostics; Smart FormSense cannot directly read Chrome extension permission settings.',
         'This report is intended for troubleshooting form detection, validation, dependency and control-adapter behavior.'
       ]
     };
@@ -12766,7 +13648,7 @@
           .slice(0, 60);
 
       const filename =
-        `Auto_Form_Filler_Auto_QA_Testing_V17_11_1_Debug_${host}_${stamp}.json`;
+        `Smart_FormSense_V${SCRIPT_VERSION.replace(/\./g, '_')}_Debug_${host}_${stamp}.json`;
 
       downloadTextFile(
         filename,
@@ -12784,7 +13666,7 @@
       return report;
     } catch (error) {
       console.error(
-        'Smart FormSense V17.26.0 debug export:',
+        'Smart FormSense V17.27.0 debug export:',
         error
       );
 
@@ -13871,7 +14753,7 @@
       product:
         'Smart FormSense',
       productVersion:
-        '17.26.0',
+        '17.27.0',
       generatedAt,
       auditType:
         'Non-destructive Form Readiness Audit',
@@ -14218,7 +15100,7 @@
   <div class="hero">
     <div class="brand">✦ SMART FORMSENSE QA</div>
     <h1>${esc(qa.page?.title || 'Form')}</h1>
-    <div class="meta">${esc(qa.page?.hostname || location.hostname || '')}<br>${esc(generated)} • v${esc(qa.productVersion || '17.26.0')}</div>
+    <div class="meta">${esc(qa.page?.hostname || location.hostname || '')}<br>${esc(generated)} • v${esc(qa.productVersion || '17.27.0')}</div>
     <div class="status ${statusClass}">${esc(status)}</div>
     <div class="overview">${esc(overview)}</div>
 
@@ -14437,7 +15319,7 @@
       product:
         'Smart FormSense',
       productVersion:
-        '17.26.0',
+        '17.27.0',
       generatedAt:
         new Date().toISOString(),
       purpose:
@@ -14532,7 +15414,7 @@
       return report;
     } catch (error) {
       console.error(
-        'Smart FormSense V17.26.0 QA debug export:',
+        'Smart FormSense V17.27.0 QA debug export:',
         error
       );
 
@@ -15232,6 +16114,33 @@
         return null;
       }
 
+      const local =
+        localFormMetrics();
+
+      if (
+        local.meaningful
+      ) {
+        state.panel?.hideAccessGuide?.();
+
+        if (force) {
+          state.panel?.setStatus(
+            `Form access is ready • ${local.operational} local field(s) available.`
+          );
+
+          state.panel?.notify?.(
+            '✓ Form access ready',
+            'Smart FormSense can access the active form on this page.',
+            'success'
+          );
+        }
+
+        return {
+          status:
+            'local-ready',
+          local
+        };
+      }
+
       const diagnostics =
         embeddedFrameAccessDiagnostics();
 
@@ -15251,7 +16160,8 @@
         return {
           status:
             'not-detected',
-          diagnostics
+          diagnostics,
+          local
         };
       }
 
@@ -15275,12 +16185,10 @@
         return {
           status:
             'dismissed',
-          diagnostics
+          diagnostics,
+          local
         };
       }
-
-      const local =
-        localFormMetrics();
 
       const agents =
         await discoverEmbeddedAgents({
@@ -15317,7 +16225,23 @@
           status:
             'ready',
           diagnostics,
+          local,
           agents
+        };
+      }
+
+      // Automatic startup checks are diagnostic only. They do not show a
+      // permission warning because many pages contain unrelated iframes or
+      // widgets that are not the form the user intends to fill.
+      if (
+        automatic &&
+        !force
+      ) {
+        return {
+          status:
+            'unconfirmed',
+          diagnostics,
+          local
         };
       }
 
@@ -15337,21 +16261,20 @@
       );
 
       state.panel?.setStatus(
-        'Embedded form detected, but Smart FormSense could not access it. Check Tampermonkey Site access.'
+        'Smart FormSense could not reach the embedded form. Check site access or reload/reopen the form if access is already enabled.'
       );
 
-      if (force) {
-        state.panel?.notify?.(
-          '⚠ Embedded form access required',
-          'Set Tampermonkey → Details → Site access → On all sites, reload the page, then recheck.',
-          'warning'
-        );
-      }
+      state.panel?.notify?.(
+        '⚠ Embedded form could not be reached',
+        'Check Tampermonkey Site access. If it is already On all sites, reload the page and reopen the form, then recheck.',
+        'warning'
+      );
 
       return {
         status:
           'blocked',
-        diagnostics
+        diagnostics,
+        local
       };
     };
 
@@ -15767,6 +16690,17 @@
       const authorization = beginAuthorizedAction(action, { source: extra.source || 'button' });
       if (!authorization) return;
 
+      if (
+        action === 'fill'
+      ) {
+        refreshSyntheticProfile({
+          announce:
+            false,
+          reason:
+            'fill-start'
+        });
+      }
+
       state.panel?.setStatus('Locating the active form...');
       let completed = false;
       let result = null;
@@ -15804,16 +16738,16 @@
 
             state.panel?.setProgress(
               0,
-              'Embedded form access required'
+              'Embedded form could not be reached'
             );
 
             state.panel?.setStatus(
-              'Smart FormSense found an embedded form, but Tampermonkey may not have permission to run inside it.'
+              'Smart FormSense found an embedded form but could not reach its frame. Check site access; if already enabled, reload/reopen the form and try again.'
             );
 
             state.panel?.notify?.(
-              '⚠ Embedded form access required',
-              'Set Tampermonkey → Details → Site access → On all sites, then reload this page.',
+              '⚠ Embedded form could not be reached',
+              'Check Tampermonkey Site access. If already On all sites, reload the page and reopen the form.',
               'warning'
             );
           } else {
@@ -17637,7 +18571,7 @@
       : {
           reportVersion: 7,
           product: 'Smart FormSense',
-          productVersion: '17.26.0',
+          productVersion: '17.27.0',
           generatedAt: new Date().toISOString(),
           auditType: 'Black-box Functional Form QA',
           page: {
@@ -17674,7 +18608,7 @@
     const cleanReason = String(reason || '').slice(0, 500);
     return {
       ...base,
-      productVersion: '17.26.0',
+      productVersion: '17.27.0',
       reportVersion: Math.max(5, Number(base.reportVersion || 0)),
       runState,
       incomplete: runState !== 'completed',
@@ -17825,7 +18759,7 @@
       return {
         reportVersion: 7,
         product: 'Smart FormSense',
-        productVersion: '17.26.0',
+        productVersion: '17.27.0',
         generatedAt,
         completedAt: ['completed', 'stopped', 'failed'].includes(runState) ? new Date().toISOString() : null,
         auditType: 'Black-box Functional Form QA',
@@ -20773,17 +21707,17 @@
           <div class="accessGuide" id="accessGuide" role="alert">
             <div class="accessGuideHead">
               <div>
-                <div class="accessGuideTitle">⚠ Embedded form access required</div>
+                <div class="accessGuideTitle">⚠ Embedded form could not be reached</div>
                 <div class="accessGuideDomain" id="accessGuideDomain"></div>
               </div>
               <button type="button" class="accessGuideClose" id="accessGuideClose" title="Dismiss">×</button>
             </div>
             <div class="accessGuideText">
-              Smart FormSense detected an embedded form, but it cannot currently run inside that frame. A common cause is Tampermonkey site access.
+              Smart FormSense detected an embedded form, but its frame did not respond. Tampermonkey site access is one common cause; the frame may also still be loading or be restricted by the website.
             </div>
             <div class="accessGuideSteps">
               <b>Chrome:</b> Extensions → Tampermonkey → Details → Site access → <b>On all sites</b><br>
-              Then reload this page, reopen the form if needed, and recheck access.
+              If this is already enabled, reload the page and reopen the form if needed. Then recheck access.
             </div>
             <div class="accessGuideActions">
               <button type="button" class="accessGuideRecheck" id="accessRecheckBtn">Recheck Access</button>
@@ -20811,7 +21745,7 @@
               <span class="creatorThoughtText" id="creatorThought"></span>
               <button class="thoughtShuffle" id="thoughtShuffle" type="button" title="Show another thought" aria-label="Show another thought">↻</button>
             </div>
-            <div class="creatorIdentity">❤️ <strong>Akash Singh</strong> · <span id="creatorEmail"></span> · <button class="versionTap" id="versionTap" type="button">v17.26.0</button></div>
+            <div class="creatorIdentity">❤️ <strong>Akash Singh</strong> · <span id="creatorEmail"></span> · <button class="versionTap" id="versionTap" type="button">v17.27.0</button></div>
           </div>
         </div>
       </div>
@@ -20951,7 +21885,7 @@
                 <div class="settingCard"><div class="settingRow"><div class="settingText"><b>Automatically check for updates</b><span>Checks at most once every 12 hours.</span></div><label class="switch"><input id="settingAutoCheckUpdates" type="checkbox"><span class="slider"></span></label></div></div>
                 <div class="settingCard">
                   <div class="settingText"><b>Version status</b><span id="updateStatusText">Checking update status…</span></div>
-                  <div class="updateStatus">Current: <strong id="currentVersionText">v17.26.0</strong> · Latest: <strong id="latestVersionText">—</strong></div>
+                  <div class="updateStatus">Current: <strong id="currentVersionText">v17.27.0</strong> · Latest: <strong id="latestVersionText">—</strong></div>
                   <div class="updateActions"><button class="settingsAction" id="checkUpdatesBtn" type="button">Check for updates</button><button class="settingsAction updateNow" id="updateNowSettings" type="button">Update Smart FormSense</button></div>
                 </div>
               </section>
