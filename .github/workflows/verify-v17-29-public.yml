@@ -1,0 +1,42 @@
+name: Verify Smart FormSense v17.29 public release
+
+on:
+  push:
+    branches:
+      - sfs-v17-29-minimize-position
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify Greasy Fork version
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import json
+          import time
+          import urllib.request
+
+          target = '17.29.0'
+          url = 'https://api.greasyfork.org/en/scripts/592133.json'
+          seen = ''
+
+          for _ in range(24):
+              try:
+                  with urllib.request.urlopen(url + '?t=' + str(int(time.time())), timeout=15) as response:
+                      data = json.load(response)
+                  seen = str(data.get('version') or '').strip()
+                  print('Greasy Fork version:', seen)
+                  if seen == target:
+                      raise SystemExit(0)
+              except SystemExit:
+                  raise
+              except Exception as exc:
+                  print('Verification attempt failed:', exc)
+              time.sleep(5)
+
+          raise SystemExit(f'Expected {target}, latest seen was {seen or "unknown"}')
+          PY
