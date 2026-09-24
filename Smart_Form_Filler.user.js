@@ -5623,6 +5623,111 @@
     return value;
   };
 
+  const stableSyntheticInt = (
+    el,
+    purpose,
+    min,
+    max
+  ) => {
+    const lower =
+      Math.ceil(
+        Number.isFinite(
+          Number(
+            min
+          )
+        )
+          ? Number(
+              min
+            )
+          : 0
+      );
+
+    const upper =
+      Math.max(
+        lower,
+        Math.floor(
+          Number.isFinite(
+            Number(
+              max
+            )
+          )
+            ? Number(
+                max
+              )
+            : lower
+        )
+      );
+
+    const span =
+      upper -
+      lower +
+      1;
+
+    const seedText =
+      [
+        profile.seed ||
+          profile.token ||
+          Date.now(),
+        state.currentFormSignature ||
+          location.hostname,
+        fieldKey(el),
+        purpose ||
+          'value'
+      ].join('|');
+
+    return lower +
+      (
+        hash32(
+          seedText
+        ) %
+        Math.max(
+          1,
+          span
+        )
+      );
+  };
+
+  const stableSyntheticPick = (
+    el,
+    purpose,
+    values
+  ) => {
+    const list =
+      Array.isArray(
+        values
+      )
+        ? values.filter(
+            value =>
+              value !== undefined &&
+              value !== null
+          )
+        : [];
+
+    if (!list.length) {
+      return null;
+    }
+
+    const seedText =
+      [
+        profile.seed ||
+          profile.token ||
+          Date.now(),
+        state.currentFormSignature ||
+          location.hostname,
+        fieldKey(el),
+        purpose ||
+          'choice',
+        list.length
+      ].join('|');
+
+    return list[
+      hash32(
+        seedText
+      ) %
+      list.length
+    ];
+  };
+
   const desiredTextValue = el => {
     const key = fieldContext(el);
     const type = normalize(el.type);
@@ -5939,7 +6044,9 @@
         );
 
       const v =
-        randomInt(
+        stableSyntheticInt(
+          el,
+          'number',
           Math.ceil(
             lower
           ),
@@ -5980,7 +6087,9 @@
             );
 
       const value =
-        randomInt(
+        stableSyntheticInt(
+          el,
+          'numeric-constraint',
           Math.ceil(
             Number.isFinite(lower)
               ? lower
@@ -6019,7 +6128,17 @@
     if (intelligence.constraints.alpha) {
       return {
         value:
-          `Test ${pick(['Alpha', 'Sample', 'Value', 'Entry', 'Record'])}`
+          `Test ${stableSyntheticPick(
+            el,
+            'alpha-text',
+            [
+              'Alpha',
+              'Sample',
+              'Value',
+              'Entry',
+              'Record'
+            ]
+          ) || 'Value'}`
       };
     }
     if (intelligence.constraints.email) return { value: profile.email };
@@ -13496,7 +13615,7 @@
     }
 
     const report = {
-      reportVersion: 1,
+      reportVersion: 2,
       generatedBy:
         'Smart FormSense V17.27.0',
       generatedAt:
