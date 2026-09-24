@@ -6,9 +6,9 @@ Smart FormSense is a Tampermonkey userscript for authorized form filling and bla
 
 ## Current production version
 
-**17.27.0**
+**17.28.0**
 
-v17.27.0 improves synthetic-data variety, embedded-form access guidance, and troubleshooting. Every newly started Fill action now creates a fresh synthetic applicant, while values stay stable during that one run so dependencies and validation remain consistent. Common profile fields, academic data, generic dropdown/radio choices, contact data, addresses, and unconstrained synthetic values now vary much more often. Access warnings no longer appear just because a page contains an unrelated iframe when a usable local form is already available, and automatic startup checks stay silent unless the user actually needs guidance.
+v17.28.0 hardens Smart FormSense UI isolation from host-site CSS. The userscript host now resets inherited document styling before mounting the Shadow DOM, establishes a fixed typography/line-height baseline, normalizes Smart FormSense controls, and protects its own positioning/scaling rules. This prevents websites with aggressive global font, line-height, text-transform, text-size-adjust, zoom, or generic element styling from stretching or visually changing the Smart FormSense panel.
 
 ## Core product rules
 
@@ -77,6 +77,10 @@ The Share menu supports:
 - **Microsoft Teams** — opens a prepared Teams chat/draft.
 
 Recipient email addresses are never sent to analytics.
+
+## UI isolation
+
+Smart FormSense mounts in a Shadow DOM and additionally resets/protects its host element and internal typography baseline. This keeps the panel visually consistent across sites with unusual global CSS.
 
 ## Updates
 
