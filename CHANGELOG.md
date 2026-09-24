@@ -2,6 +2,16 @@
 
 Recent notable public changes to Smart FormSense are documented here. The repository commit history remains the source of truth for intermediate historical patches that predate the current maintained release notes.
 
+## 17.29.0
+
+Minimized-panel visibility fix.
+
+- Fixed the v17.28 style-priority conflict that could cause Smart FormSense to disappear when minimized
+- Minimize now anchors the compact pill to the bottom-right using the same protected host-style priority as the UI isolation layer
+- Restore and panel/mini dragging use the same protected positioning path so they remain compatible with the host CSS reset
+- Added a small debug breadcrumb when the panel is minimized
+- No changes to phone formatting, form filling, QA, iframe handling, synthetic data, existing-value protection, or submission safety
+
 ## 17.28.0
 
 Host-site CSS isolation fix for the Smart FormSense interface.
