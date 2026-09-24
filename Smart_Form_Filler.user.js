@@ -1019,7 +1019,7 @@
 
     const title =
       gender === 'Female'
-        ? pick(['Ms', 'Mrs'])
+        ? 'Ms'
         : 'Mr';
 
     const middle =
