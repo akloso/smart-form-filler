@@ -2,6 +2,19 @@
 
 Recent notable public changes to Smart FormSense are documented here. The repository commit history remains the source of truth for intermediate historical patches that predate the current maintained release notes.
 
+## 17.28.0
+
+Host-site CSS isolation fix for the Smart FormSense interface.
+
+- Reset and protected the Smart FormSense host element before the Shadow DOM is mounted
+- Added a fixed Smart FormSense typography baseline so host-page font size and line height cannot stretch the panel
+- Neutralized inherited font style, letter/word spacing, text transform, text indent, text shadow, text alignment, direction, and text-size-adjust differences
+- Protected panel anchoring, z-index, box sizing, background, and zoom from aggressive host-page selectors
+- Normalized Smart FormSense button/input/select/textarea typography inside the Shadow DOM
+- Added explicit panel-level font-size and line-height baselines while preserving the existing compact design and all component-specific sizes
+- Added a lightweight debug breadcrumb for UI-isolation initialization
+- No changes to form detection, Fill/QA behavior, iframe bridge logic, synthetic data, existing-value protection, Stop, Undo, or final-submit/payment safety
+
 ## 17.27.0
 
 Synthetic-data variety, access-warning accuracy, and debug-report cleanup.
