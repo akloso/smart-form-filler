@@ -2,6 +2,24 @@
 
 Recent notable public changes to Smart FormSense are documented here. The repository commit history remains the source of truth for intermediate historical patches that predate the current maintained release notes.
 
+## 17.27.0
+
+Synthetic-data variety, access-warning accuracy, and debug-report cleanup.
+
+- Generates a fresh synthetic applicant for every newly started Fill action while keeping one run internally consistent
+- Expanded randomized synthetic names, gender/title, date of birth, contact details, addresses, demographics, parent/guardian details, organizations, academic institutions, qualifications, streams, marks, percentages, CGPA, and generic text
+- Synthetic Gmail addresses now carry a varying token suffix so repeated names still normally produce different addresses
+- Unknown/generic dropdowns, radio groups, and ARIA comboboxes now use a stable-per-applicant randomized valid choice rather than always selecting the first option
+- Kept semantic/dependency-aware choices prioritized so randomization does not intentionally break known field relationships
+- Removed the false-positive startup permission warning when a usable local form is already available
+- Automatic iframe access checks are now diagnostic-only when an iframe does not respond; user-facing guidance appears after an actual embedded-form access failure or manual Recheck
+- Access guidance now says that Tampermonkey site access is one possible cause and explicitly covers the case where **On all sites** is already enabled
+- Fixed the debug filename so it uses the actual runtime version instead of the old hard-coded V17_11_1 label
+- Added embedded-form access/liveness diagnostics to Debug Export
+- Fixed debug events whose event name could be overwritten by an input field's `type`
+- Accepted/rejected debug counts now only include active operational fields, avoiding hidden/template controls inflating the totals
+- Existing-value protection, explicit-action requirement, Stop, Undo, CAPTCHA/file-upload handling, and final-submit/payment safety remain unchanged
+
 ## 17.26.0
 
 Embedded-form access detection and onboarding guidance.
