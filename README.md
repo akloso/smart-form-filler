@@ -6,9 +6,9 @@ Smart FormSense is a Tampermonkey userscript for authorized form filling and bla
 
 ## Current production version
 
-**17.28.0**
+**17.29.0**
 
-v17.28.0 hardens Smart FormSense UI isolation from host-site CSS. The userscript host now resets inherited document styling before mounting the Shadow DOM, establishes a fixed typography/line-height baseline, normalizes Smart FormSense controls, and protects its own positioning/scaling rules. This prevents websites with aggressive global font, line-height, text-transform, text-size-adjust, zoom, or generic element styling from stretching or visually changing the Smart FormSense panel.
+v17.29.0 fixes the minimized-panel positioning regression introduced by the stronger v17.28 UI isolation. Runtime position changes for minimize, restore, and dragging now use the same protected style priority as the host isolation layer, so the minimized Smart FormSense pill remains anchored on-screen instead of disappearing.
 
 ## Core product rules
 
