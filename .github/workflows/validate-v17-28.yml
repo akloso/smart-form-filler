@@ -1,0 +1,48 @@
+name: Validate Smart FormSense v17.28
+
+on:
+  push:
+    branches:
+      - sfs-v17-28-ui-isolation
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: JavaScript syntax
+        run: node --check Smart_Form_Filler.user.js
+
+      - name: Version and product invariants
+        shell: bash
+        run: |
+          grep -Fq "// @version      17.28.0" Smart_Form_Filler.user.js
+          grep -Fq "const SCRIPT_VERSION = '17.28.0';" Smart_Form_Filler.user.js
+          grep -Fq "const BRIDGE_MARKER = '__STFF_V17_7_BRIDGE__';" Smart_Form_Filler.user.js
+          grep -Fq "const FEEDBACK_ENDPOINT = 'https://formspree.io/f/xbgjvoaw';" Smart_Form_Filler.user.js
+          grep -Fq "const POSTHOG_HOST = 'https://eu.i.posthog.com';" Smart_Form_Filler.user.js
+          grep -Fq "const UPDATE_INFO_URL = 'https://api.greasyfork.org/en/scripts/592133.json';" Smart_Form_Filler.user.js
+
+      - name: UI isolation checks
+        shell: bash
+        run: |
+          grep -Fq "const setHostStyle =" Smart_Form_Filler.user.js
+          grep -Fq "setHostStyle(" Smart_Form_Filler.user.js
+          grep -Fq ":host{" Smart_Form_Filler.user.js
+          grep -Fq "font-size:16px!important;" Smart_Form_Filler.user.js
+          grep -Fq "line-height:1.2!important;" Smart_Form_Filler.user.js
+          grep -Fq "text-size-adjust:100%!important;" Smart_Form_Filler.user.js
+          grep -Fq "font-size:16px;" Smart_Form_Filler.user.js
+          grep -Fq "line-height:1.2;" Smart_Form_Filler.user.js
+          grep -Fq "'panel-ui-isolation'" Smart_Form_Filler.user.js
+
+      - name: Documentation checks
+        shell: bash
+        run: |
+          grep -Fq "**17.28.0**" README.md
+          grep -Fq "## 17.28.0" CHANGELOG.md
