@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Smart FormSense
 // @namespace    smart-form-filler
-// @version      17.28.0
+// @version      17.29.0
 // @description  Automatic form filling and functional QA testing for authorized web-form validation, safe progression, embedded forms, and synthetic test data.
 // @author       Akash Singh
 // @match        *://*/*
@@ -54,7 +54,7 @@
   const SETTINGS_VERSION = 4;
   const ACTION_DEFAULT_TTL_MS = 5 * 60 * 1000;
   const PRODUCT_NAME = 'Smart FormSense';
-  const SCRIPT_VERSION = '17.28.0';
+  const SCRIPT_VERSION = '17.29.0';
   const FEEDBACK_ENDPOINT = 'https://formspree.io/f/xbgjvoaw';
   const UPDATE_INFO_URL = 'https://api.greasyfork.org/en/scripts/592133.json';
   const UPDATE_CHECK_KEY = 'STFF_UPDATE_CHECK_V1';
@@ -322,7 +322,7 @@
     );
 
     console.error(
-      `Smart FormSense V17.28.0 [${stage}]`,
+      `Smart FormSense V17.29.0 [${stage}]`,
       error
     );
 
@@ -13617,7 +13617,7 @@
     const report = {
       reportVersion: 2,
       generatedBy:
-        'Smart FormSense V17.28.0',
+        'Smart FormSense V17.29.0',
       generatedAt:
         new Date().toISOString(),
       mode:
@@ -13785,7 +13785,7 @@
       return report;
     } catch (error) {
       console.error(
-        'Smart FormSense V17.28.0 debug export:',
+        'Smart FormSense V17.29.0 debug export:',
         error
       );
 
@@ -14872,7 +14872,7 @@
       product:
         'Smart FormSense',
       productVersion:
-        '17.28.0',
+        '17.29.0',
       generatedAt,
       auditType:
         'Non-destructive Form Readiness Audit',
@@ -15219,7 +15219,7 @@
   <div class="hero">
     <div class="brand">✦ SMART FORMSENSE QA</div>
     <h1>${esc(qa.page?.title || 'Form')}</h1>
-    <div class="meta">${esc(qa.page?.hostname || location.hostname || '')}<br>${esc(generated)} • v${esc(qa.productVersion || '17.28.0')}</div>
+    <div class="meta">${esc(qa.page?.hostname || location.hostname || '')}<br>${esc(generated)} • v${esc(qa.productVersion || '17.29.0')}</div>
     <div class="status ${statusClass}">${esc(status)}</div>
     <div class="overview">${esc(overview)}</div>
 
@@ -15438,7 +15438,7 @@
       product:
         'Smart FormSense',
       productVersion:
-        '17.28.0',
+        '17.29.0',
       generatedAt:
         new Date().toISOString(),
       purpose:
@@ -15533,7 +15533,7 @@
       return report;
     } catch (error) {
       console.error(
-        'Smart FormSense V17.28.0 QA debug export:',
+        'Smart FormSense V17.29.0 QA debug export:',
         error
       );
 
@@ -18690,7 +18690,7 @@
       : {
           reportVersion: 7,
           product: 'Smart FormSense',
-          productVersion: '17.28.0',
+          productVersion: '17.29.0',
           generatedAt: new Date().toISOString(),
           auditType: 'Black-box Functional Form QA',
           page: {
@@ -18727,7 +18727,7 @@
     const cleanReason = String(reason || '').slice(0, 500);
     return {
       ...base,
-      productVersion: '17.28.0',
+      productVersion: '17.29.0',
       reportVersion: Math.max(5, Number(base.reportVersion || 0)),
       runState,
       incomplete: runState !== 'completed',
@@ -18878,7 +18878,7 @@
       return {
         reportVersion: 7,
         product: 'Smart FormSense',
-        productVersion: '17.28.0',
+        productVersion: '17.29.0',
         generatedAt,
         completedAt: ['completed', 'stopped', 'failed'].includes(runState) ? new Date().toISOString() : null,
         auditType: 'Black-box Functional Form QA',
@@ -21986,7 +21986,7 @@
               <span class="creatorThoughtText" id="creatorThought"></span>
               <button class="thoughtShuffle" id="thoughtShuffle" type="button" title="Show another thought" aria-label="Show another thought">↻</button>
             </div>
-            <div class="creatorIdentity">❤️ <strong>Akash Singh</strong> · <span id="creatorEmail"></span> · <button class="versionTap" id="versionTap" type="button">v17.28.0</button></div>
+            <div class="creatorIdentity">❤️ <strong>Akash Singh</strong> · <span id="creatorEmail"></span> · <button class="versionTap" id="versionTap" type="button">v17.29.0</button></div>
           </div>
         </div>
       </div>
@@ -22126,7 +22126,7 @@
                 <div class="settingCard"><div class="settingRow"><div class="settingText"><b>Automatically check for updates</b><span>Checks at most once every 12 hours.</span></div><label class="switch"><input id="settingAutoCheckUpdates" type="checkbox"><span class="slider"></span></label></div></div>
                 <div class="settingCard">
                   <div class="settingText"><b>Version status</b><span id="updateStatusText">Checking update status…</span></div>
-                  <div class="updateStatus">Current: <strong id="currentVersionText">v17.28.0</strong> · Latest: <strong id="latestVersionText">—</strong></div>
+                  <div class="updateStatus">Current: <strong id="currentVersionText">v17.29.0</strong> · Latest: <strong id="latestVersionText">—</strong></div>
                   <div class="updateActions"><button class="settingsAction" id="checkUpdatesBtn" type="button">Check for updates</button><button class="settingsAction updateNow" id="updateNowSettings" type="button">Update Smart FormSense</button></div>
                 </div>
               </section>
@@ -22865,10 +22865,10 @@
 
     $('resetAllSettings')?.addEventListener('click', () => {
       resetAllSettings();
-      host.style.left = 'auto';
-      host.style.top = 'auto';
-      host.style.right = '8px';
-      host.style.bottom = '8px';
+      setHostStyle('left', 'auto');
+      setHostStyle('top', 'auto');
+      setHostStyle('right', '8px');
+      setHostStyle('bottom', '8px');
       state.shortcutCaptureAction = null;
       renderSettings();
       setShortcutMessage('All settings reset to defaults.', 'ok');
@@ -22920,10 +22920,22 @@
     };
 
     const resetHostPosition = () => {
-      host.style.left = 'auto';
-      host.style.top = 'auto';
-      host.style.right = '8px';
-      host.style.bottom = '8px';
+      setHostStyle(
+        'left',
+        'auto'
+      );
+      setHostStyle(
+        'top',
+        'auto'
+      );
+      setHostStyle(
+        'right',
+        '8px'
+      );
+      setHostStyle(
+        'bottom',
+        '8px'
+      );
     };
 
     const minimize = () => {
@@ -22932,6 +22944,19 @@
       resetHostPosition();
       refs.panel.style.display = 'none';
       refs.mini.style.display = 'flex';
+
+      debugEvent(
+        'panel-minimized',
+        {
+          anchor:
+            'bottom-right',
+          right:
+            '8px',
+          bottom:
+            '8px'
+        }
+      );
+
       positionToastStack();
     };
 
@@ -22946,8 +22971,14 @@
           const rect = refs.panel.getBoundingClientRect();
           const left = clamp(parseFloat(host.style.left) || 6, 6, Math.max(6, window.innerWidth - Math.min(rect.width, window.innerWidth - 6)));
           const top = clamp(parseFloat(host.style.top) || 6, 6, Math.max(6, window.innerHeight - Math.min(rect.height, window.innerHeight - 6)));
-          host.style.left = `${left}px`;
-          host.style.top = `${top}px`;
+          setHostStyle(
+            'left',
+            `${left}px`
+          );
+          setHostStyle(
+            'top',
+            `${top}px`
+          );
         }
       });
     };
@@ -23249,7 +23280,10 @@
       },
       toggle() {
         if (host.style.display === 'none') {
-          host.style.display = 'block';
+          setHostStyle(
+            'display',
+            'block'
+          );
           resetHostPosition();
           restore();
         } else if (refs.panel.style.display === 'none') {
@@ -23517,7 +23551,10 @@
       resetHostPosition();
       refs.mini.style.display = 'none';
       refs.panel.style.display = 'block';
-      host.style.display = 'none';
+      setHostStyle(
+        'display',
+        'none'
+      );
     };
 
     $('minChoice').onclick = () => {
@@ -23584,10 +23621,22 @@
       if (Math.abs(dx) + Math.abs(dy) > 3) panelDrag.moved = true;
       if (!panelDrag.moved) return;
       const rect = refs.panel.getBoundingClientRect();
-      host.style.right = 'auto';
-      host.style.bottom = 'auto';
-      host.style.left = `${clamp(panelDrag.left + dx, 6, Math.max(6, window.innerWidth - Math.min(rect.width, window.innerWidth - 6)))}px`;
-      host.style.top = `${clamp(panelDrag.top + dy, 6, Math.max(6, window.innerHeight - 42))}px`;
+      setHostStyle(
+        'right',
+        'auto'
+      );
+      setHostStyle(
+        'bottom',
+        'auto'
+      );
+      setHostStyle(
+        'left',
+        `${clamp(panelDrag.left + dx, 6, Math.max(6, window.innerWidth - Math.min(rect.width, window.innerWidth - 6)))}px`
+      );
+      setHostStyle(
+        'top',
+        `${clamp(panelDrag.top + dy, 6, Math.max(6, window.innerHeight - 42))}px`
+      );
       positionToastStack();
     });
 
@@ -23627,10 +23676,22 @@
 
       if (!drag.moved) return;
 
-      host.style.right = 'auto';
-      host.style.bottom = 'auto';
-      host.style.left = `${clamp(drag.left + dx, 6, window.innerWidth - 190)}px`;
-      host.style.top = `${clamp(drag.top + dy, 6, window.innerHeight - 50)}px`;
+      setHostStyle(
+        'right',
+        'auto'
+      );
+      setHostStyle(
+        'bottom',
+        'auto'
+      );
+      setHostStyle(
+        'left',
+        `${clamp(drag.left + dx, 6, window.innerWidth - 190)}px`
+      );
+      setHostStyle(
+        'top',
+        `${clamp(drag.top + dy, 6, window.innerHeight - 50)}px`
+      );
       positionToastStack();
     });
 
