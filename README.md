@@ -6,9 +6,9 @@ Smart FormSense is a Tampermonkey userscript for authorized form filling and bla
 
 ## Current production version
 
-**17.26.0**
+**17.27.0**
 
-v17.26.0 adds proactive embedded-form access diagnostics and end-user guidance. Smart FormSense can now detect when a likely embedded form exists but its frame agent is unavailable, explain that Tampermonkey site access may be blocking the iframe, show the relevant embedded-form hostname when available, and provide an in-panel **Recheck Access** flow.
+v17.27.0 improves synthetic-data variety, embedded-form access guidance, and troubleshooting. Every newly started Fill action now creates a fresh synthetic applicant, while values stay stable during that one run so dependencies and validation remain consistent. Common profile fields, academic data, generic dropdown/radio choices, contact data, addresses, and unconstrained synthetic values now vary much more often. Access warnings no longer appear just because a page contains an unrelated iframe when a usable local form is already available, and automatic startup checks stay silent unless the user actually needs guidance.
 
 ## Core product rules
 
@@ -34,6 +34,7 @@ Smart FormSense understands the form and fills it with synthetic test data when 
 - Supports text inputs, dropdowns, radios, checkboxes, custom controls, repeating rows, academic/table layouts, delayed DOM updates, and dynamic/dependent fields.
 - Includes **Validate**, **Recheck & Correct**, **Stop**, **Undo**, **New Applicant**, navigation counters, and debug export.
 - Supports embedded and cross-origin forms through the existing top-page/child-frame bridge.
+- Starts each new **Fill** action with a fresh synthetic applicant. Synthetic values remain consistent within that run, but subsequent Fill actions intentionally vary names, contact details, addresses, demographics, academic data, generic values, and many option choices where safe.
 
 ### 🧪 Auto QA Testing
 
@@ -88,6 +89,10 @@ Smart FormSense checks the public Greasy Fork JSON API for the currently publish
 The source metadata `@updateURL` and `@downloadURL` also point to the public Greasy Fork userscript endpoint. Greasy Fork may rewrite these metadata keys when publishing, which is expected.
 
 When an update is available, **Update Smart FormSense** opens the Greasy Fork page. Complete the Tampermonkey update there, then reload any already-open form page so the new userscript version is injected.
+
+## Debug diagnostics
+
+Developer-mode debug exports now use the live Smart FormSense version in the filename and include embedded-form access diagnostics such as visible iframe counts, likely embedded-form hostnames, responsive frame agents, liveness age, active/last remote agent IDs, and the local access-guide state. Debug event names are protected from being overwritten by a field's HTML input type, and accepted/rejected counts now represent active operational fields rather than hidden/template DOM controls.
 
 ## Feedback
 
@@ -159,7 +164,7 @@ In Chrome:
 
 **Extensions → Tampermonkey → Details → Site access → On all sites**
 
-Smart FormSense cannot change this Chrome extension permission itself. If it detects a likely embedded form but cannot communicate with the iframe, it now shows an in-product access warning with **Recheck Access**.
+Smart FormSense cannot change or directly read this Chrome extension permission itself. If an embedded form cannot be reached during an actual action, Smart FormSense shows **Recheck Access** and explains both possibilities: site access may need enabling, or—if it is already **On all sites**—the page/form may need to be reloaded or reopened. Automatic startup checks remain silent when they cannot confirm an iframe, which avoids false warnings from unrelated page embeds.
 
 ## Usage
 
